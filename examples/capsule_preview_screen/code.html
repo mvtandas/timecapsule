@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Capsule Preview</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#019863",
+              "background-light": "#f5f8f7",
+              "background-dark": "#0f231c",
+            },
+            fontFamily: {
+              "display": ["Plus Jakarta Sans"]
+            },
+            borderRadius: { "DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px" },
+          },
+        },
+      }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-gray-800 dark:text-gray-200">
+<div class="relative flex h-auto min-h-screen w-full flex-col justify-between">
+<div class="flex-grow">
+<header class="flex items-center p-4">
+<button class="text-gray-800 dark:text-white">
+<span class="material-symbols-outlined"> close </span>
+</button>
+</header>
+<main class="px-4 pb-6">
+<h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Capsule Preview</h1>
+<div class="space-y-6">
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" for="capsule-title">Capsule Title</label>
+<input class="form-input w-full rounded-lg border-0 bg-primary/10 dark:bg-primary/20 p-4 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary" id="capsule-title" placeholder="My Awesome Capsule" type="text"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" for="capsule-description">Capsule Description</label>
+<textarea class="form-textarea w-full rounded-lg border-0 bg-primary/10 dark:bg-primary/20 p-4 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary" id="capsule-description" placeholder="A collection of memories from..." rows="4"></textarea>
+</div>
+</div>
+<h2 class="text-xl font-bold text-gray-900 dark:text-white mt-8 mb-4">Content</h2>
+<div class="grid grid-cols-2 grid-rows-2 gap-2 rounded-xl overflow-hidden aspect-[4/3]">
+<div class="col-span-2 row-span-1 bg-cover bg-center" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCjflFgH7frxxijjAfE_H4nbvDyMnE3zifvVJvYhC6LwPYv1KvJBsI7gajkAC2TlnZc_ZE8jhaUhN-KqsfqXiWuyhY09HBechDXh4lkxjpRGZTOSWqe72KEJmBKfMEPtCSqEJ_l_c6VTI8eYEsJtCJ0gh7r65YUBqBwMkYPT6pRw4bfsOQLqd8W3z1RRkfZb0S1slu8Rzff99K42FT8eNz3VBsKSxXYUWxeUFrNX87vryzdFM7x5KasmxJfBWDxnHKhaD6IUyZ78DtH");'></div>
+<div class="col-span-1 row-span-1 bg-cover bg-center" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDL2ksQtyzx427OwbrfzQt2Ze5n3NCTj0ok363GMsE6Xsyo9F-AIaJJ6GN6gaBfHejC4INsMIT0gudddF2My5fQAMH2VhAC551cR2o2LeCwhWEqF5Q7Vm2zk3T3tZcIqJL8oDzB0K9lqh-l0WB8nF56ik5IGjvHEUnGxAMUHA6dl622M_V94H1W_rqig1NoXzeMyzb0qMmChS-tcs8DTPfGl78Gv3T0vXXsLjSRV0ZWHI0nc6bPctxtpcv7MXhhSRrF2YyKjFzvUq7g");'></div>
+<div class="col-span-1 row-span-1 bg-cover bg-center" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDDQBkhpoBBmNUOYUkdlKA0A2HuPN4HXfOq1oAs-AbesSd3SQHYwbnI2AhqrmA4u2VquxXO0vHmtCWC084L7swH0MLsnu11OCiWymR7QB4JshRdIRz_lHuByJ7zKXTzecvk50xNgnVBIe0jsblBEIljWuJ30br2nr_hxtZ8lgOQ3wzhggjvgBXFiDd2tPFn_zdAzK7DL49dMKiebrlLQSxqkXyw3zJF3BzOrqwY9mlDWF1JAtWY7bI0U0T6zV-abIp4cKywr6BF8d8Z");'></div>
+</div>
+<h2 class="text-xl font-bold text-gray-900 dark:text-white mt-8 mb-4">Settings</h2>
+<div class="space-y-4">
+<div class="flex items-center gap-4 rounded-lg bg-primary/10 dark:bg-primary/20 p-4">
+<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/20 dark:bg-primary/30 text-primary">
+<span class="material-symbols-outlined"> calendar_month </span>
+</div>
+<div class="flex-grow">
+<p class="font-medium text-gray-800 dark:text-gray-200">Open Date</p>
+<p class="text-sm text-gray-600 dark:text-gray-400">July 20, 2024</p>
+</div>
+</div>
+<div class="flex items-center gap-4 rounded-lg bg-primary/10 dark:bg-primary/20 p-4">
+<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/20 dark:bg-primary/30 text-primary">
+<span class="material-symbols-outlined"> location_on </span>
+</div>
+<div class="flex-grow">
+<p class="font-medium text-gray-800 dark:text-gray-200">Location</p>
+<p class="text-sm text-gray-600 dark:text-gray-400">Rome, Italy</p>
+</div>
+</div>
+<div class="flex items-center gap-4 rounded-lg bg-primary/10 dark:bg-primary/20 p-4">
+<div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/20 dark:bg-primary/30 text-primary">
+<span class="material-symbols-outlined"> lock </span>
+</div>
+<div class="flex-grow">
+<p class="font-medium text-gray-800 dark:text-gray-200">Privacy</p>
+<p class="text-sm text-gray-600 dark:text-gray-400">Private</p>
+</div>
+</div>
+</div>
+</main>
+</div>
+<footer class="sticky bottom-0 bg-background-light dark:bg-background-dark/80 backdrop-blur-sm p-4 border-t border-primary/10 dark:border-primary/20">
+<div class="flex gap-3">
+<button class="flex-1 rounded-lg h-12 px-4 text-sm font-bold bg-primary/20 dark:bg-primary/30 text-primary">Edit</button>
+<button class="flex-1 rounded-lg h-12 px-4 text-sm font-bold bg-primary text-white">Save</button>
+</div>
+</footer>
+</div>
+
+</body></html>

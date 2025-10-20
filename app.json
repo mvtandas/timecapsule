@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "Time Capsule",
+    "slug": "time-capsule",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "timecapsule",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.timecapsule.app"
+    },
+    "android": {
+      "package": "com.timecapsule.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "timecapsule"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "platforms": ["ios", "android"],
+    "plugins": [
+      "expo-location",
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you add them to your time capsules."
+        }
+      ]
+    ],
+    "notification": {
+      "color": "#FAC638",
+      "iosDisplayInForeground": true
+    },
+    "extra": {}
+  }
+}

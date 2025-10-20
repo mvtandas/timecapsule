@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+
+<html class="" lang="en"><head>
+<meta charset="utf-8"/>
+<title>Time Capsule</title>
+<link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?display=swap&amp;family=Plus+Jakarta+Sans:wght@400;500;700;800" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>tailwind.config = {darkMode: "class", theme: {extend: {colors: {primary: "#FAC638", "background-light": "#f8f8f5", "background-dark": "#231e0f"}, fontFamily: {display: "Plus Jakarta Sans"}, borderRadius: {DEFAULT: "0.5rem", lg: "1rem", xl: "1.5rem", full: "9999px"}}}};</script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display">
+<div class="flex flex-col min-h-screen">
+<main class="flex-grow">
+<div class="relative h-80">
+<div class="absolute inset-0 bg-center bg-no-repeat bg-cover" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDdi7kJycziMYjHr4-9-S6Po6Hbd2F8iMhhL3WzpNzWWqJVvuPbbiqknlZbbUShHuJy7uDBuTN5XLuzSFd2C7nrAM6wrmlP7LKBcS9baluzVdF6RzJ0WTg0FylI6N9irSmVtVC8sgVsYH93rXkX5Spdp3z6TL5v_TgwAL2ku_2tcf6MUjpDwRFkD1pMYA2i32wP03URFpys3oCoznCCRagRtLnMaBUIBkaahKPu2QrL9LNOwYOGEuihfn-uf-M9KVc1YLh13lYrhrtN");'></div>
+<div class="absolute inset-0 bg-gradient-to-t from-background-dark via-background-dark/80 to-transparent"></div>
+</div>
+<div class="px-6 -mt-16 relative z-10 text-center text-white">
+<h1 class="text-3xl font-bold">Capture Moments, Share Memories</h1>
+<p class="mt-2 text-base text-white/80">
+                    Create digital capsules with memories, messages, and content linked to specific times and locations. Share your life's journey with loved ones.
+                </p>
+</div>
+<div class="px-6 pt-8 pb-4 space-y-4">
+<button class="w-full h-12 bg-primary text-white font-bold rounded-lg tracking-wide">
+                    Get Started
+                </button>
+<button class="w-full h-12 bg-primary/20 dark:bg-primary/30 text-primary font-bold rounded-lg tracking-wide">
+                    Log In
+                </button>
+</div>
+</main>
+<footer class="sticky bottom-0 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm border-t border-white/10 dark:border-white/10">
+<nav class="flex justify-around items-center h-20">
+<a class="flex flex-col items-center gap-1 text-primary" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="text-xs font-medium">Capsules</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-white/60 dark:text-white/60" href="#">
+<span class="material-symbols-outlined">add_box</span>
+<span class="text-xs font-medium">Create</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-white/60 dark:text-white/60" href="#">
+<span class="material-symbols-outlined">location_on</span>
+<span class="text-xs font-medium">Map</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-white/60 dark:text-white/60" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="text-xs font-medium">Profile</span>
+</a>
+</nav>
+<div class="h-safe-area-bottom bg-background-light/80 dark:bg-background-dark/80"></div>
+</footer>
+</div>
+</body></html>
