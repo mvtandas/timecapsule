@@ -25,7 +25,7 @@ import { CapsuleService } from '../../services/capsuleService';
 
 const { width, height } = Dimensions.get('window');
 
-type Screen = 'Dashboard' | 'Create' | 'Explore' | 'Profile';
+type Screen = 'Dashboard' | 'MyCapsules' | 'Create' | 'Explore' | 'Profile';
 
 interface CreateCapsuleScreenProps {
   onNavigate: (screen: Screen) => void;
@@ -505,6 +505,22 @@ const CreateCapsuleScreen = ({ onNavigate }: CreateCapsuleScreenProps) => {
         </TouchableOpacity>
       </View>
 
+      {/* Bottom Navigation */}
+      <View style={styles.bottomNav}>
+        <TouchableOpacity onPress={() => onNavigate('MyCapsules')} style={styles.navItem}>
+          <Ionicons name="albums" size={24} color="#94a3b8" />
+          <Text style={styles.navText}>My Capsules</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => onNavigate('Create')} style={styles.navItem}>
+          <Ionicons name="add-circle" size={24} color="#FAC638" />
+          <Text style={[styles.navText, styles.navTextActive]}>Create</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => onNavigate('Profile')} style={styles.navItem}>
+          <Ionicons name="person" size={24} color="#94a3b8" />
+          <Text style={styles.navText}>Profile</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Date Picker Modal */}
       <DatePickerModal
         visible={showDatePicker}
@@ -874,6 +890,29 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#64748b',
+  },
+  bottomNav: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'flex-start',
+    paddingTop: 8,
+    paddingBottom: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    backgroundColor: '#f8f8f5',
+  },
+  navItem: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  navText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#94a3b8',
+  },
+  navTextActive: {
+    fontWeight: '700',
+    color: '#FAC638',
   },
 });
 

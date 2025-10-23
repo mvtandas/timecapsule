@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/authStore';
 import { CapsuleService } from '../../services/capsuleService';
 
-type Screen = 'Dashboard' | 'Create' | 'Explore' | 'Profile';
+type Screen = 'Dashboard' | 'MyCapsules' | 'Create' | 'Explore' | 'Profile';
 
 interface ProfileScreenProps {
   onNavigate: (screen: Screen) => void;
@@ -210,17 +210,13 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
 
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
-        <TouchableOpacity onPress={() => onNavigate('Dashboard')} style={styles.navItem}>
-          <Ionicons name="file-tray-full-outline" size={24} color="#94a3b8" />
-          <Text style={styles.navText}>Capsules</Text>
+        <TouchableOpacity onPress={() => onNavigate('MyCapsules')} style={styles.navItem}>
+          <Ionicons name="albums" size={24} color="#94a3b8" />
+          <Text style={styles.navText}>My Capsules</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => onNavigate('Create')} style={styles.navItem}>
-          <Ionicons name="add-circle-outline" size={24} color="#94a3b8" />
+          <Ionicons name="add-circle" size={24} color="#94a3b8" />
           <Text style={styles.navText}>Create</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => onNavigate('Explore')} style={styles.navItem}>
-          <Ionicons name="map-outline" size={24} color="#94a3b8" />
-          <Text style={styles.navText}>Map</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => onNavigate('Profile')} style={styles.navItem}>
           <Ionicons name="person" size={24} color="#FAC638" />

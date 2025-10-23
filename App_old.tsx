@@ -7,12 +7,11 @@ import WelcomeScreen from './src/screens/auth/WelcomeScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import SignupScreen from './src/screens/auth/SignupScreen';
 import DashboardScreen from './src/screens/dashboard/DashboardScreen';
-import MyCapsulesScreen from './src/screens/dashboard/MyCapsulesScreen';
 import CreateCapsuleScreen from './src/screens/capsules/CreateCapsuleScreen';
 import ExploreScreen from './src/screens/explore/ExploreScreen';
 import ProfileScreen from './src/screens/profile/ProfileScreen';
 
-type Screen = 'Welcome' | 'Login' | 'Signup' | 'Dashboard' | 'MyCapsules' | 'Create' | 'Explore' | 'Profile';
+type Screen = 'Welcome' | 'Login' | 'Signup' | 'Dashboard' | 'Create' | 'Explore' | 'Profile';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('Welcome');
@@ -29,7 +28,7 @@ export default function App() {
       setCurrentScreen('Dashboard');
     }
     // If user logs out, go to Welcome
-    if (!user && !loading && (currentScreen === 'Dashboard' || currentScreen === 'MyCapsules' || currentScreen === 'Create' || currentScreen === 'Explore' || currentScreen === 'Profile')) {
+    if (!user && !loading && (currentScreen === 'Dashboard' || currentScreen === 'Create' || currentScreen === 'Explore' || currentScreen === 'Profile')) {
       setCurrentScreen('Welcome');
     }
   }, [user, loading]);
@@ -62,7 +61,6 @@ export default function App() {
       {currentScreen === 'Login' && <LoginScreen onNavigate={navigate} onLogin={handleLogin} />}
       {currentScreen === 'Signup' && <SignupScreen onNavigate={navigate} onSignup={handleLogin} />}
       {currentScreen === 'Dashboard' && <DashboardScreen onNavigate={navigate} onLogout={handleLogout} />}
-      {currentScreen === 'MyCapsules' && <MyCapsulesScreen onNavigate={navigate} onLogout={handleLogout} />}
       {currentScreen === 'Create' && <CreateCapsuleScreen onNavigate={navigate} />}
       {currentScreen === 'Explore' && <ExploreScreen onNavigate={navigate} />}
       {currentScreen === 'Profile' && <ProfileScreen onNavigate={navigate} onLogout={handleLogout} />}
