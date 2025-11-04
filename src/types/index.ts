@@ -2,8 +2,18 @@ export interface User {
   id: string;
   email: string;
   display_name?: string;
+  username?: string;
+  phone_number?: string;
   avatar_url?: string;
   created_at: string;
+}
+
+export interface Friend {
+  id: string;
+  name: string;
+  username: string;
+  avatar_url?: string;
+  friends_since: string;
 }
 
 export interface Capsule {

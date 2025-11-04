@@ -159,6 +159,75 @@ export class MediaService {
     }
   }
 
+  // Upload profile avatar (optimized for profile photos)
+  static async uploadAvatar(
+    imageUri: string,
+    userId: string
+  ): Promise<{ url: string | null; error: any }> {
+    try {
+      console.log('Starting avatar upload for user:', userId);
+      console.log('Image URI:', imageUri);
+
+      const fileExt = imageUri.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `avatar-${userId}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      // Check if FileSystem is available
+      if (!FileSystem || !FileSystem.readAsStringAsync) {
+        throw new Error('FileSystem module not available');
+      }
+
+      // Read file as base64
+      console.log('Reading file as base64...');
+      const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: 'base64',
+      });
+
+      if (!base64) {
+        throw new Error('Failed to read file as base64');
+      }
+
+      console.log('Base64 length:', base64.length);
+
+      // Convert base64 to array buffer
+      const arrayBuffer = this.base64ToArrayBuffer(base64);
+      console.log('Array buffer size:', arrayBuffer.byteLength);
+
+      // Upload to Supabase Storage
+      console.log('Uploading to Supabase...');
+      const { data, error } = await supabase.storage
+        .from('capsule-media')
+        .upload(filePath, arrayBuffer, {
+          contentType: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`,
+          upsert: true,
+        });
+
+      if (error) {
+        console.error('Supabase upload error:', error);
+        throw error;
+      }
+
+      console.log('Upload successful:', data);
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('capsule-media')
+        .getPublicUrl(filePath);
+
+      console.log('Public URL:', publicUrl);
+
+      return { url: publicUrl, error: null };
+    } catch (error: any) {
+      console.error('Error uploading avatar:', error);
+      console.error('Error details:', {
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name,
+      });
+      return { url: null, error };
+    }
+  }
+
   // Delete file from Supabase Storage
   static async deleteFile(
     url: string,

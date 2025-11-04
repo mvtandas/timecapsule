@@ -1,5 +1,62 @@
 # Supabase Setup Guide
 
+## ⚠️ IMPORTANT: Profile Photo Upload Fix
+
+### Storage Bucket Configuration
+
+To enable profile photo uploads, ensure your Supabase Storage is properly configured:
+
+#### 1. Create Storage Bucket (if not exists)
+```sql
+-- In Supabase Dashboard → Storage
+-- Create a bucket named: capsule-media
+-- Make it PUBLIC
+```
+
+#### 2. Set Storage Policies
+```sql
+-- Allow authenticated users to upload to avatars folder
+CREATE POLICY "Authenticated users can upload avatars"
+ON storage.objects
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'capsule-media' 
+  AND (storage.foldername(name))[1] = 'avatars'
+);
+
+-- Allow anyone to view avatar files
+CREATE POLICY "Anyone can view avatars"
+ON storage.objects
+FOR SELECT
+TO public
+USING (bucket_id = 'capsule-media');
+
+-- Allow users to update their own avatars
+CREATE POLICY "Users can update own avatars"
+ON storage.objects
+FOR UPDATE
+TO authenticated
+USING (bucket_id = 'capsule-media' AND (storage.foldername(name))[1] = 'avatars')
+WITH CHECK (bucket_id = 'capsule-media' AND (storage.foldername(name))[1] = 'avatars');
+
+-- Allow users to delete their own avatars
+CREATE POLICY "Users can delete own avatars"
+ON storage.objects
+FOR DELETE
+TO authenticated
+USING (bucket_id = 'capsule-media' AND (storage.foldername(name))[1] = 'avatars');
+```
+
+#### 3. Verify Bucket Settings
+- Go to Supabase Dashboard → Storage → capsule-media
+- Ensure "Public bucket" is enabled
+- File size limit should be at least 5MB
+
+---
+
+# Supabase Setup Guide
+
 ## 1. Create a Supabase Project
 
 1. Go to [https://app.supabase.com](https://app.supabase.com)

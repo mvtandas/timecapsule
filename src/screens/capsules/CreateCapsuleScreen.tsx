@@ -22,6 +22,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import DatePickerModal from '../../components/DatePickerModal';
 import { CapsuleService } from '../../services/capsuleService';
+import { Friend } from '../../types';
 
 const { width, height } = Dimensions.get('window');
 
@@ -45,7 +46,51 @@ const CreateCapsuleScreen = ({ onNavigate }: CreateCapsuleScreenProps) => {
     openDate: null as Date | null,
     location: null as { lat: number; lng: number; address: string } | null,
     media: [] as any[],
+    isPublic: true,
+    allowedUsers: [] as string[],
   });
+
+  const [newUsername, setNewUsername] = useState('');
+  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+  
+  // Mock friends data - sorted by interaction frequency
+  const [friends] = useState<Friend[]>([
+    {
+      id: '1',
+      name: 'Elif Yılmaz',
+      username: 'elifyilmaz',
+      avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
+      friends_since: '2021',
+    },
+    {
+      id: '2',
+      name: 'Ahmet Demir',
+      username: 'ahmetdemir',
+      avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+      friends_since: '2022',
+    },
+    {
+      id: '3',
+      name: 'Zeynep Kaya',
+      username: 'zeynepkaya',
+      avatar_url: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400',
+      friends_since: '2020',
+    },
+    {
+      id: '4',
+      name: 'Mehmet Öztürk',
+      username: 'mehmetozturk',
+      avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
+      friends_since: '2023',
+    },
+    {
+      id: '5',
+      name: 'Ayşe Şahin',
+      username: 'aysesahin',
+      avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400',
+      friends_since: '2021',
+    },
+  ]);
 
   useEffect(() => {
     // Get current location on mount
@@ -337,8 +382,11 @@ const CreateCapsuleScreen = ({ onNavigate }: CreateCapsuleScreenProps) => {
             </View>
 
             {/* Location Selection */}
-            <Text style={styles.stepSubtitle} style={{ marginTop: 24, marginBottom: 16 }}>
-              Where is this memory?
+            <Text style={[styles.stepTitle, styles.sectionTitle]}>
+              Where is the Memory?
+            </Text>
+            <Text style={styles.stepSubtitle}>
+              Choose the location where this capsule should be accessible
             </Text>
             
             <TouchableOpacity 
@@ -356,6 +404,193 @@ const CreateCapsuleScreen = ({ onNavigate }: CreateCapsuleScreenProps) => {
               </View>
               <Ionicons name="map-outline" size={20} color="#94a3b8" />
             </TouchableOpacity>
+
+            {/* Access Control Section */}
+            <View style={styles.accessControlSection}>
+              <Text style={styles.subsectionTitle}>
+                Who can open this capsule?
+              </Text>
+
+              {/* Public/Private Toggle */}
+              <TouchableOpacity 
+                style={styles.toggleContainer}
+                onPress={() => setCapsuleData({ ...capsuleData, isPublic: !capsuleData.isPublic })}
+                activeOpacity={0.7}
+              >
+                <View style={styles.toggleInfo}>
+                  <Ionicons 
+                    name={capsuleData.isPublic ? "globe-outline" : "lock-closed-outline"} 
+                    size={24} 
+                    color="#FAC638" 
+                  />
+                  <View style={styles.toggleTextContainer}>
+                    <Text style={styles.toggleTitle}>
+                      {capsuleData.isPublic ? 'Public Capsule' : 'Private Capsule'}
+                    </Text>
+                    <Text style={styles.toggleSubtext}>
+                      {capsuleData.isPublic 
+                        ? 'Anyone can open after unlock time' 
+                        : 'Only selected people can open'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={[styles.switchToggle, capsuleData.isPublic && styles.switchToggleActive]}>
+                  <View style={[styles.switchThumb, capsuleData.isPublic && styles.switchThumbActive]} />
+                </View>
+              </TouchableOpacity>
+
+              {/* Authorized Users List - Only show when private */}
+              {!capsuleData.isPublic && (
+                <>
+                  {/* Username Input */}
+                  <View style={styles.addContactContainer}>
+                    <View style={styles.usernameInputContainer}>
+                      <Ionicons name="at-outline" size={20} color="#94a3b8" style={styles.usernameIcon} />
+                      <TextInput
+                        style={styles.usernameInput}
+                        value={newUsername}
+                        onChangeText={setNewUsername}
+                        placeholder="Enter username"
+                        placeholderTextColor="#94a3b8"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                    </View>
+                    <TouchableOpacity
+                      style={styles.addButton}
+                      onPress={() => {
+                        if (newUsername.trim()) {
+                          const username = newUsername.trim().toLowerCase();
+                          if (!capsuleData.allowedUsers.includes(username)) {
+                            setCapsuleData({
+                              ...capsuleData,
+                              allowedUsers: [...capsuleData.allowedUsers, username],
+                            });
+                          }
+                          setNewUsername('');
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="add-circle" size={24} color="#FAC638" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Friend Picker - Horizontal Scrollable */}
+                  <View style={styles.friendPickerSection}>
+                    <Text style={styles.friendPickerTitle}>Quick Select Friends</Text>
+                    <ScrollView 
+                      horizontal 
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.friendPickerScrollContent}
+                    >
+                      {friends.map((friend) => {
+                        const isSelected = selectedFriends.includes(friend.username);
+                        return (
+                          <TouchableOpacity
+                            key={friend.id}
+                            style={styles.friendPickerItem}
+                            onPress={() => {
+                              let newSelectedFriends: string[];
+                              let newAllowedUsers: string[];
+                              
+                              if (isSelected) {
+                                // Deselect friend
+                                newSelectedFriends = selectedFriends.filter(u => u !== friend.username);
+                                newAllowedUsers = capsuleData.allowedUsers.filter(u => u !== friend.username);
+                              } else {
+                                // Select friend
+                                newSelectedFriends = [...selectedFriends, friend.username];
+                                newAllowedUsers = capsuleData.allowedUsers.includes(friend.username)
+                                  ? capsuleData.allowedUsers
+                                  : [...capsuleData.allowedUsers, friend.username];
+                              }
+                              
+                              setSelectedFriends(newSelectedFriends);
+                              setCapsuleData({
+                                ...capsuleData,
+                                allowedUsers: newAllowedUsers,
+                              });
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[
+                              styles.friendPickerAvatar,
+                              isSelected && styles.friendPickerAvatarSelected
+                            ]}>
+                              {friend.avatar_url ? (
+                                <Image source={{ uri: friend.avatar_url }} style={styles.friendPickerAvatarImage} />
+                              ) : (
+                                <View style={styles.friendPickerAvatarPlaceholder}>
+                                  <Ionicons name="person" size={32} color="#94a3b8" />
+                                </View>
+                              )}
+                              {isSelected && (
+                                <View style={styles.selectionCheckmark}>
+                                  <Ionicons name="checkmark-circle" size={24} color="#FAC638" />
+                                </View>
+                              )}
+                            </View>
+                            <Text style={styles.friendPickerName} numberOfLines={1}>
+                              {friend.name.split(' ')[0]}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+
+                  {/* List of Authorized Users */}
+                  {capsuleData.allowedUsers.length > 0 && (
+                    <View style={styles.authorizedUsersList}>
+                      <Text style={styles.authorizedUsersTitle}>
+                        Selected Users ({capsuleData.allowedUsers.length})
+                      </Text>
+                      {capsuleData.allowedUsers.map((username, index) => {
+                        const friend = friends.find(f => f.username === username);
+                        return (
+                          <View key={index} style={styles.userItem}>
+                            <View style={styles.userAvatar}>
+                              {friend?.avatar_url ? (
+                                <Image source={{ uri: friend.avatar_url }} style={styles.userAvatarImage} />
+                              ) : (
+                                <Ionicons name="person" size={20} color="#64748b" />
+                              )}
+                            </View>
+                            <View style={styles.userInfo}>
+                              <Text style={styles.userName}>
+                                {friend?.name || username}
+                              </Text>
+                              <Text style={styles.userUsername}>@{username}</Text>
+                            </View>
+                            <TouchableOpacity
+                              onPress={() => {
+                                const newUsers = capsuleData.allowedUsers.filter(u => u !== username);
+                                const newSelectedFriends = selectedFriends.filter(u => u !== username);
+                                setSelectedFriends(newSelectedFriends);
+                                setCapsuleData({ ...capsuleData, allowedUsers: newUsers });
+                              }}
+                              style={styles.removeButton}
+                            >
+                              <Ionicons name="close-circle" size={20} color="#FF6B6B" />
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+
+                  {capsuleData.allowedUsers.length === 0 && (
+                    <View style={styles.emptyState}>
+                      <Ionicons name="people-outline" size={32} color="#cbd5e1" />
+                      <Text style={styles.emptyStateText}>
+                        No users selected yet. Select friends or enter a username to share with specific people.
+                      </Text>
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
           </View>
         );
 
@@ -478,6 +713,11 @@ const CreateCapsuleScreen = ({ onNavigate }: CreateCapsuleScreenProps) => {
         style={styles.content} 
         contentContainerStyle={styles.contentContainer}
         keyboardShouldPersistTaps="handled"
+        scrollEventThrottle={16}
+        decelerationRate="normal"
+        bounces={true}
+        overScrollMode="auto"
+        showsVerticalScrollIndicator={true}
       >
         {renderStep()}
       </ScrollView>
@@ -505,21 +745,6 @@ const CreateCapsuleScreen = ({ onNavigate }: CreateCapsuleScreenProps) => {
         </TouchableOpacity>
       </View>
 
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity onPress={() => onNavigate('MyCapsules')} style={styles.navItem}>
-          <Ionicons name="albums" size={24} color="#94a3b8" />
-          <Text style={styles.navText}>My Capsules</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => onNavigate('Create')} style={styles.navItem}>
-          <Ionicons name="add-circle" size={24} color="#FAC638" />
-          <Text style={[styles.navText, styles.navTextActive]}>Create</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => onNavigate('Profile')} style={styles.navItem}>
-          <Ionicons name="person" size={24} color="#94a3b8" />
-          <Text style={styles.navText}>Profile</Text>
-        </TouchableOpacity>
-      </View>
 
       {/* Date Picker Modal */}
       <DatePickerModal
@@ -670,10 +895,20 @@ const styles = StyleSheet.create({
     color: '#1e293b',
     marginBottom: 8,
   },
+  sectionTitle: {
+    marginTop: 32,
+    marginBottom: 8,
+  },
   stepSubtitle: {
     fontSize: 16,
     color: '#64748b',
     marginBottom: 32,
+  },
+  subsectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 16,
   },
   input: {
     backgroundColor: 'white',
@@ -741,6 +976,217 @@ const styles = StyleSheet.create({
   locationSubtext: {
     fontSize: 12,
     color: '#94a3b8',
+  },
+  // Access Control Styles
+  accessControlSection: {
+    marginTop: 32,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  toggleInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  toggleTextContainer: {
+    flex: 1,
+  },
+  toggleTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  toggleSubtext: {
+    fontSize: 13,
+    color: '#64748b',
+  },
+  switchToggle: {
+    width: 50,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#cbd5e1',
+    padding: 2,
+    justifyContent: 'center',
+  },
+  switchToggleActive: {
+    backgroundColor: '#FAC638',
+  },
+  switchThumb: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  switchThumbActive: {
+    alignSelf: 'flex-end',
+  },
+  addContactContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  usernameInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  usernameIcon: {
+    marginRight: 12,
+  },
+  usernameInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1e293b',
+  },
+  addButton: {
+    width: 50,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FAC63820',
+    borderRadius: 12,
+  },
+  // Friend Picker Styles
+  friendPickerSection: {
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  friendPickerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 12,
+  },
+  friendPickerScrollContent: {
+    paddingRight: 20,
+  },
+  friendPickerItem: {
+    alignItems: 'center',
+    marginRight: 16,
+    width: 72,
+  },
+  friendPickerAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    marginBottom: 8,
+    borderWidth: 3,
+    borderColor: '#e2e8f0',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  friendPickerAvatarSelected: {
+    borderColor: '#FAC638',
+    borderWidth: 3,
+  },
+  friendPickerAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  friendPickerAvatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectionCheckmark: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: 'white',
+    borderRadius: 12,
+  },
+  friendPickerName: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  authorizedUsersList: {
+    gap: 12,
+    marginTop: 16,
+  },
+  authorizedUsersTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 8,
+  },
+  userItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 12,
+    gap: 12,
+  },
+  userAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  userAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  userUsername: {
+    fontSize: 13,
+    color: '#64748b',
+  },
+  removeButton: {
+    padding: 4,
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: 32,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    borderStyle: 'dashed',
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#94a3b8',
+    textAlign: 'center',
+    marginTop: 12,
+    lineHeight: 20,
+    paddingHorizontal: 16,
   },
   presetsContainer: {
     marginTop: 8,
@@ -890,29 +1336,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#64748b',
-  },
-  bottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'flex-start',
-    paddingTop: 8,
-    paddingBottom: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    backgroundColor: '#f8f8f5',
-  },
-  navItem: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  navText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#94a3b8',
-  },
-  navTextActive: {
-    fontWeight: '700',
-    color: '#FAC638',
   },
 });
 
