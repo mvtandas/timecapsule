@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, RefreshControl, TextInput, Dimensions, Platform, Animated, PanResponder, Modal, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, RefreshControl, TextInput, Dimensions, Platform, Animated, PanResponder, Modal, Image, KeyboardAvoidingView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { BlurView } from 'expo-blur';
 import { CapsuleService } from '../../services/capsuleService';
 import { CapsuleIcon } from '../../components/common/CapsuleIcon';
-import { Friend } from '../../types';
 
 interface DashboardScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -23,51 +22,12 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
     latitudeDelta: 0.01,
     longitudeDelta: 0.01,
   });
+  const [activeTab, setActiveTab] = useState<'top' | 'recent'>('recent');
   const [capsules, setCapsules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCapsule, setSelectedCapsule] = useState<any>(null);
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [lastTappedCapsule, setLastTappedCapsule] = useState<string | null>(null);
-  const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
-
-  // Mock friends data
-  const [friends, setFriends] = useState<Friend[]>([
-    {
-      id: '1',
-      name: 'Elif Yılmaz',
-      username: 'elifyilmaz',
-      avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
-      friends_since: '2021',
-    },
-    {
-      id: '2',
-      name: 'Ahmet Demir',
-      username: 'ahmetdemir',
-      avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
-      friends_since: '2022',
-    },
-    {
-      id: '3',
-      name: 'Zeynep Kaya',
-      username: 'zeynepkaya',
-      avatar_url: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400',
-      friends_since: '2020',
-    },
-    {
-      id: '4',
-      name: 'Mehmet Öztürk',
-      username: 'mehmetozturk',
-      avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
-      friends_since: '2023',
-    },
-    {
-      id: '5',
-      name: 'Ayşe Şahin',
-      username: 'aysesahin',
-      avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400',
-      friends_since: '2021',
-    },
-  ]);
   const modalOpacity = useRef(new Animated.Value(0)).current;
   const mapRef = useRef<MapView>(null);
   
@@ -86,7 +46,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
   // Bottom sheet animation values
   // Bottom sheet now extends to the bottom of the screen
   const COLLAPSED_HEIGHT = height * 0.35; // 35% of screen height
-  const EXPANDED_HEIGHT = height * 0.65; // 65% of screen height
+  const EXPANDED_HEIGHT = height * 0.90; // 90% of screen height
   const bottomSheetHeight = useRef(new Animated.Value(COLLAPSED_HEIGHT)).current;
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -150,7 +110,8 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
   const loadCapsules = async () => {
     try {
       setLoading(true);
-      const { data, error } = await CapsuleService.getUserCapsules();
+      // Fetch all accessible capsules (owned + public + shared)
+      const { data, error } = await CapsuleService.getAllAccessibleCapsules();
       if (error) {
         console.error('Error loading capsules:', error);
       } else {
@@ -183,8 +144,62 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
     onNavigate('MyCapsules');
   };
 
-  const handleFriendPress = (friend: Friend) => {
-    onNavigate('FriendProfile', { friend });
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Earth radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Distance in km
+  };
+
+  const formatDistance = (distance: number): string => {
+    if (distance < 1) {
+      return `${Math.round(distance * 1000)} m`;
+    }
+    return `${distance.toFixed(1)} km`;
+  };
+
+  const getMediaUrl = (capsule: any): string | null => {
+    // content_refs can be:
+    // 1. Array of URL strings: ["https://..."]
+    // 2. Array of objects: [{url: "https://...", type: "image"}]
+    // 3. Single URL string: "https://..."
+    // 4. null/undefined
+    
+    if (!capsule.content_refs) return null;
+    
+    // If it's an array
+    if (Array.isArray(capsule.content_refs)) {
+      if (capsule.content_refs.length === 0) return null;
+      
+      const firstItem = capsule.content_refs[0];
+      
+      // If first item is a string (direct URL)
+      if (typeof firstItem === 'string') {
+        return firstItem;
+      }
+      
+      // If first item is an object with url property
+      if (firstItem && typeof firstItem === 'object' && firstItem.url) {
+        return firstItem.url;
+      }
+      
+      // If first item is an object with file_url property
+      if (firstItem && typeof firstItem === 'object' && firstItem.file_url) {
+        return firstItem.file_url;
+      }
+    }
+    
+    // If it's a direct string URL
+    if (typeof capsule.content_refs === 'string') {
+      return capsule.content_refs;
+    }
+    
+    return null;
   };
 
   const formatTimeUntilOpen = (openDate: string | null): string => {
@@ -215,11 +230,28 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
     setLastTappedCapsule(capsule.id);
   };
 
-  const handleCalloutPress = (capsule: any) => {
+  const handleCalloutPress = async (capsule: any) => {
     // Tapping "Tap for details" should always open the detail modal
     setSelectedCapsule(capsule);
     setShowTimeModal(true);
     openDetailModal();
+    
+    // Increment view count
+    if (capsule?.id) {
+      await CapsuleService.incrementViewCount(capsule.id);
+    }
+  };
+
+  const handleMarkerPress = async (capsule: any) => {
+    // When grid item or marker is tapped, open detail modal
+    setSelectedCapsule(capsule);
+    setShowTimeModal(true);
+    openDetailModal();
+    
+    // Increment view count
+    if (capsule?.id) {
+      await CapsuleService.incrementViewCount(capsule.id);
+    }
   };
 
   const openDetailModal = () => {
@@ -572,16 +604,6 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
           })}
         </MapView>
         
-        {/* Hamburger Menu - Overlay on Map */}
-        <TouchableOpacity 
-          style={styles.menuButtonOverlay}
-          onPress={() => onNavigate('Profile')}
-        >
-          <View style={styles.menuButtonCircle}>
-            <Ionicons name="menu" size={24} color="#1e293b" />
-          </View>
-        </TouchableOpacity>
-        
       </View>
 
       {/* Navigation/Location Button - Fixed on Map, Moves with Bottom Sheet */}
@@ -620,6 +642,12 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
           <View style={styles.dragHandle} />
       </View>
 
+        {/* Keyboard Avoiding View */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
         {/* Scrollable Content Inside Bottom Sheet */}
         <ScrollView
           style={styles.bottomSheetContent}
@@ -630,87 +658,122 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
           decelerationRate="normal"
           bounces={true}
           overScrollMode="auto"
+          keyboardShouldPersistTaps="handled"
         >
-      {/* Invite Banner */}
-      <View style={styles.inviteBanner}>
-        <Text style={styles.inviteText}>Invite a friend!</Text>
-            <TouchableOpacity style={styles.inviteButton} onPress={openInviteModal}>
-          <Text style={styles.inviteButtonText}>Invite</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Create Capsule Button - Full Width */}
+      <TouchableOpacity 
+        style={styles.createCapsuleButton} 
+        onPress={handleCreateCapsule}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="add-circle" size={24} color="white" style={styles.createButtonIcon} />
+        <Text style={styles.createButtonText}>Create Capsule</Text>
+      </TouchableOpacity>
 
-      {/* Search Section */}
-      <View style={styles.searchSection}>
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#94a3b8" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-                placeholder="Find a Capsule!"
-            placeholderTextColor="#94a3b8"
-            value={searchQuery}
-            onChangeText={handleSearch}
-          />
+      {/* Nearby Capsules Section */}
+      <View style={styles.nearbyCapsules}>
+        {/* Header */}
+        <View style={styles.nearbyHeader}>
+          <Text style={styles.nearbyTitle}>Nearby Capsules</Text>
+          <Text style={styles.nearbyCount}>
+            {capsules.filter(c => c.is_public).length} posts
+          </Text>
         </View>
-      </View>
 
-      {/* Service Cards */}
-      <View style={styles.serviceCards}>
-        <TouchableOpacity style={styles.serviceCard} onPress={handleCreateCapsule}>
-          <View style={styles.serviceCardContent}>
-            <View style={styles.serviceIcon}>
-              <Ionicons name="time" size={32} color="#FAC638" />
-            </View>
-            <Text style={styles.serviceTitle}>Create Capsule</Text>
-            <Text style={styles.serviceSubtitle}>Create new time capsule</Text>
+        {/* Tabs: Top / Recent */}
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'top' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('top')}
+          >
+            <Text style={[styles.tabText, activeTab === 'top' && styles.tabTextActive]}>
+              Top
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'recent' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('recent')}
+          >
+            <Text style={[styles.tabText, activeTab === 'recent' && styles.tabTextActive]}>
+              Recent
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Grid Layout - 3 columns */}
+        {loading ? (
+          <View style={styles.feedLoadingContainer}>
+            <ActivityIndicator size="large" color="#FAC638" />
           </View>
-        </TouchableOpacity>
+        ) : capsules.length > 0 ? (
+          <View style={styles.capsuleGrid}>
+            {capsules
+              .filter(capsule => capsule.is_public)
+              .sort((a, b) => {
+                if (activeTab === 'recent') {
+                  // Recent: sort by creation date (newest first)
+                  return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+                } else {
+                  // Top: sort by view count (most viewed first)
+                  const viewsA = a.view_count || 0;
+                  const viewsB = b.view_count || 0;
+                  return viewsB - viewsA;
+                }
+              })
+              .map((capsule, index) => {
+                const distance = calculateDistance(
+                  userLocation.latitude,
+                  userLocation.longitude,
+                  capsule.displayLat || capsule.lat || userLocation.latitude,
+                  capsule.displayLng || capsule.lng || userLocation.longitude
+                );
 
-        <TouchableOpacity style={styles.serviceCard} onPress={handleMyCapsules}>
-          <View style={styles.serviceCardContent}>
-            <View style={styles.serviceIcon}>
-              <Ionicons name="albums" size={32} color="#06D6A0" />
-            </View>
-            <Text style={styles.serviceTitle}>My Capsules</Text>
-            <Text style={styles.serviceSubtitle}>View your capsules</Text>
+                return (
+                  <TouchableOpacity
+                    key={capsule.id || index}
+                    style={styles.gridItem}
+                    onPress={() => handleMarkerPress(capsule)}
+                    activeOpacity={0.7}
+                  >
+                    {/* Square Image Preview */}
+                    {getMediaUrl(capsule) ? (
+                      <Image
+                        source={{ uri: getMediaUrl(capsule)! }}
+                        style={styles.gridImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={[styles.gridImage, styles.gridImagePlaceholder]}>
+                        <Ionicons name="image-outline" size={32} color="#cbd5e1" />
+                      </View>
+                    )}
+                    
+                    {/* Locked Overlay */}
+                    {isCapsuleLocked(capsule.open_at) && (
+                      <View style={styles.gridLockedOverlay}>
+                        <Ionicons name="lock-closed" size={16} color="white" />
+                      </View>
+                    )}
+
+                    {/* Distance Badge */}
+                    <View style={styles.distanceBadge}>
+                      <Ionicons name="location" size={10} color="white" />
+                      <Text style={styles.distanceText}>{formatDistance(distance)}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
           </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* Info Banner */}
-      <View style={styles.infoBanner}>
-            <Text style={styles.infoText}>Drop a capsule, create a memory for future</Text>
-      </View>
-
-      {/* My Friends Section */}
-      <View style={styles.friendsSection}>
-        <Text style={styles.friendsSectionTitle}>My Friends</Text>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.friendsScrollContent}
-        >
-          {friends.map((friend) => (
-            <TouchableOpacity
-              key={friend.id}
-              style={styles.friendItem}
-              onPress={() => handleFriendPress(friend)}
-              activeOpacity={0.7}
-            >
-              {friend.avatar_url ? (
-                <Image source={{ uri: friend.avatar_url }} style={styles.friendAvatar} />
-              ) : (
-                <View style={[styles.friendAvatar, styles.friendAvatarPlaceholder]}>
-                  <Ionicons name="person" size={32} color="#94a3b8" />
-                </View>
-              )}
-              <Text style={styles.friendName} numberOfLines={1}>
-                {friend.name.split(' ')[0]}
-              </Text>
-        </TouchableOpacity>
-          ))}
-        </ScrollView>
+        ) : (
+          <View style={styles.feedEmptyState}>
+            <Ionicons name="file-tray-outline" size={48} color="#cbd5e1" />
+            <Text style={styles.feedEmptyText}>No nearby capsules</Text>
+            <Text style={styles.feedEmptySubtext}>Be the first to create one here!</Text>
+          </View>
+        )}
       </View>
         </ScrollView>
+        </KeyboardAvoidingView>
       </Animated.View>
 
       {/* Capsule Detail Modal - Bottom Sheet */}
@@ -1156,25 +1219,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 1,
-  },
-  menuButtonOverlay: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 50,
-    left: 16,
-    zIndex: 1000,
-  },
-  menuButtonCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'white',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 5,
   },
   map: {
     flex: 1,
@@ -1657,151 +1701,147 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1e293b',
   },
-  inviteBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#06D6A0',
+  // Create Capsule Button (Full Width)
+  createCapsuleButton: {
+    backgroundColor: '#FAC638',
     marginHorizontal: 16,
-    marginVertical: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  inviteText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-  },
-  inviteButton: {
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  inviteButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'white',
-  },
-  searchSection: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1e293b',
-  },
-  serviceCards: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 12,
-    marginBottom: 16,
-  },
-  serviceCard: {
-    flex: 1,
-    backgroundColor: 'white',
+    marginTop: 12,
+    marginBottom: 20,
+    paddingVertical: 16,
     borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  serviceCardContent: {
-    alignItems: 'center',
-  },
-  serviceIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#f8f9fa',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  serviceTitle: {
-    fontSize: 16,
+  createButtonIcon: {
+    marginRight: 8,
+  },
+  createButtonText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: 'white',
+  },
+  // Nearby Capsules Section
+  nearbyCapsules: {
+    paddingBottom: 100, // Extra space for bottom tab bar
+  },
+  nearbyHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  nearbyTitle: {
+    fontSize: 18,
     fontWeight: '700',
     color: '#1e293b',
     marginBottom: 4,
-    textAlign: 'center',
   },
-  serviceSubtitle: {
-    fontSize: 12,
+  nearbyCount: {
+    fontSize: 13,
     color: '#64748b',
-    textAlign: 'center',
   },
-  infoBanner: {
-    backgroundColor: '#f1f5f9',
-    marginHorizontal: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+  // Tabs (Top / Recent)
+  tabsContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
-  infoText: {
-    fontSize: 14,
-    color: '#64748b',
-    textAlign: 'center',
-  },
-  // Friends Section
-  friendsSection: {
-    marginTop: 24,
-    paddingHorizontal: 16,
-  },
-  friendsSectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 16,
-  },
-  friendsScrollContent: {
-    paddingRight: 20,
-  },
-  friendItem: {
+  tabButton: {
+    flex: 1,
+    paddingVertical: 14,
     alignItems: 'center',
-    marginRight: 16,
-    width: 72,
+    justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
-  friendAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: '#FAC638',
+  tabButtonActive: {
+    borderBottomColor: '#1e293b',
   },
-  friendAvatarPlaceholder: {
-    backgroundColor: '#e2e8f0',
+  tabText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#94a3b8',
+  },
+  tabTextActive: {
+    color: '#1e293b',
+  },
+  // Grid Layout
+  capsuleGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingTop: 1,
+  },
+  gridItem: {
+    width: width / 3,
+    height: width / 3,
+    position: 'relative',
+    borderWidth: 0.5,
+    borderColor: 'white',
+  },
+  gridImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  gridImagePlaceholder: {
+    backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  friendName: {
-    fontSize: 12,
-    fontWeight: '500',
+  gridLockedOverlay: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 12,
+    padding: 4,
+  },
+  distanceBadge: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 2,
+  },
+  distanceText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'white',
+  },
+  feedLoadingContainer: {
+    paddingVertical: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  feedEmptyState: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 16,
+  },
+  feedEmptyText: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#64748b',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  feedEmptySubtext: {
+    fontSize: 14,
+    color: '#94a3b8',
     textAlign: 'center',
   },
+  // Friends Section
   bottomSheet: {
     position: 'absolute',
     bottom: 0,

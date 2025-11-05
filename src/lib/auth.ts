@@ -3,14 +3,28 @@ import { User } from '../types';
 
 export class AuthService {
   // Sign up with email and password
-  static async signUp(email: string, password: string, displayName?: string) {
+  static async signUp(email: string, password: string, displayName?: string, username?: string) {
     try {
+      // First, check if username is already taken
+      if (username) {
+        const { data: existingUsername } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('username', username.toLowerCase())
+          .maybeSingle();
+
+        if (existingUsername) {
+          throw new Error('Username is already taken');
+        }
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             display_name: displayName,
+            username: username,
           },
         },
       });
@@ -33,11 +47,17 @@ export class AuthService {
           const { error: profileError } = await supabase.from('profiles').insert({
             id: data.user.id,
             display_name: displayName || email.split('@')[0],
-          });
+            username: username?.toLowerCase() || null,
+            email: email, // Store email for username lookup
+          } as any);
 
           if (profileError) {
             console.error('Profile creation error:', profileError);
-            // Don't fail signup if profile creation fails
+            // Check if it's a username uniqueness error
+            if (profileError.message?.toLowerCase().includes('username')) {
+              throw new Error('Username is already taken');
+            }
+            // Don't fail signup if profile creation fails for other reasons
           }
         }
       }
@@ -48,15 +68,43 @@ export class AuthService {
     }
   }
 
-  // Sign in with email and password
-  static async signIn(email: string, password: string) {
+  // Sign in with email or username and password
+  static async signIn(identifier: string, password: string) {
     try {
+      // Check if identifier is an email or username
+      const isEmail = identifier.includes('@');
+      
+      let email = identifier;
+      
+      // If it's a username, look up the email from profiles table
+      if (!isEmail) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('username', identifier.toLowerCase())
+          .maybeSingle();
+
+        if (profileError || !profile || !(profile as any).email) {
+          throw new Error('Username not found. Please check your username or use your email to login.');
+        }
+        
+        email = (profile as any).email;
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      return { data, error };
+      if (error) {
+        // Provide a clearer error message
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('Invalid username/email or password');
+        }
+        throw error;
+      }
+
+      return { data, error: null };
     } catch (error) {
       return { data: null, error };
     }
@@ -149,6 +197,29 @@ export class AuthService {
     }
   }
 
+  // Update user email (requires auth update)
+  static async updateEmail(newEmail: string) {
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        email: newEmail,
+      });
+
+      if (error) throw error;
+
+      // Also update email in profiles table
+      if (data.user) {
+        await supabase
+          .from('profiles')
+          .update({ email: newEmail } as any)
+          .eq('id', data.user.id);
+      }
+
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  }
+
   // Update user profile
   static async updateProfile(updates: Partial<User>) {
     try {
@@ -156,9 +227,29 @@ export class AuthService {
       
       if (!user) throw new Error('No user logged in');
 
+      // If username is being updated, check if it's already taken
+      if (updates.username) {
+        const { data: existingUsername } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('username', updates.username.toLowerCase())
+          .neq('id', user.id) // Exclude current user
+          .maybeSingle();
+
+        if (existingUsername) {
+          throw new Error('Username is already taken');
+        }
+      }
+
+      // Prepare updates with lowercase username
+      const profileUpdates = {
+        ...updates,
+        username: updates.username ? updates.username.toLowerCase() : updates.username,
+      };
+
       const { data, error } = await supabase
         .from('profiles')
-        .update(updates)
+        .update(profileUpdates as any)
         .eq('id', user.id)
         .select()
         .single();

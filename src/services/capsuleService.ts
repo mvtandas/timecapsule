@@ -13,6 +13,7 @@ export interface Capsule {
   allowed_users: any[] | null;
   blockchain_hash: string | null;
   created_at: string;
+  view_count?: number;
 }
 
 export interface CreateCapsuleData {
@@ -198,6 +199,49 @@ export class CapsuleService {
       return { data: capsules, error: null };
     } catch (error) {
       return { data: null, error };
+    }
+  }
+
+  // Get all accessible capsules (owned + public + shared with user)
+  static async getAllAccessibleCapsules() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) throw new Error('No user logged in');
+
+      // Fetch capsules that are:
+      // 1. Owned by user (owner_id = user.id)
+      // 2. Public (is_public = true)
+      // 3. Shared with user (via shared_capsules table)
+      
+      const { data, error } = await supabase
+        .from('capsules')
+        .select('*')
+        .or(`owner_id.eq.${user.id},is_public.eq.true`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  }
+
+  // Increment view count for a capsule
+  static async incrementViewCount(capsuleId: string) {
+    try {
+      // Call the Postgres function we created
+      const { error } = await supabase.rpc('increment_capsule_view_count', {
+        capsule_uuid: capsuleId
+      });
+
+      if (error) throw error;
+
+      return { error: null };
+    } catch (error) {
+      console.error('Error incrementing view count:', error);
+      return { error };
     }
   }
 }

@@ -12,10 +12,12 @@ import CreateCapsuleScreen from './src/screens/capsules/CreateCapsuleScreen';
 import ExploreScreen from './src/screens/explore/ExploreScreen';
 import ProfileScreen from './src/screens/profile/ProfileScreen';
 import FriendProfileScreen from './src/screens/friends/FriendProfileScreen';
+import FriendsScreen from './src/screens/friends/FriendsScreen';
 import AccountSettingsScreen from './src/screens/profile/AccountSettingsScreen';
+import BottomTabBar from './src/components/common/BottomTabBar';
 import { Friend } from './src/types';
 
-type Screen = 'Welcome' | 'Login' | 'Signup' | 'Dashboard' | 'MyCapsules' | 'Create' | 'Explore' | 'Profile' | 'FriendProfile' | 'AccountSettings';
+type Screen = 'Welcome' | 'Login' | 'Signup' | 'Dashboard' | 'MyCapsules' | 'Create' | 'Explore' | 'Profile' | 'Friends' | 'FriendProfile' | 'AccountSettings';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -85,9 +87,21 @@ export default function App() {
 
   // Determine if navigation is forward (right-to-left) or backward (left-to-right)
   const shouldAnimateForward = (from: string, to: string): boolean => {
+    // Bottom tab navigation (horizontal swipe between Friends, Dashboard, Profile)
+    const tabOrder = ['Friends', 'Dashboard', 'Profile'];
+    const fromIndex = tabOrder.indexOf(from);
+    const toIndex = tabOrder.indexOf(to);
+    
+    if (fromIndex !== -1 && toIndex !== -1) {
+      return toIndex > fromIndex; // Right if moving to higher index, left if lower
+    }
+    
+    // Navigation from tab screens to other screens
+    if (from === 'Dashboard' && to === 'FriendProfile') return true;
+    if (from === 'Friends' && to === 'FriendProfile') return true;
+    
     // Profile navigation from Dashboard should animate forward (right-to-left)
     if (from === 'Dashboard' && to === 'Profile') return true;
-    if (from === 'Dashboard' && to === 'FriendProfile') return true;
     // Going back to Dashboard from Profile should animate backward (left-to-right)
     if (from === 'Profile' && to === 'Dashboard') return false;
     
@@ -145,6 +159,9 @@ export default function App() {
     );
   }
 
+  // Check if current screen should show bottom tabs
+  const shouldShowBottomTabs = ['Dashboard', 'Friends', 'Profile'].includes(currentScreen);
+
   return (
     <View style={styles.container}>
       <Animated.View 
@@ -160,6 +177,7 @@ export default function App() {
         {currentScreen === 'Login' && <LoginScreen onNavigate={navigate} onLogin={handleLogin} />}
         {currentScreen === 'Signup' && <SignupScreen onNavigate={navigate} onSignup={handleLogin} />}
         {currentScreen === 'Dashboard' && <DashboardScreen onNavigate={navigate} onLogout={handleLogout} />}
+        {currentScreen === 'Friends' && <FriendsScreen onNavigate={navigate} />}
         {currentScreen === 'MyCapsules' && <MyCapsulesScreen onNavigate={navigate} onLogout={handleLogout} />}
         {currentScreen === 'Create' && <CreateCapsuleScreen onNavigate={navigate} />}
         {currentScreen === 'Explore' && <ExploreScreen onNavigate={navigate} />}
@@ -169,6 +187,12 @@ export default function App() {
         )}
         {currentScreen === 'AccountSettings' && <AccountSettingsScreen onNavigate={navigate} />}
       </Animated.View>
+      
+      {/* Bottom Tab Bar - Only show on main screens */}
+      {shouldShowBottomTabs && user && (
+        <BottomTabBar activeTab={currentScreen} onNavigate={navigate} />
+      )}
+      
       <StatusBar style="auto" />
     </View>
   );

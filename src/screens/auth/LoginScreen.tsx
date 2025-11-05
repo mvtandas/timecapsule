@@ -9,21 +9,21 @@ interface LoginScreenProps {
 }
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigate, onLogin }) => {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState(''); // Can be username or email
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuthStore();
 
   const handleSignIn = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter your email and password');
+    if (!identifier || !password) {
+      Alert.alert('Error', 'Please enter your username/email and password');
       return;
     }
 
     setLoading(true);
     
-    const { error } = await signIn(email, password);
+    const { error } = await signIn(identifier, password);
     
     setLoading(false);
     
@@ -31,7 +31,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigate, onLogin }) => {
       console.log('Login error:', error);
       Alert.alert(
         'Login Failed', 
-        error.message || 'Invalid email or password. Please try again.\n\nNote: Check if you need to verify your email first.'
+        error.message || 'Invalid username/email or password. Please try again.'
       );
     } else {
       Alert.alert('Success!', 'Welcome back!');
@@ -68,13 +68,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigate, onLogin }) => {
         {/* Form */}
         <View style={styles.formContainer}>
           <View style={styles.inputContainer}>
-            <MaterialIcons name="email" size={24} color="#6b7280" style={styles.inputIcon} />
+            <MaterialIcons name="person" size={24} color="#6b7280" style={styles.inputIcon} />
             <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Enter your email"
+              value={identifier}
+              onChangeText={setIdentifier}
+              placeholder="Username or Email"
               placeholderTextColor="#9ca3af"
-              keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               autoComplete="off"

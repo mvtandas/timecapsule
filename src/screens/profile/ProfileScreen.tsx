@@ -21,6 +21,8 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
     { id: 'memories', label: 'Memories Saved', value: '0', icon: 'images', tappable: false },
     { id: 'days', label: 'Days Active', value: '0', icon: 'calendar', tappable: false },
   ]);
+  const [capsulesCreated, setCapsulesCreated] = useState(0);
+  const [capsulesReceived, setCapsulesReceived] = useState(0);
   const [loading, setLoading] = useState(true);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editName, setEditName] = useState(user?.display_name || '');
@@ -82,7 +84,12 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
   const loadStats = async () => {
     try {
       setLoading(true);
+      
+      // Fetch created capsules
       const { data, error } = await CapsuleService.getUserCapsules();
+      
+      // Fetch received/shared capsules
+      const { data: sharedData, error: sharedError } = await CapsuleService.getSharedCapsules();
       
       if (!error && data) {
         const capsulesCount = data.length;
@@ -97,6 +104,10 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
           const now = new Date();
           daysActive = Math.floor((now.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24));
         }
+
+        // Set capsules counts
+        setCapsulesCreated(capsulesCount);
+        setCapsulesReceived(!sharedError && sharedData ? sharedData.length : 0);
 
         setStats([
           { id: 'created', label: 'Capsules Created', value: capsulesCount.toString(), icon: 'archive', tappable: true },
@@ -358,23 +369,28 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
           </TouchableOpacity>
           <Text style={styles.userName}>{user?.display_name || 'User'}</Text>
           
-          {/* User Info Display */}
-          <View style={styles.userInfoContainer}>
-            <View style={styles.userInfoRow}>
-              <Text style={styles.userInfoLabel}>Email</Text>
-              <Text style={styles.userInfoValue}>{user?.email || 'Not set'}</Text>
+          {/* User Info Row - Centered & Tappable */}
+          <TouchableOpacity 
+            style={styles.userInfoRow}
+            onPress={() => onNavigate('AccountSettings')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.userInfoWrapper}>
+              <Text style={styles.userInfoText} numberOfLines={2}>
+                <Text style={styles.infoLabel}>Email: </Text>
+                <Text style={styles.infoValue}>{user?.email || 'Not set'}</Text>
+                <Text style={styles.infoDivider}> • </Text>
+                <Text style={styles.infoLabel}>Username: </Text>
+                <Text style={styles.infoValue}>{user?.username || 'Not set'}</Text>
+                <Text style={styles.infoDivider}> • </Text>
+                <Text style={styles.infoLabel}>Phone: </Text>
+                <Text style={styles.infoValue}>{user?.phone_number || 'Not set'}</Text>
+              </Text>
             </View>
-            
-            <View style={styles.userInfoRow}>
-              <Text style={styles.userInfoLabel}>Username</Text>
-              <Text style={styles.userInfoValue}>{user?.username || 'Not set'}</Text>
+            <View style={styles.chevronContainer}>
+              <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
             </View>
-            
-            <View style={styles.userInfoRow}>
-              <Text style={styles.userInfoLabel}>Phone</Text>
-              <Text style={styles.userInfoValue}>{user?.phone_number || 'Not set'}</Text>
-            </View>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* My Friends Section */}
@@ -442,6 +458,44 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
             </View>
           )}
         </View>
+
+        {/* My Capsules Preview */}
+        <TouchableOpacity 
+          style={styles.capsulesPreviewCard}
+          onPress={() => onNavigate('MyCapsules')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.capsulesPreviewHeader}>
+            <Text style={styles.capsulesPreviewTitle}>My Capsules</Text>
+            <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+          </View>
+          
+          <View style={styles.capsulesPreviewContent}>
+            <View style={styles.capsulePreviewItem}>
+              <View style={styles.capsulePreviewIconContainer}>
+                <Ionicons name="create-outline" size={28} color="#FAC638" />
+              </View>
+              <Text style={styles.capsulePreviewValue}>{capsulesCreated}</Text>
+              <Text style={styles.capsulePreviewLabel}>Created</Text>
+            </View>
+            
+            <View style={styles.capsulePreviewDivider} />
+            
+            <View style={styles.capsulePreviewItem}>
+              <View style={styles.capsulePreviewIconContainer}>
+                <Ionicons name="gift-outline" size={28} color="#10b981" />
+              </View>
+              <Text style={styles.capsulePreviewValue}>{capsulesReceived}</Text>
+              <Text style={styles.capsulePreviewLabel}>Received</Text>
+            </View>
+          </View>
+          
+          {capsulesCreated === 0 && capsulesReceived === 0 && (
+            <View style={styles.capsulesEmptyState}>
+              <Text style={styles.capsulesEmptyText}>No capsules yet</Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
         {/* Stats */}
         <View style={styles.statsContainer}>
@@ -688,28 +742,50 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: '#1e293b',
-    marginBottom: 16,
+    marginBottom: 12,
+    textAlign: 'center',
   },
-  userInfoContainer: {
-    width: '100%',
-    gap: 10,
-  },
+  // User info row (horizontal, centered)
   userInfoRow: {
-    flexDirection: 'column',
+    width: '100%',
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    minHeight: 50,
+    gap: 8,
   },
-  userInfoLabel: {
-    fontSize: 12,
+  userInfoWrapper: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userInfoText: {
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  infoLabel: {
+    fontSize: 13,
     fontWeight: '500',
     color: '#94a3b8',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
-  userInfoValue: {
-    fontSize: 15,
+  infoValue: {
+    fontSize: 13,
     fontWeight: '600',
     color: '#1e293b',
+  },
+  infoDivider: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: '#cbd5e1',
+  },
+  chevronContainer: {
+    paddingLeft: 4,
   },
   // Friends Section
   friendsCard: {
@@ -799,6 +875,74 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
     lineHeight: 20,
+  },
+  // My Capsules Preview Styles
+  capsulesPreviewCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  capsulesPreviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  capsulesPreviewTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  capsulesPreviewContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  capsulePreviewItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  capsulePreviewIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#f8f9fa',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  capsulePreviewValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  capsulePreviewLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#64748b',
+  },
+  capsulePreviewDivider: {
+    width: 1,
+    height: 60,
+    backgroundColor: '#e2e8f0',
+    marginHorizontal: 16,
+  },
+  capsulesEmptyState: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  capsulesEmptyText: {
+    fontSize: 14,
+    color: '#94a3b8',
+    fontStyle: 'italic',
   },
   statsContainer: {
     flexDirection: 'row',

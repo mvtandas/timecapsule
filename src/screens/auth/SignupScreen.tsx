@@ -10,6 +10,7 @@ interface SignupScreenProps {
 
 const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup }) => {
   const [displayName, setDisplayName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -18,10 +19,37 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup }) => 
   const [loading, setLoading] = useState(false);
   const { signUp } = useAuthStore();
 
+  const validateUsername = (username: string): { valid: boolean; message?: string } => {
+    // Check length
+    if (username.length < 3 || username.length > 20) {
+      return { valid: false, message: 'Username must be between 3 and 20 characters' };
+    }
+    
+    // Check allowed characters (letters, numbers, underscores, periods)
+    const usernameRegex = /^[a-zA-Z0-9_.]+$/;
+    if (!usernameRegex.test(username)) {
+      return { valid: false, message: 'Username can only contain letters, numbers, underscores, and periods' };
+    }
+    
+    // Check if it starts with a letter or number
+    if (!/^[a-zA-Z0-9]/.test(username)) {
+      return { valid: false, message: 'Username must start with a letter or number' };
+    }
+    
+    return { valid: true };
+  };
+
   const handleSignUp = async () => {
     // Validation
-    if (!displayName || !email || !password || !confirmPassword) {
+    if (!displayName || !username || !email || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    // Validate username format
+    const usernameValidation = validateUsername(username);
+    if (!usernameValidation.valid) {
+      Alert.alert('Invalid Username', usernameValidation.message);
       return;
     }
 
@@ -37,13 +65,19 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup }) => 
 
     setLoading(true);
     
-    const { error } = await signUp(email, password, displayName);
+    const { error } = await signUp(email, password, displayName, username);
     
     setLoading(false);
     
     if (error) {
       console.log('Signup error:', error);
-      Alert.alert('Error', error.message || 'Failed to create account. Please try again.');
+      // Check for username uniqueness error
+      const errorMessage = error.message || '';
+      if (errorMessage.toLowerCase().includes('username') && errorMessage.toLowerCase().includes('already')) {
+        Alert.alert('Username Taken', 'This username is already in use. Please choose a different one.');
+      } else {
+        Alert.alert('Error', errorMessage || 'Failed to create account. Please try again.');
+      }
     } else {
       Alert.alert(
         'Success!', 
@@ -98,6 +132,23 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup }) => 
               placeholder="Full Name"
               placeholderTextColor="#9ca3af"
               autoCapitalize="words"
+              autoCorrect={false}
+              autoComplete="off"
+              importantForAutofill="no"
+              textContentType="none"
+              style={styles.input}
+              editable={!loading}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <MaterialIcons name="alternate-email" size={24} color="#6b7280" style={styles.inputIcon} />
+            <TextInput
+              value={username}
+              onChangeText={setUsername}
+              placeholder="Username (3-20 characters)"
+              placeholderTextColor="#9ca3af"
+              autoCapitalize="none"
               autoCorrect={false}
               autoComplete="off"
               importantForAutofill="no"
