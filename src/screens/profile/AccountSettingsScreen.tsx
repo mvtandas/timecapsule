@@ -3,10 +3,8 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIn
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/authStore';
 
-type Screen = 'Dashboard' | 'MyCapsules' | 'Create' | 'Explore' | 'Profile' | 'FriendProfile' | 'AccountSettings';
-
 interface AccountSettingsScreenProps {
-  onNavigate: (screen: Screen, data?: any) => void;
+  onNavigate: (screen: string, data?: any) => void;
 }
 
 const AccountSettingsScreen = ({ onNavigate }: AccountSettingsScreenProps) => {

@@ -9,10 +9,8 @@ import { Friend } from '../../types';
 
 const { height } = Dimensions.get('window');
 
-type Screen = 'Dashboard' | 'MyCapsules' | 'Create' | 'Explore' | 'Profile' | 'FriendProfile' | 'AccountSettings';
-
 interface ProfileScreenProps {
-  onNavigate: (screen: Screen, data?: any) => void;
+  onNavigate: (screen: string, data?: any) => void;
   onLogout: () => void;
 }
 

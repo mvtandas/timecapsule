@@ -26,10 +26,8 @@ import { Friend } from '../../types';
 
 const { width, height } = Dimensions.get('window');
 
-type Screen = 'Dashboard' | 'MyCapsules' | 'Create' | 'Explore' | 'Profile';
-
 interface CreateCapsuleScreenProps {
-  onNavigate: (screen: Screen) => void;
+  onNavigate: (screen: string) => void;
 }
 
 const CreateCapsuleScreen = ({ onNavigate }: CreateCapsuleScreenProps) => {

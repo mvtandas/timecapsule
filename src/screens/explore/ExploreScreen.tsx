@@ -7,10 +7,8 @@ import { CapsuleService } from '../../services/capsuleService';
 
 const { width, height } = Dimensions.get('window');
 
-type Screen = 'Dashboard' | 'Create' | 'Explore' | 'Profile';
-
 interface ExploreScreenProps {
-  onNavigate: (screen: Screen) => void;
+  onNavigate: (screen: string) => void;
 }
 
 const RADIUS_KM = 50; // 50km radius to view capsules

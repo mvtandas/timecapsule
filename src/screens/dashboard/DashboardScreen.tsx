@@ -8,10 +8,8 @@ import { CapsuleService } from '../../services/capsuleService';
 import { CapsuleIcon } from '../../components/common/CapsuleIcon';
 import { Friend } from '../../types';
 
-type Screen = 'Dashboard' | 'MyCapsules' | 'Create' | 'Explore' | 'Profile' | 'FriendProfile';
-
 interface DashboardScreenProps {
-  onNavigate: (screen: Screen, data?: any) => void;
+  onNavigate: (screen: string, data?: any) => void;
   onLogout?: () => void;
 }
 
@@ -797,7 +795,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                                   <Image source={{ uri: friend.avatar_url }} style={styles.detailModalSharedAvatarImage} />
                                 ) : (
                                   <View style={styles.detailModalSharedAvatarPlaceholder}>
-                                    <Ionicons name="person" size={24} color="#94a3b8" />
+          <Ionicons name="person" size={24} color="#94a3b8" />
                                   </View>
                                 )}
                                 {isCurrentUser && (

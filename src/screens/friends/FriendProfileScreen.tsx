@@ -13,10 +13,8 @@ import { Friend } from '../../types';
 
 const { width, height } = Dimensions.get('window');
 
-type Screen = 'Dashboard' | 'MyCapsules' | 'Create' | 'Explore' | 'Profile' | 'FriendProfile';
-
 interface FriendProfileScreenProps {
-  onNavigate: (screen: Screen) => void;
+  onNavigate: (screen: string) => void;
   friend: Friend;
 }
 

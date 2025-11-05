@@ -1,10 +1,14 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet, Alert, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import MapView, { Marker } from 'react-native-maps';
 
 interface CapsuleDetailsScreenProps {
   onBack: () => void;
 }
+
+const { width } = Dimensions.get('window');
 
 const CapsuleDetailsScreen = ({ onBack }: CapsuleDetailsScreenProps) => {
   const capsule = {
@@ -13,19 +17,28 @@ const CapsuleDetailsScreen = ({ onBack }: CapsuleDetailsScreenProps) => {
     openDate: '2025-12-25',
     createdDate: '2024-10-18',
     location: 'Santa Monica Beach, CA',
-    isLocked: true,
+    isLocked: false, // Change to false to see unlocked state
     daysUntilOpen: 68,
     emoji: '🏖️',
     color: '#FFD166',
+    mediaUri: 'https://picsum.photos/400/600?random=1', // Main media for top display
+    mediaType: 'image', // or 'video'
     media: [
       { id: '1', type: 'image', uri: 'https://picsum.photos/400/300?random=1' },
       { id: '2', type: 'image', uri: 'https://picsum.photos/400/300?random=2' },
       { id: '3', type: 'video', uri: 'https://picsum.photos/400/300?random=3' },
     ],
     sharedWith: [
-      { id: '1', name: 'Sarah Johnson', email: 'sarah@example.com' },
-      { id: '2', name: 'Mike Chen', email: 'mike@example.com' },
+      { id: '1', name: 'Sarah Johnson', email: 'sarah@example.com', avatar: null, isCurrentUser: false },
+      { id: '2', name: 'Mike Chen', email: 'mike@example.com', avatar: null, isCurrentUser: false },
+      { id: '3', name: 'You', email: 'you@example.com', avatar: null, isCurrentUser: true },
     ],
+    sharedOn: '2024-10-18T14:30:00Z',
+    sharedLocation: 'Santa Monica Beach, CA',
+    coordinates: {
+      latitude: 34.0195,
+      longitude: -118.4912,
+    },
   };
 
   const handleShare = () => {
@@ -54,6 +67,17 @@ const CapsuleDetailsScreen = ({ onBack }: CapsuleDetailsScreenProps) => {
     );
   };
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -67,104 +91,131 @@ const CapsuleDetailsScreen = ({ onBack }: CapsuleDetailsScreenProps) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        {/* Capsule Header */}
-        <View style={styles.capsuleHeader}>
-          <View style={[styles.iconWrapper, { backgroundColor: capsule.color }]}>
-            <Text style={styles.iconText}>{capsule.emoji}</Text>
-          </View>
-          <Text style={styles.capsuleTitle}>{capsule.title}</Text>
-          
-          {capsule.isLocked ? (
-            <View style={styles.lockedBadge}>
-              <Ionicons name="lock-closed" size={16} color="white" />
-              <Text style={styles.lockedText}>Opens in {capsule.daysUntilOpen} days</Text>
+      <ScrollView style={styles.content}>
+        {/* Top Section - Media Display */}
+        <View style={styles.mediaContainer}>
+          {capsule.mediaUri ? (
+            <View style={styles.mediaWrapper}>
+              <Image 
+                source={{ uri: capsule.mediaUri }} 
+                style={styles.heroMedia}
+                resizeMode="cover"
+              />
+              {capsule.mediaType === 'video' && !capsule.isLocked && (
+                <View style={styles.playIconOverlay}>
+                  <Ionicons name="play-circle" size={64} color="white" />
+                </View>
+              )}
+              {capsule.isLocked && (
+                <BlurView intensity={80} style={styles.blurOverlay}>
+                  <View style={styles.lockedOverlay}>
+                    <Ionicons name="lock-closed" size={48} color="white" />
+                    <Text style={styles.lockedLabel}>Locked</Text>
+                    <Text style={styles.lockedSubtext}>Opens in {capsule.daysUntilOpen} days</Text>
+                  </View>
+                </BlurView>
+              )}
             </View>
           ) : (
-            <View style={[styles.lockedBadge, styles.unlockedBadge]}>
-              <Ionicons name="lock-open" size={16} color="white" />
-              <Text style={styles.lockedText}>Unlocked</Text>
+            <View style={[styles.placeholderMedia, { backgroundColor: capsule.color }]}>
+              <Text style={styles.placeholderEmoji}>{capsule.emoji}</Text>
             </View>
           )}
         </View>
 
-        {/* Description */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Message</Text>
-          <Text style={styles.description}>{capsule.description}</Text>
+        {/* Textual Content */}
+        <View style={styles.contentSection}>
+          <Text style={styles.capsuleTitle}>{capsule.title}</Text>
+          <Text style={styles.capsuleDescription}>{capsule.description}</Text>
         </View>
 
-        {/* Details */}
+        {/* Sharing Information */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Shared With</Text>
+          <View style={styles.sharedWithContainer}>
+            {capsule.sharedWith.map((person) => (
+              <View key={person.id} style={styles.avatarItem}>
+                <View style={[
+                  styles.avatar,
+                  person.isCurrentUser && styles.avatarCurrent
+                ]}>
+                  {person.avatar ? (
+                    <Image source={{ uri: person.avatar }} style={styles.avatarImage} />
+                  ) : (
+                    <Text style={styles.avatarText}>
+                      {person.name.charAt(0).toUpperCase()}
+                    </Text>
+                  )}
+                </View>
+                <Text style={styles.avatarName} numberOfLines={1}>
+                  {person.isCurrentUser ? 'You' : person.name.split(' ')[0]}
+                </Text>
+              </View>
+            ))}
+          </View>
+          {capsule.sharedWith.some(p => p.isCurrentUser) && (
+            <View style={styles.sharedWithYouBadge}>
+              <Ionicons name="checkmark-circle" size={16} color="#06D6A0" />
+              <Text style={styles.sharedWithYouText}>Shared with you</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Meta Information */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Details</Text>
-          <View style={styles.detailsGrid}>
-            <View style={styles.detailItem}>
+          <View style={styles.metaInfo}>
+            <View style={styles.metaRow}>
               <Ionicons name="calendar-outline" size={20} color="#94a3b8" />
-              <View style={styles.detailText}>
-                <Text style={styles.detailLabel}>Open Date</Text>
-                <Text style={styles.detailValue}>{capsule.openDate}</Text>
+              <View style={styles.metaTextContainer}>
+                <Text style={styles.metaLabel}>Shared On</Text>
+                <Text style={styles.metaValue}>{formatDate(capsule.sharedOn)}</Text>
               </View>
             </View>
-            <View style={styles.detailItem}>
+            <View style={styles.metaRow}>
               <Ionicons name="location-outline" size={20} color="#94a3b8" />
-              <View style={styles.detailText}>
-                <Text style={styles.detailLabel}>Location</Text>
-                <Text style={styles.detailValue}>{capsule.location}</Text>
+              <View style={styles.metaTextContainer}>
+                <Text style={styles.metaLabel}>Shared Location</Text>
+                <Text style={styles.metaValue}>{capsule.sharedLocation}</Text>
               </View>
             </View>
-            <View style={styles.detailItem}>
+            <View style={styles.metaRow}>
               <Ionicons name="time-outline" size={20} color="#94a3b8" />
-              <View style={styles.detailText}>
-                <Text style={styles.detailLabel}>Created</Text>
-                <Text style={styles.detailValue}>{capsule.createdDate}</Text>
+              <View style={styles.metaTextContainer}>
+                <Text style={styles.metaLabel}>Opens On</Text>
+                <Text style={styles.metaValue}>{capsule.openDate}</Text>
               </View>
             </View>
           </View>
         </View>
 
-        {/* Media */}
+        {/* Mini Map */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Media ({capsule.media.length})</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaScroll}>
-            {capsule.media.map((item) => (
-              <TouchableOpacity key={item.id} style={styles.mediaItem}>
-                <Image source={{ uri: item.uri }} style={styles.mediaImage} />
-                {item.type === 'video' && (
-                  <View style={styles.playIcon}>
-                    <Ionicons name="play-circle" size={40} color="white" />
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity style={styles.addMediaButton}>
-              <Ionicons name="add-circle-outline" size={40} color="#FAC638" />
-              <Text style={styles.addMediaText}>Add More</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-
-        {/* Shared With */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Shared With ({capsule.sharedWith.length})</Text>
-            <TouchableOpacity onPress={handleShare}>
-              <Ionicons name="person-add-outline" size={24} color="#FAC638" />
-            </TouchableOpacity>
+          <Text style={styles.sectionTitle}>Drop Location</Text>
+          <View style={styles.mapContainer}>
+            <MapView
+              style={styles.map}
+              initialRegion={{
+                latitude: capsule.coordinates.latitude,
+                longitude: capsule.coordinates.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+              }}
+              scrollEnabled={false}
+              zoomEnabled={false}
+              pitchEnabled={false}
+              rotateEnabled={false}
+            >
+              <Marker
+                coordinate={capsule.coordinates}
+                title={capsule.title}
+              >
+                <View style={styles.customMarker}>
+                  <Text style={styles.markerEmoji}>{capsule.emoji}</Text>
+                </View>
+              </Marker>
+            </MapView>
           </View>
-          {capsule.sharedWith.map((person) => (
-            <View key={person.id} style={styles.personItem}>
-              <View style={styles.personAvatar}>
-                <Ionicons name="person" size={24} color="white" />
-              </View>
-              <View style={styles.personInfo}>
-                <Text style={styles.personName}>{person.name}</Text>
-                <Text style={styles.personEmail}>{person.email}</Text>
-              </View>
-              <TouchableOpacity>
-                <Ionicons name="close-circle-outline" size={24} color="#94a3b8" />
-              </TouchableOpacity>
-            </View>
-          ))}
         </View>
 
         {/* Delete Button */}
@@ -209,163 +260,200 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  contentContainer: {
-    padding: 16,
+  // Media Section Styles
+  mediaContainer: {
+    width: '100%',
+    height: 300,
+    backgroundColor: '#1e293b',
   },
-  capsuleHeader: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 24,
+  mediaWrapper: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  heroMedia: {
+    width: '100%',
+    height: '100%',
+  },
+  playIconOverlay: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -32 }, { translateY: -32 }],
+  },
+  blurOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
   },
-  iconWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  lockedOverlay: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
   },
-  iconText: {
-    fontSize: 40,
+  lockedLabel: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: 'white',
+    marginTop: 16,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  lockedSubtext: {
+    fontSize: 16,
+    color: 'white',
+    marginTop: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  placeholderMedia: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderEmoji: {
+    fontSize: 80,
+  },
+  // Content Section Styles
+  contentSection: {
+    padding: 20,
+    backgroundColor: 'white',
   },
   capsuleTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '700',
     color: '#1e293b',
     marginBottom: 12,
-    textAlign: 'center',
   },
-  lockedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FF6B6B',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 6,
+  capsuleDescription: {
+    fontSize: 16,
+    color: '#475569',
+    lineHeight: 24,
   },
-  unlockedBadge: {
-    backgroundColor: '#06D6A0',
-  },
-  lockedText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 14,
-  },
+  // Shared With Section
   section: {
     backgroundColor: 'white',
-    borderRadius: 16,
     padding: 20,
-    marginBottom: 16,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+    marginTop: 1,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#1e293b',
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  description: {
-    fontSize: 16,
-    color: '#475569',
-    lineHeight: 24,
-  },
-  detailsGrid: {
+  sharedWithContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 16,
   },
-  detailItem: {
+  avatarItem: {
+    alignItems: 'center',
+    width: 70,
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FAC638',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  avatarCurrent: {
+    borderWidth: 3,
+    borderColor: '#06D6A0',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
+  },
+  avatarText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: 'white',
+  },
+  avatarName: {
+    fontSize: 12,
+    color: '#475569',
+    textAlign: 'center',
+  },
+  sharedWithYouBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  sharedWithYouText: {
+    fontSize: 14,
+    color: '#06D6A0',
+    fontWeight: '600',
+  },
+  // Meta Information Styles
+  metaInfo: {
+    gap: 16,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: 12,
   },
-  detailText: {
+  metaTextContainer: {
     flex: 1,
   },
-  detailLabel: {
+  metaLabel: {
     fontSize: 12,
     color: '#94a3b8',
-    marginBottom: 2,
-  },
-  detailValue: {
-    fontSize: 16,
+    marginBottom: 4,
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  metaValue: {
+    fontSize: 16,
     color: '#1e293b',
+    fontWeight: '500',
   },
-  mediaScroll: {
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
-  },
-  mediaItem: {
-    width: 150,
-    height: 150,
+  // Map Styles
+  mapContainer: {
+    height: 200,
     borderRadius: 12,
-    marginRight: 12,
     overflow: 'hidden',
-    position: 'relative',
+    backgroundColor: '#e2e8f0',
   },
-  mediaImage: {
+  map: {
     width: '100%',
     height: '100%',
   },
-  playIcon: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -20 }, { translateY: -20 }],
-  },
-  addMediaButton: {
-    width: 150,
-    height: 150,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f8f8f5',
-  },
-  addMediaText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FAC638',
-    marginTop: 8,
-  },
-  personItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  personAvatar: {
+  customMarker: {
     width: 48,
     height: 48,
     borderRadius: 24,
     backgroundColor: '#FAC638',
-    alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  personInfo: {
-    flex: 1,
+  markerEmoji: {
+    fontSize: 24,
   },
-  personName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 2,
-  },
-  personEmail: {
-    fontSize: 14,
-    color: '#94a3b8',
-  },
+  // Delete Button
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -374,6 +462,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     gap: 8,
+    margin: 20,
+    marginTop: 1,
     borderWidth: 2,
     borderColor: '#FF6B6B',
   },
