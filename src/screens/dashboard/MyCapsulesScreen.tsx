@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, RefreshControl, Modal, Animated, Dimensions, PanResponder, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, RefreshControl, Modal, Animated, Dimensions, PanResponder, Platform, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import MapView, { Marker } from 'react-native-maps';
 import { CapsuleService } from '../../services/capsuleService';
 
 const { width, height } = Dimensions.get('window');
@@ -160,11 +161,13 @@ const MyCapsulesScreen = ({ onNavigate }: MyCapsulesScreenProps) => {
   };
 
   // PanResponder for drag-to-dismiss on detail modal
+  // Only triggers from the drag handle, not the scrollable content
   const detailModalPanResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dy) > 5;
+        // Only capture downward drags that start near the top
+        return gestureState.dy > 10 && Math.abs(gestureState.dx) < 10;
       },
       onPanResponderMove: (_, gestureState) => {
         if (gestureState.dy > 0) {
@@ -354,10 +357,12 @@ const MyCapsulesScreen = ({ onNavigate }: MyCapsulesScreenProps) => {
                 transform: [{ translateY: detailModalTranslateY }],
               },
             ]}
-            {...detailModalPanResponder.panHandlers}
           >
             {/* Drag Handle */}
-            <View style={styles.detailModalDragHandle}>
+            <View 
+              style={styles.detailModalDragHandle}
+              {...detailModalPanResponder.panHandlers}
+            >
               <View style={styles.detailModalDragIndicator} />
             </View>
 
@@ -374,10 +379,84 @@ const MyCapsulesScreen = ({ onNavigate }: MyCapsulesScreenProps) => {
             <ScrollView 
               style={styles.detailModalContent}
               contentContainerStyle={styles.detailModalContentContainer}
-              showsVerticalScrollIndicator={false}
-              scrollEnabled={!isCapsuleLocked(selectedCapsule)}
+              showsVerticalScrollIndicator={true}
+              scrollEnabled={true}
+              bounces={true}
             >
-              <View style={styles.detailModalContentWrapper}>
+              {/* Media Section */}
+              <View style={styles.detailModalMediaSection}>
+                {(() => {
+                  // Get the first media item from content_refs
+                  const contentRefs = selectedCapsule?.content_refs;
+                  const hasMedia = contentRefs && contentRefs.length > 0;
+                  
+                  if (!hasMedia) {
+                    return (
+                      <View style={styles.detailModalMediaPlaceholder}>
+                        <Ionicons name="image-outline" size={48} color="#cbd5e1" />
+                        <Text style={styles.detailModalMediaPlaceholderText}>No media attached</Text>
+                      </View>
+                    );
+                  }
+
+                  // Get first media item - can be string URL or object with file_url
+                  const firstMedia = contentRefs[0];
+                  const mediaUrl = typeof firstMedia === 'string' ? firstMedia : firstMedia?.file_url || firstMedia?.uri;
+                  const mediaType = typeof firstMedia === 'object' ? firstMedia?.content_type || firstMedia?.type : null;
+                  
+                  // Determine if it's a video
+                  const isVideo = mediaType === 'video' || 
+                                  (typeof mediaUrl === 'string' && (
+                                    mediaUrl.includes('.mp4') || 
+                                    mediaUrl.includes('.mov') || 
+                                    mediaUrl.includes('.avi')
+                                  ));
+
+                  if (!mediaUrl) {
+                    return (
+                      <View style={styles.detailModalMediaPlaceholder}>
+                        <Ionicons name="image-outline" size={48} color="#cbd5e1" />
+                        <Text style={styles.detailModalMediaPlaceholderText}>Media unavailable</Text>
+                      </View>
+                    );
+                  }
+
+                  return (
+                    <View style={styles.detailModalMediaContainer}>
+                      {isVideo ? (
+                        <View style={styles.detailModalMediaVideoContainer}>
+                          <Ionicons name="play-circle" size={64} color="#ffffff" style={styles.detailModalVideoIcon} />
+                          <Image 
+                            source={{ uri: mediaUrl }}
+                            style={styles.detailModalMediaImage}
+                            resizeMode="cover"
+                          />
+                        </View>
+                      ) : (
+                        <Image 
+                          source={{ uri: mediaUrl }}
+                          style={styles.detailModalMediaImage}
+                          resizeMode="cover"
+                        />
+                      )}
+                      
+                      {isCapsuleLocked(selectedCapsule) && (
+                        <BlurView intensity={80} style={styles.detailModalMediaBlur}>
+                          <View style={styles.detailModalMediaLockedBadge}>
+                            <Ionicons name="lock-closed" size={32} color="#ffffff" />
+                            <Text style={styles.detailModalMediaLockedText}>Locked</Text>
+                            <Text style={styles.detailModalMediaLockedSubtext}>
+                              Unlocks on {new Date(selectedCapsule.open_at || '').toLocaleDateString()}
+                            </Text>
+                          </View>
+                        </BlurView>
+                      )}
+                    </View>
+                  );
+                })()}
+              </View>
+
+              <View style={styles.detailModalTextContent}>
                 {/* Title */}
                 <Text style={styles.detailModalTitle}>
                   {selectedCapsule?.title || 'Untitled Capsule'}
@@ -390,74 +469,150 @@ const MyCapsulesScreen = ({ onNavigate }: MyCapsulesScreenProps) => {
                   </Text>
                 )}
 
-                {/* Countdown/Info Section */}
-                {selectedCapsule?.open_at && (
-                  <View style={styles.detailModalInfoSection}>
-                    {isCapsuleLocked(selectedCapsule) ? (
-                      <View style={styles.detailModalCountdownContainer}>
-                        <Text style={styles.detailModalCountdownLabel}>Opens in</Text>
-                        <View style={styles.detailModalCountdownGrid}>
-                          {(() => {
-                            const time = getTimeComponents(selectedCapsule.open_at);
-                            return (
-                              <>
-                                <View style={styles.detailModalCountdownItem}>
-                                  <Text style={styles.detailModalCountdownValue}>{time.days}</Text>
-                                  <Text style={styles.detailModalCountdownUnit}>Days</Text>
-                                </View>
-                                <View style={styles.detailModalCountdownItem}>
-                                  <Text style={styles.detailModalCountdownValue}>{time.hours}</Text>
-                                  <Text style={styles.detailModalCountdownUnit}>Hours</Text>
-                                </View>
-                                <View style={styles.detailModalCountdownItem}>
-                                  <Text style={styles.detailModalCountdownValue}>{time.minutes}</Text>
-                                  <Text style={styles.detailModalCountdownUnit}>Mins</Text>
-                                </View>
-                              </>
-                            );
-                          })()}
-                        </View>
+                {/* Countdown Timer (if locked) */}
+                {isCapsuleLocked(selectedCapsule) && selectedCapsule?.open_at && (
+                  <View style={styles.detailModalCountdownContainer}>
+                    <Text style={styles.detailModalCountdownLabel}>Opens in</Text>
+                    <View style={styles.detailModalCountdownGrid}>
+                      {(() => {
+                        const time = getTimeComponents(selectedCapsule.open_at);
+                        return (
+                          <>
+                            <View style={styles.detailModalCountdownItem}>
+                              <Text style={styles.detailModalCountdownValue}>{time.days}</Text>
+                              <Text style={styles.detailModalCountdownUnit}>Days</Text>
+                            </View>
+                            <View style={styles.detailModalCountdownItem}>
+                              <Text style={styles.detailModalCountdownValue}>{time.hours}</Text>
+                              <Text style={styles.detailModalCountdownUnit}>Hours</Text>
+                            </View>
+                            <View style={styles.detailModalCountdownItem}>
+                              <Text style={styles.detailModalCountdownValue}>{time.minutes}</Text>
+                              <Text style={styles.detailModalCountdownUnit}>Mins</Text>
+                            </View>
+                          </>
+                        );
+                      })()}
+                    </View>
+                  </View>
+                )}
+
+                {/* Shared With Section */}
+                <View style={styles.detailModalSection}>
+                  <Text style={styles.detailModalSectionTitle}>Shared With</Text>
+                  <View style={styles.detailModalSharedContainer}>
+                    {selectedCapsule?.is_public ? (
+                      <View style={styles.detailModalPublicBadge}>
+                        <Ionicons name="globe-outline" size={20} color="#64748b" />
+                        <Text style={styles.detailModalPublicText}>This capsule is public</Text>
                       </View>
                     ) : (
-                      <View style={styles.detailModalConditionRow}>
-                        <Ionicons name="lock-open" size={20} color="#06D6A0" />
-                        <Text style={styles.detailModalConditionText}>Capsule is unlocked</Text>
+                      <ScrollView 
+                        horizontal 
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.detailModalSharedList}
+                      >
+                        {/* Mock shared users - replace with actual data */}
+                        {[1, 2, 3].map((item, index) => (
+                          <View key={index} style={styles.detailModalSharedUser}>
+                            <View style={styles.detailModalSharedAvatar}>
+                              <Ionicons name="person" size={20} color="#94a3b8" />
+                            </View>
+                            <Text style={styles.detailModalSharedName}>User {item}</Text>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    )}
+                  </View>
+                </View>
+
+                {/* Meta Information */}
+                <View style={styles.detailModalSection}>
+                  <Text style={styles.detailModalSectionTitle}>Details</Text>
+                  <View style={styles.detailModalMetaContainer}>
+                    <View style={styles.detailModalMetaRow}>
+                      <Ionicons name="calendar-outline" size={20} color="#64748b" />
+                      <View style={styles.detailModalMetaTextContainer}>
+                        <Text style={styles.detailModalMetaLabel}>Shared On</Text>
+                        <Text style={styles.detailModalMetaValue}>
+                          {selectedCapsule?.created_at 
+                            ? new Date(selectedCapsule.created_at).toLocaleString('en-US', {
+                                month: 'long',
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit'
+                              })
+                            : 'Unknown'}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    {selectedCapsule?.open_at && (
+                      <View style={styles.detailModalMetaRow}>
+                        <Ionicons name="time-outline" size={20} color="#64748b" />
+                        <View style={styles.detailModalMetaTextContainer}>
+                          <Text style={styles.detailModalMetaLabel}>Opens On</Text>
+                          <Text style={styles.detailModalMetaValue}>
+                            {new Date(selectedCapsule.open_at).toLocaleString('en-US', {
+                              month: 'long',
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit'
+                            })}
+                          </Text>
+                        </View>
                       </View>
                     )}
 
-                    {/* Date Info */}
-                    <View style={styles.detailModalConditionRow}>
-                      <Ionicons name="calendar-outline" size={20} color="#64748b" />
-                      <Text style={styles.detailModalConditionValue}>
-                        Created: {selectedCapsule?.created_at ? new Date(selectedCapsule.created_at).toLocaleDateString() : 'Unknown'}
-                      </Text>
-                    </View>
-                    <View style={styles.detailModalConditionRow}>
-                      <Ionicons name="time-outline" size={20} color="#64748b" />
-                      <Text style={styles.detailModalConditionValue}>
-                        Opens: {selectedCapsule?.open_at ? new Date(selectedCapsule.open_at).toLocaleDateString() : 'No date set'}
-                      </Text>
+                    {(selectedCapsule?.lat && selectedCapsule?.lng) && (
+                      <View style={styles.detailModalMetaRow}>
+                        <Ionicons name="location-outline" size={20} color="#64748b" />
+                        <View style={styles.detailModalMetaTextContainer}>
+                          <Text style={styles.detailModalMetaLabel}>Shared Location</Text>
+                          <Text style={styles.detailModalMetaValue}>
+                            {selectedCapsule.lat.toFixed(4)}, {selectedCapsule.lng.toFixed(4)}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {/* Mini Map */}
+                {(selectedCapsule?.lat && selectedCapsule?.lng) && (
+                  <View style={styles.detailModalSection}>
+                    <Text style={styles.detailModalSectionTitle}>Drop Location</Text>
+                    <View style={styles.detailModalMapContainer}>
+                      <MapView
+                        style={styles.detailModalMiniMap}
+                        initialRegion={{
+                          latitude: selectedCapsule.lat,
+                          longitude: selectedCapsule.lng,
+                          latitudeDelta: 0.01,
+                          longitudeDelta: 0.01,
+                        }}
+                        scrollEnabled={false}
+                        zoomEnabled={false}
+                        pitchEnabled={false}
+                        rotateEnabled={false}
+                      >
+                        <Marker
+                          coordinate={{
+                            latitude: selectedCapsule.lat,
+                            longitude: selectedCapsule.lng,
+                          }}
+                        >
+                          <View style={styles.detailModalMapMarker}>
+                            <Ionicons name="location" size={32} color="#FAC638" />
+                          </View>
+                        </Marker>
+                      </MapView>
                     </View>
                   </View>
                 )}
               </View>
-
-              {/* Blur overlay for locked capsules */}
-              {isCapsuleLocked(selectedCapsule) && (
-                <View style={styles.detailModalBlurContainer} pointerEvents="auto">
-                  <BlurView intensity={100} style={styles.detailModalBlurView}>
-                    <View style={styles.detailModalLockedOverlay} pointerEvents="none">
-                      <View style={styles.detailModalLockedBadge}>
-                        <Ionicons name="lock-closed" size={48} color="#ffffff" />
-                        <Text style={styles.detailModalLockedText}>Locked</Text>
-                        <Text style={styles.detailModalLockedSubtext}>
-                          This capsule will unlock on {selectedCapsule?.open_at ? new Date(selectedCapsule.open_at).toLocaleDateString() : 'the specified date'}
-                        </Text>
-                      </View>
-                    </View>
-                  </BlurView>
-                </View>
-              )}
             </ScrollView>
 
             {/* Share Button - Fixed at bottom */}
@@ -649,16 +804,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 5,
+    overflow: 'hidden',
   },
   detailModalDragHandle: {
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    alignSelf: 'stretch',
   },
   detailModalDragIndicator: {
-    width: 40,
-    height: 4,
+    width: 48,
+    height: 5,
     backgroundColor: '#cbd5e1',
-    borderRadius: 2,
+    borderRadius: 3,
   },
   detailModalCloseButton: {
     position: 'absolute',
@@ -676,11 +834,76 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   detailModalContentContainer: {
-    padding: 24,
-    paddingBottom: 100,
+    paddingBottom: Platform.OS === 'ios' ? 120 : 100,
+    flexGrow: 1,
   },
-  detailModalContentWrapper: {
+  detailModalMediaSection: {
+    width: '100%',
+  },
+  detailModalMediaContainer: {
+    width: '100%',
+    height: 250,
+    backgroundColor: '#f1f5f9',
     position: 'relative',
+  },
+  detailModalMediaImage: {
+    width: '100%',
+    height: '100%',
+  },
+  detailModalMediaVideoContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+  },
+  detailModalVideoIcon: {
+    position: 'absolute',
+    zIndex: 2,
+    opacity: 0.8,
+  },
+  detailModalMediaBlur: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  detailModalMediaLockedBadge: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 28,
+    paddingVertical: 20,
+    borderRadius: 20,
+    maxWidth: width * 0.8,
+  },
+  detailModalMediaLockedText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginTop: 12,
+  },
+  detailModalMediaLockedSubtext: {
+    fontSize: 13,
+    color: '#e2e8f0',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  detailModalMediaPlaceholder: {
+    width: '100%',
+    height: 250,
+    backgroundColor: '#f8fafc',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailModalMediaPlaceholderText: {
+    fontSize: 14,
+    color: '#94a3b8',
+    marginTop: 8,
+  },
+  detailModalTextContent: {
+    paddingHorizontal: 24,
+    paddingVertical: 20,
   },
   detailModalTitle: {
     fontSize: 28,
@@ -694,14 +917,11 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: 24,
   },
-  detailModalInfoSection: {
-    gap: 12,
-  },
   detailModalCountdownContainer: {
     backgroundColor: '#f8fafc',
     borderRadius: 16,
     padding: 20,
-    marginBottom: 16,
+    marginBottom: 24,
   },
   detailModalCountdownLabel: {
     fontSize: 14,
@@ -743,42 +963,89 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748b',
   },
-  detailModalBlurContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 999,
+  detailModalSection: {
+    marginBottom: 24,
   },
-  detailModalBlurView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  detailModalLockedOverlay: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  detailModalLockedBadge: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    paddingHorizontal: 32,
-    paddingVertical: 24,
-    borderRadius: 20,
-  },
-  detailModalLockedText: {
-    fontSize: 24,
+  detailModalSectionTitle: {
+    fontSize: 18,
     fontWeight: '700',
-    color: '#ffffff',
-    marginTop: 12,
+    color: '#1e293b',
+    marginBottom: 12,
   },
-  detailModalLockedSubtext: {
+  detailModalSharedContainer: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 16,
+  },
+  detailModalPublicBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  detailModalPublicText: {
     fontSize: 14,
-    color: '#e2e8f0',
-    marginTop: 8,
-    textAlign: 'center',
-    maxWidth: 280,
+    color: '#64748b',
+  },
+  detailModalSharedList: {
+    gap: 16,
+  },
+  detailModalSharedUser: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  detailModalSharedAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#e2e8f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailModalSharedName: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  detailModalMetaContainer: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 16,
+    gap: 16,
+  },
+  detailModalMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  detailModalMetaTextContainer: {
+    flex: 1,
+  },
+  detailModalMetaLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#94a3b8',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  detailModalMetaValue: {
+    fontSize: 14,
+    color: '#1e293b',
+    fontWeight: '500',
+  },
+  detailModalMapContainer: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#f1f5f9',
+  },
+  detailModalMiniMap: {
+    flex: 1,
+  },
+  detailModalMapMarker: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   detailModalFooter: {
     position: 'absolute',

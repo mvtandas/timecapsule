@@ -20,8 +20,8 @@ type Screen = 'Welcome' | 'Login' | 'Signup' | 'Dashboard' | 'MyCapsules' | 'Cre
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('Welcome');
-  const [previousScreen, setPreviousScreen] = useState<Screen>('Welcome');
+  const [currentScreen, setCurrentScreen] = useState<string>('Welcome');
+  const [previousScreen, setPreviousScreen] = useState<string>('Welcome');
   const [navigationData, setNavigationData] = useState<any>(null);
   const { user, loading, refreshSession, signOut } = useAuthStore();
   
@@ -34,7 +34,7 @@ export default function App() {
     refreshSession();
   }, []);
 
-  const navigate = (screen: Screen, data?: any) => {
+  const navigate = (screen: string, data?: any) => {
     if (screen === currentScreen) return;
     
     // Store navigation data if provided
@@ -84,7 +84,7 @@ export default function App() {
   };
 
   // Determine if navigation is forward (right-to-left) or backward (left-to-right)
-  const shouldAnimateForward = (from: Screen, to: Screen): boolean => {
+  const shouldAnimateForward = (from: string, to: string): boolean => {
     // Profile navigation from Dashboard should animate forward (right-to-left)
     if (from === 'Dashboard' && to === 'Profile') return true;
     if (from === 'Dashboard' && to === 'FriendProfile') return true;
