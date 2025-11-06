@@ -10,9 +10,10 @@ const { width, height } = Dimensions.get('window');
 interface MyCapsulesScreenProps {
   onNavigate: (screen: string, data?: any) => void;
   onLogout?: () => void;
+  onGoBack?: () => void;
 }
 
-const MyCapsulesScreen = ({ onNavigate }: MyCapsulesScreenProps) => {
+const MyCapsulesScreen = ({ onNavigate, onGoBack }: MyCapsulesScreenProps) => {
   const [activeTab, setActiveTab] = useState<'created' | 'shared'>('created');
   const [capsules, setCapsules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -219,7 +220,7 @@ const MyCapsulesScreen = ({ onNavigate }: MyCapsulesScreenProps) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => onNavigate('Dashboard')} style={styles.backButton}>
+        <TouchableOpacity onPress={() => onGoBack && onGoBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#1e293b" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Capsules</Text>
@@ -373,7 +374,7 @@ const MyCapsulesScreen = ({ onNavigate }: MyCapsulesScreenProps) => {
               activeOpacity={0.7}
             >
               <Ionicons name="close" size={24} color="#64748b" />
-            </TouchableOpacity>
+        </TouchableOpacity>
 
             {/* Content */}
             <ScrollView 
@@ -624,8 +625,8 @@ const MyCapsulesScreen = ({ onNavigate }: MyCapsulesScreenProps) => {
               >
                 <Ionicons name="share-social" size={20} color="#1e293b" style={styles.detailModalShareIcon} />
                 <Text style={styles.detailModalShareText}>Share Capsule</Text>
-              </TouchableOpacity>
-            </View>
+        </TouchableOpacity>
+      </View>
           </Animated.View>
         </View>
       </Modal>

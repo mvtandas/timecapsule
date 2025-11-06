@@ -1,16 +1,33 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Image, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Image, Platform, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { getRecentVisits, addRecentVisit, RecentVisit } from '../../utils/recentVisits';
 
 interface FriendsScreenProps {
   onNavigate: (screen: string, data?: any) => void;
+  onGoBack?: () => void;
+}
+
+interface FriendWithActivity {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  lastCapsule?: {
+    title: string;
+    location?: string;
+    created_at: string;
+  } | null;
 }
 
 const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
   // Recent visits (replaces static friends data)
   const [recentVisits, setRecentVisits] = useState<RecentVisit[]>([]);
+
+  // Friends list state
+  const [friends, setFriends] = useState<FriendWithActivity[]>([]);
+  const [loadingFriends, setLoadingFriends] = useState(true);
 
   // User search state
   const [userSearchQuery, setUserSearchQuery] = useState('');
@@ -19,14 +36,104 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load recent visits on mount
+  // Load recent visits and friends on mount
   useEffect(() => {
     loadRecentVisits();
+    loadFriends();
   }, []);
 
   const loadRecentVisits = async () => {
     const visits = await getRecentVisits();
     setRecentVisits(visits);
+  };
+
+  // Load friends with their last activity
+  const loadFriends = async () => {
+    try {
+      setLoadingFriends(true);
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoadingFriends(false);
+        return;
+      }
+
+      // For now, get users who have interacted with current user's capsules
+      // or users the current user has shared capsules with
+      const { data: capsulesData, error: capsulesError } = await supabase
+        .from('capsules')
+        .select('created_by, shared_with')
+        .or(`created_by.eq.${user.id},shared_with.cs.{${user.id}}`);
+
+      if (capsulesError) {
+        console.error('Error fetching capsules:', capsulesError);
+        setLoadingFriends(false);
+        return;
+      }
+
+      // Extract unique user IDs (friends)
+      const friendIds = new Set<string>();
+      capsulesData?.forEach(capsule => {
+        if (capsule.created_by && capsule.created_by !== user.id) {
+          friendIds.add(capsule.created_by);
+        }
+        if (capsule.shared_with && Array.isArray(capsule.shared_with)) {
+          capsule.shared_with.forEach((id: string) => {
+            if (id !== user.id) friendIds.add(id);
+          });
+        }
+      });
+
+      // Get friend profiles
+      const friendIdsArray = Array.from(friendIds);
+      if (friendIdsArray.length === 0) {
+        setFriends([]);
+        setLoadingFriends(false);
+        return;
+      }
+
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .in('id', friendIdsArray);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        setLoadingFriends(false);
+        return;
+      }
+
+      // Get last capsule for each friend
+      const friendsWithActivity: FriendWithActivity[] = await Promise.all(
+        (profilesData || []).map(async (profile) => {
+          const { data: lastCapsule } = await supabase
+            .from('capsules')
+            .select('title, lat, lng, created_at')
+            .eq('created_by', profile.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          return {
+            ...profile,
+            lastCapsule: lastCapsule ? {
+              title: lastCapsule.title || 'Untitled',
+              location: lastCapsule.lat && lastCapsule.lng 
+                ? `${lastCapsule.lat.toFixed(2)}, ${lastCapsule.lng.toFixed(2)}`
+                : undefined,
+              created_at: lastCapsule.created_at,
+            } : null,
+          };
+        })
+      );
+
+      setFriends(friendsWithActivity);
+    } catch (error) {
+      console.error('Error loading friends:', error);
+    } finally {
+      setLoadingFriends(false);
+    }
   };
 
   // Search users by username
@@ -108,8 +215,41 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
     onNavigate('FriendProfile', { friend: visit });
   };
 
+  // Handle friend press
+  const handleFriendPress = async (friend: FriendWithActivity) => {
+    // Add to recent visits
+    await addRecentVisit({
+      id: friend.id,
+      username: friend.username,
+      display_name: friend.display_name,
+      avatar_url: friend.avatar_url,
+    });
+    
+    // Reload recent visits
+    await loadRecentVisits();
+    
+    onNavigate('FriendProfile', { friend });
+  };
+
+  // Format time ago
+  const formatTimeAgo = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Friends</Text>
       </View>
@@ -219,10 +359,94 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
           )}
         </View>
 
+        {/* My Friends Section - Full List */}
+        <View style={styles.allFriendsSection}>
+          <Text style={styles.sectionTitle}>
+            My Friends {friends.length > 0 && `(${friends.length})`}
+          </Text>
+          
+          {loadingFriends ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#FAC638" />
+              <Text style={styles.loadingText}>Loading friends...</Text>
+            </View>
+          ) : friends.length > 0 ? (
+            <View style={styles.friendsList}>
+              {friends.map((friend, index) => (
+                <TouchableOpacity
+                  key={friend.id}
+                  style={[
+                    styles.friendListItem,
+                    index < friends.length - 1 && styles.friendListItemBorder
+                  ]}
+                  onPress={() => handleFriendPress(friend)}
+                  activeOpacity={0.7}
+                >
+                  {/* Left: Avatar */}
+                  {friend.avatar_url ? (
+                    <Image source={{ uri: friend.avatar_url }} style={styles.friendListAvatar} />
+                  ) : (
+                    <View style={[styles.friendListAvatar, styles.friendListAvatarPlaceholder]}>
+                      <Ionicons name="person" size={24} color="#94a3b8" />
+                    </View>
+                  )}
+
+                  {/* Center: Name and Username */}
+                  <View style={styles.friendListInfo}>
+                    <Text style={styles.friendListName} numberOfLines={1}>
+                      {friend.display_name || friend.username}
+                    </Text>
+                    {friend.display_name && (
+                      <Text style={styles.friendListUsername} numberOfLines={1}>
+                        @{friend.username}
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* Right: Activity Indicator */}
+                  <View style={styles.friendListActivity}>
+                    {friend.lastCapsule ? (
+                      <>
+                        <View style={styles.activityRow}>
+                          <Ionicons name="time-outline" size={14} color="#64748b" />
+                          <Text style={styles.activityText} numberOfLines={1}>
+                            {formatTimeAgo(friend.lastCapsule.created_at)}
+                          </Text>
+                        </View>
+                        {friend.lastCapsule.location && (
+                          <View style={styles.activityRow}>
+                            <Ionicons name="location-outline" size={14} color="#64748b" />
+                            <Text style={styles.activityText} numberOfLines={1}>
+                              {friend.lastCapsule.title}
+                            </Text>
+                          </View>
+                        )}
+                      </>
+                    ) : (
+                      <Text style={styles.activityTextMuted}>No activity</Text>
+                    )}
+                  </View>
+
+                  {/* Chevron */}
+                  <Ionicons name="chevron-forward" size={20} color="#cbd5e1" style={styles.friendListChevron} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="people-outline" size={48} color="#cbd5e1" />
+              <Text style={styles.emptyStateText}>No friends yet</Text>
+              <Text style={styles.emptyStateSubtext}>
+                Start by creating and sharing capsules with others
+              </Text>
+            </View>
+          )}
+        </View>
+
         {/* Bottom padding for tab bar */}
         <View style={{ height: 100 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -233,8 +457,9 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: 'white',
+    paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight ? StatusBar.currentHeight + 16 : 16,
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
@@ -393,6 +618,84 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  // All Friends Section - List View
+  allFriendsSection: {
+    backgroundColor: 'white',
+    padding: 20,
+    marginBottom: 20,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#64748b',
+    marginTop: 12,
+  },
+  friendsList: {
+    marginTop: 8,
+  },
+  friendListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  friendListItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  friendListAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    marginRight: 12,
+  },
+  friendListAvatarPlaceholder: {
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  friendListInfo: {
+    flex: 1,
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  friendListName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  friendListUsername: {
+    fontSize: 14,
+    color: '#64748b',
+  },
+  friendListActivity: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  activityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  activityText: {
+    fontSize: 12,
+    color: '#64748b',
+    marginLeft: 4,
+    maxWidth: 120,
+  },
+  activityTextMuted: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+  },
+  friendListChevron: {
+    marginLeft: 4,
   },
 });
 

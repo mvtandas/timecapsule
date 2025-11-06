@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 interface BottomTabBarProps {
   activeTab: string;
-  onNavigate: (screen: string) => void;
+  onNavigate: (screen: string, data?: any, replace?: boolean) => void;
 }
 
 const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onNavigate }) => {
@@ -22,7 +22,7 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onNavigate }) =>
           <TouchableOpacity
             key={tab.id}
             style={styles.tab}
-            onPress={() => onNavigate(tab.id)}
+            onPress={() => onNavigate(tab.id, undefined, true)}
             activeOpacity={0.7}
           >
             <Ionicons

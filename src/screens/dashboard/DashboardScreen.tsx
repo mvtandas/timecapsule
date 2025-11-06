@@ -10,6 +10,7 @@ import { CapsuleIcon } from '../../components/common/CapsuleIcon';
 interface DashboardScreenProps {
   onNavigate: (screen: string, data?: any) => void;
   onLogout?: () => void;
+  onGoBack?: () => void;
 }
 
 const { width, height } = Dimensions.get('window');
@@ -668,7 +669,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
       >
         <Ionicons name="add-circle" size={24} color="white" style={styles.createButtonIcon} />
         <Text style={styles.createButtonText}>Create Capsule</Text>
-      </TouchableOpacity>
+        </TouchableOpacity>
 
       {/* Nearby Capsules Section */}
       <View style={styles.nearbyCapsules}>
@@ -678,7 +679,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
           <Text style={styles.nearbyCount}>
             {capsules.filter(c => c.is_public).length} posts
           </Text>
-        </View>
+      </View>
 
         {/* Tabs: Top / Recent */}
         <View style={styles.tabsContainer}>
@@ -745,7 +746,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                     ) : (
                       <View style={[styles.gridImage, styles.gridImagePlaceholder]}>
                         <Ionicons name="image-outline" size={32} color="#cbd5e1" />
-                      </View>
+        </View>
                     )}
                     
                     {/* Locked Overlay */}
@@ -760,7 +761,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                       <Ionicons name="location" size={10} color="white" />
                       <Text style={styles.distanceText}>{formatDistance(distance)}</Text>
                     </View>
-                  </TouchableOpacity>
+            </TouchableOpacity>
                 );
               })}
           </View>
@@ -811,7 +812,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
             {/* Drag Handle - Swipe down to dismiss */}
             <View style={styles.detailModalDragHandle} {...detailModalPanResponder.panHandlers}>
               <View style={styles.detailModalDragBar} />
-            </View>
+      </View>
 
             {/* Close Button */}
             <TouchableOpacity 
@@ -839,7 +840,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                       <View style={styles.detailModalPublicBadge}>
                         <Ionicons name="globe-outline" size={20} color="#06D6A0" />
                         <Text style={styles.detailModalPublicText}>This capsule is public</Text>
-                      </View>
+            </View>
                     ) : (
                       <ScrollView
                         horizontal
@@ -859,7 +860,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                                 ) : (
                                   <View style={styles.detailModalSharedAvatarPlaceholder}>
           <Ionicons name="person" size={24} color="#94a3b8" />
-                                  </View>
+          </View>
                                 )}
                                 {isCurrentUser && (
                                   <View style={styles.detailModalSharedBadge}>
@@ -899,8 +900,8 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                             />
                           );
                         })}
-                      </View>
-                    </View>
+            </View>
+          </View>
                   )}
 
                   {/* Locked Media Placeholder */}
@@ -1107,7 +1108,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
             {/* Drag Handle */}
             <View style={styles.inviteModalDragHandle} {...inviteModalPanResponder.panHandlers}>
               <View style={styles.inviteModalDragBar} />
-            </View>
+      </View>
 
             {/* Close Button */}
             <TouchableOpacity 
@@ -1195,8 +1196,8 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                 >
                   <Ionicons name="paper-plane" size={20} color="white" style={styles.inviteModalActionButtonIcon} />
                   <Text style={styles.inviteModalActionButtonText}>Send Invitation</Text>
-                </TouchableOpacity>
-              </View>
+        </TouchableOpacity>
+      </View>
             </ScrollView>
           </Animated.View>
         </View>

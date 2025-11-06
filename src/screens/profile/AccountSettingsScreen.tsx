@@ -6,9 +6,10 @@ import { AuthService } from '../../lib/auth';
 
 interface AccountSettingsScreenProps {
   onNavigate: (screen: string, data?: any) => void;
+  onGoBack?: () => void;
 }
 
-const AccountSettingsScreen = ({ onNavigate }: AccountSettingsScreenProps) => {
+const AccountSettingsScreen = ({ onNavigate, onGoBack }: AccountSettingsScreenProps) => {
   const { user, updateProfile } = useAuthStore();
   
   // User info edit state
@@ -139,7 +140,7 @@ const AccountSettingsScreen = ({ onNavigate }: AccountSettingsScreenProps) => {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => onNavigate('Profile')}
+          onPress={() => onGoBack && onGoBack()}
         >
           <Ionicons name="arrow-back" size={24} color="#1e293b" />
         </TouchableOpacity>

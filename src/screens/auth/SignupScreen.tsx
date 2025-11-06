@@ -6,9 +6,10 @@ import { useAuthStore } from '../../store/authStore';
 interface SignupScreenProps {
   onNavigate: (screen: 'Welcome' | 'Login' | 'Signup') => void;
   onSignup: () => void;
+  onGoBack?: () => void;
 }
 
-const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup }) => {
+const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoBack }) => {
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -93,7 +94,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup }) => 
   };
   
   const handleBack = () => {
-    onNavigate('Welcome');
+    onGoBack && onGoBack();
   };
 
   return (

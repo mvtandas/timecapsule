@@ -1,7 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Animated, Dimensions, SafeAreaView } from 'react-native';
 import { useAuthStore } from './src/store/authStore';
 import WelcomeScreen from './src/screens/auth/WelcomeScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
@@ -25,6 +25,7 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<string>('Welcome');
   const [previousScreen, setPreviousScreen] = useState<string>('Welcome');
   const [navigationData, setNavigationData] = useState<any>(null);
+  const [navigationHistory, setNavigationHistory] = useState<Array<{screen: string, data?: any}>>([{screen: 'Welcome'}]);
   const { user, loading, refreshSession, signOut } = useAuthStore();
   
   // Animation values
@@ -36,8 +37,8 @@ export default function App() {
     refreshSession();
   }, []);
 
-  const navigate = (screen: string, data?: any) => {
-    if (screen === currentScreen) return;
+  const navigate = (screen: string, data?: any, replace: boolean = false) => {
+    if (screen === currentScreen && !replace) return;
     
     // Store navigation data if provided
     if (data) {
@@ -48,6 +49,19 @@ export default function App() {
     const isForward = shouldAnimateForward(currentScreen, screen);
     
     setPreviousScreen(currentScreen);
+    
+    // Update navigation history
+    if (replace) {
+      // Replace current screen in history (for tab switching)
+      setNavigationHistory(prev => {
+        const newHistory = [...prev];
+        newHistory[newHistory.length - 1] = { screen, data };
+        return newHistory;
+      });
+    } else {
+      // Add to navigation history (for forward navigation)
+      setNavigationHistory(prev => [...prev, { screen, data }]);
+    }
     
     // Animate out current screen
     Animated.parallel([
@@ -70,6 +84,65 @@ export default function App() {
       fadeAnim.setValue(0);
       
       // Animate in new screen
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+  };
+
+  const goBack = () => {
+    if (navigationHistory.length <= 1) {
+      // Already at the first screen, can't go back
+      return;
+    }
+    
+    // Remove current screen from history
+    const newHistory = [...navigationHistory];
+    newHistory.pop();
+    setNavigationHistory(newHistory);
+    
+    // Get previous screen
+    const previous = newHistory[newHistory.length - 1];
+    
+    // Navigate to previous screen
+    const isForward = false; // Going back is always backward animation
+    
+    if (previous.data) {
+      setNavigationData(previous.data);
+    }
+    
+    setPreviousScreen(currentScreen);
+    
+    // Animate out current screen
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: SCREEN_WIDTH, // Always slide right (backward)
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Switch screen
+      setCurrentScreen(previous.screen);
+      
+      // Reset position for previous screen (from left)
+      slideAnim.setValue(-SCREEN_WIDTH);
+      fadeAnim.setValue(0);
+      
+      // Animate in previous screen
       Animated.parallel([
         Animated.timing(slideAnim, {
           toValue: 0,
@@ -133,6 +206,8 @@ export default function App() {
     // If user is authenticated, go to Dashboard with animation
     if (user && currentScreen === 'Welcome') {
       navigate('Dashboard');
+      // Clear history and start fresh from Dashboard
+      setNavigationHistory([{screen: 'Dashboard'}]);
     }
     // If user logs out, go to Welcome (handled in handleLogout)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -140,6 +215,8 @@ export default function App() {
 
   const handleLogin = () => {
     navigate('Dashboard');
+    // Clear history and start fresh from Dashboard
+    setNavigationHistory([{screen: 'Dashboard'}]);
   };
 
   const handleLogout = async () => {
@@ -148,6 +225,8 @@ export default function App() {
     slideAnim.setValue(0);
     fadeAnim.setValue(1);
     setCurrentScreen('Welcome');
+    // Reset navigation history
+    setNavigationHistory([{screen: 'Welcome'}]);
   };
 
   // Show loading screen while checking auth
@@ -163,42 +242,48 @@ export default function App() {
   const shouldShowBottomTabs = ['Dashboard', 'Friends', 'Profile'].includes(currentScreen);
 
   return (
-    <View style={styles.container}>
-      <Animated.View 
-        style={[
-          styles.screenContainer,
-          {
-            transform: [{ translateX: slideAnim }],
-            opacity: fadeAnim,
-          },
-        ]}
-      >
-        {currentScreen === 'Welcome' && <WelcomeScreen onNavigate={navigate} />}
-        {currentScreen === 'Login' && <LoginScreen onNavigate={navigate} onLogin={handleLogin} />}
-        {currentScreen === 'Signup' && <SignupScreen onNavigate={navigate} onSignup={handleLogin} />}
-        {currentScreen === 'Dashboard' && <DashboardScreen onNavigate={navigate} onLogout={handleLogout} />}
-        {currentScreen === 'Friends' && <FriendsScreen onNavigate={navigate} />}
-        {currentScreen === 'MyCapsules' && <MyCapsulesScreen onNavigate={navigate} onLogout={handleLogout} />}
-        {currentScreen === 'Create' && <CreateCapsuleScreen onNavigate={navigate} />}
-        {currentScreen === 'Explore' && <ExploreScreen onNavigate={navigate} />}
-        {currentScreen === 'Profile' && <ProfileScreen onNavigate={navigate} onLogout={handleLogout} />}
-        {currentScreen === 'FriendProfile' && navigationData?.friend && (
-          <FriendProfileScreen onNavigate={navigate} friend={navigationData.friend} />
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <Animated.View 
+          style={[
+            styles.screenContainer,
+            {
+              transform: [{ translateX: slideAnim }],
+              opacity: fadeAnim,
+            },
+          ]}
+        >
+          {currentScreen === 'Welcome' && <WelcomeScreen onNavigate={navigate} onGoBack={goBack} />}
+          {currentScreen === 'Login' && <LoginScreen onNavigate={navigate} onLogin={handleLogin} onGoBack={goBack} />}
+          {currentScreen === 'Signup' && <SignupScreen onNavigate={navigate} onSignup={handleLogin} onGoBack={goBack} />}
+          {currentScreen === 'Dashboard' && <DashboardScreen onNavigate={navigate} onLogout={handleLogout} onGoBack={goBack} />}
+          {currentScreen === 'Friends' && <FriendsScreen onNavigate={navigate} onGoBack={goBack} />}
+          {currentScreen === 'MyCapsules' && <MyCapsulesScreen onNavigate={navigate} onLogout={handleLogout} onGoBack={goBack} />}
+          {currentScreen === 'Create' && <CreateCapsuleScreen onNavigate={navigate} onGoBack={goBack} />}
+          {currentScreen === 'Explore' && <ExploreScreen onNavigate={navigate} onGoBack={goBack} />}
+          {currentScreen === 'Profile' && <ProfileScreen onNavigate={navigate} onLogout={handleLogout} onGoBack={goBack} />}
+          {currentScreen === 'FriendProfile' && navigationData?.friend && (
+            <FriendProfileScreen onNavigate={navigate} friend={navigationData.friend} onGoBack={goBack} />
+          )}
+          {currentScreen === 'AccountSettings' && <AccountSettingsScreen onNavigate={navigate} onGoBack={goBack} />}
+        </Animated.View>
+        
+        {/* Bottom Tab Bar - Only show on main screens */}
+        {shouldShowBottomTabs && user && (
+          <BottomTabBar activeTab={currentScreen} onNavigate={navigate} />
         )}
-        {currentScreen === 'AccountSettings' && <AccountSettingsScreen onNavigate={navigate} />}
-      </Animated.View>
-      
-      {/* Bottom Tab Bar - Only show on main screens */}
-      {shouldShowBottomTabs && user && (
-        <BottomTabBar activeTab={currentScreen} onNavigate={navigate} />
-      )}
-      
-      <StatusBar style="auto" />
-    </View>
+        
+        <StatusBar style="auto" />
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: 'white',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f8f8f5',

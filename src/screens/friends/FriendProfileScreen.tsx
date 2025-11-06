@@ -15,10 +15,11 @@ const { width, height } = Dimensions.get('window');
 
 interface FriendProfileScreenProps {
   onNavigate: (screen: string) => void;
+  onGoBack?: () => void;
   friend: Friend;
 }
 
-const FriendProfileScreen = ({ onNavigate, friend }: FriendProfileScreenProps) => {
+const FriendProfileScreen = ({ onNavigate, onGoBack, friend }: FriendProfileScreenProps) => {
   const [activeTab, setActiveTab] = useState<'shared' | 'public' | 'activity'>('shared');
 
   // Mock capsule data shared with this friend
@@ -52,7 +53,7 @@ const FriendProfileScreen = ({ onNavigate, friend }: FriendProfileScreenProps) =
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => onNavigate('Dashboard')}
+          onPress={() => onGoBack && onGoBack()}
         >
           <Ionicons name="arrow-back" size={24} color="#1e293b" />
         </TouchableOpacity>

@@ -5,13 +5,13 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../../store/authStore';
 import { CapsuleService } from '../../services/capsuleService';
 import { MediaService } from '../../lib/media';
-import { Friend } from '../../types';
 
 const { height } = Dimensions.get('window');
 
 interface ProfileScreenProps {
   onNavigate: (screen: string, data?: any) => void;
   onLogout: () => void;
+  onGoBack?: () => void;
 }
 
 const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
@@ -29,46 +29,6 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
   const [photoPickerVisible, setPhotoPickerVisible] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(user?.avatar_url || null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  
-  // Friends state
-  const [newUsername, setNewUsername] = useState('');
-  const [friends, setFriends] = useState<Friend[]>([
-    {
-      id: '1',
-      name: 'Elif Yılmaz',
-      username: 'elifyilmaz',
-      avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
-      friends_since: '2021',
-    },
-    {
-      id: '2',
-      name: 'Ahmet Demir',
-      username: 'ahmetdemir',
-      avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
-      friends_since: '2022',
-    },
-    {
-      id: '3',
-      name: 'Zeynep Kaya',
-      username: 'zeynepkaya',
-      avatar_url: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400',
-      friends_since: '2020',
-    },
-    {
-      id: '4',
-      name: 'Mehmet Öztürk',
-      username: 'mehmetozturk',
-      avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
-      friends_since: '2023',
-    },
-    {
-      id: '5',
-      name: 'Ayşe Şahin',
-      username: 'aysesahin',
-      avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400',
-      friends_since: '2021',
-    },
-  ]);
 
   useEffect(() => {
     loadStats();
@@ -180,38 +140,6 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Logout', onPress: onLogout, style: 'destructive' },
     ]);
-  };
-
-  const handleAddFriend = () => {
-    if (!newUsername.trim()) {
-      Alert.alert('Error', 'Please enter a username');
-      return;
-    }
-
-    const username = newUsername.trim().toLowerCase();
-    
-    // Check if already a friend
-    if (friends.find(f => f.username === username)) {
-      Alert.alert('Already Friends', 'This user is already in your friends list');
-      setNewUsername('');
-      return;
-    }
-
-    // Mock add friend (in real app, would call API)
-    const newFriend: Friend = {
-      id: Date.now().toString(),
-      name: username.charAt(0).toUpperCase() + username.slice(1),
-      username: username,
-      friends_since: new Date().getFullYear().toString(),
-    };
-
-    setFriends([...friends, newFriend]);
-    setNewUsername('');
-    Alert.alert('Success', `Added @${username} to your friends!`);
-  };
-
-  const handleFriendPress = (friend: Friend) => {
-    onNavigate('FriendProfile', { friend });
   };
 
   const handleAvatarPress = () => {
@@ -391,72 +319,6 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
               <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
             </View>
           </TouchableOpacity>
-        </View>
-
-        {/* My Friends Section */}
-        <View style={styles.friendsCard}>
-          <Text style={styles.friendsTitle}>My Friends</Text>
-          
-          {/* Add Friend Input */}
-          <View style={styles.addFriendContainer}>
-            <View style={styles.usernameInputContainer}>
-              <Ionicons name="at-outline" size={20} color="#94a3b8" style={styles.usernameIcon} />
-              <TextInput
-                style={styles.usernameInput}
-                value={newUsername}
-                onChangeText={setNewUsername}
-                placeholder="Enter username to add friend"
-                placeholderTextColor="#94a3b8"
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="done"
-                onSubmitEditing={handleAddFriend}
-              />
-            </View>
-            <TouchableOpacity
-              style={styles.addFriendButton}
-              onPress={handleAddFriend}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="add-circle" size={24} color="#FAC638" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Friends List */}
-          {friends.length > 0 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.friendsScrollContent}
-            >
-              {friends.map((friend) => (
-                <TouchableOpacity
-                  key={friend.id}
-                  style={styles.friendItem}
-                  onPress={() => handleFriendPress(friend)}
-                  activeOpacity={0.7}
-                >
-                  {friend.avatar_url ? (
-                    <Image source={{ uri: friend.avatar_url }} style={styles.friendAvatar} />
-                  ) : (
-                    <View style={[styles.friendAvatar, styles.friendAvatarPlaceholder]}>
-                      <Ionicons name="person" size={32} color="#94a3b8" />
-                    </View>
-                  )}
-                  <Text style={styles.friendName} numberOfLines={1}>
-                    {friend.name.split(' ')[0]}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          ) : (
-            <View style={styles.emptyFriendsState}>
-              <Ionicons name="people-outline" size={48} color="#cbd5e1" />
-              <Text style={styles.emptyFriendsText}>
-                No friends yet. Add friends by entering their username above.
-              </Text>
-            </View>
-          )}
         </View>
 
         {/* My Capsules Preview */}
@@ -677,6 +539,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
+    paddingBottom: 120, // Extra space for bottom tab bar + logout button
   },
   profileCard: {
     backgroundColor: 'white',
@@ -786,95 +649,6 @@ const styles = StyleSheet.create({
   },
   chevronContainer: {
     paddingLeft: 4,
-  },
-  // Friends Section
-  friendsCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  friendsTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 16,
-  },
-  addFriendContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 20,
-  },
-  usernameInputContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  usernameIcon: {
-    marginRight: 12,
-  },
-  usernameInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1e293b',
-  },
-  addFriendButton: {
-    width: 50,
-    height: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FAC63820',
-    borderRadius: 12,
-  },
-  friendsScrollContent: {
-    paddingRight: 20,
-  },
-  friendItem: {
-    alignItems: 'center',
-    marginRight: 16,
-    width: 72,
-  },
-  friendAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: '#FAC638',
-  },
-  friendAvatarPlaceholder: {
-    backgroundColor: '#e2e8f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  friendName: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#64748b',
-    textAlign: 'center',
-  },
-  emptyFriendsState: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  emptyFriendsText: {
-    fontSize: 14,
-    color: '#94a3b8',
-    textAlign: 'center',
-    marginTop: 12,
-    lineHeight: 20,
   },
   // My Capsules Preview Styles
   capsulesPreviewCard: {
@@ -1033,7 +807,7 @@ const styles = StyleSheet.create({
     color: '#FF6B6B',
   },
   bottomSpacer: {
-    height: 20,
+    height: 100, // Extra space for bottom tab bar
   },
   // Photo Picker Modal
   photoPickerOverlay: {

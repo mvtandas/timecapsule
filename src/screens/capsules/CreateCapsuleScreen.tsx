@@ -28,9 +28,10 @@ const { width, height } = Dimensions.get('window');
 
 interface CreateCapsuleScreenProps {
   onNavigate: (screen: string) => void;
+  onGoBack?: () => void;
 }
 
-const CreateCapsuleScreen = ({ onNavigate }: CreateCapsuleScreenProps) => {
+const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps) => {
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -206,7 +207,7 @@ const CreateCapsuleScreen = ({ onNavigate }: CreateCapsuleScreenProps) => {
     if (step > 1) {
       setStep(step - 1);
     } else {
-      onNavigate('Dashboard');
+      onGoBack && onGoBack();
     }
   };
 
