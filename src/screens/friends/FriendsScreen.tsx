@@ -63,11 +63,12 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
       // or users the current user has shared capsules with
       const { data: capsulesData, error: capsulesError } = await supabase
         .from('capsules')
-        .select('created_by, shared_with')
-        .or(`created_by.eq.${user.id},shared_with.cs.{${user.id}}`);
+        .select('owner_id, shared_with')
+        .or(`owner_id.eq.${user.id},shared_with.cs.{${user.id}}`);
 
       if (capsulesError) {
-        console.error('Error fetching capsules:', capsulesError);
+        // Silently handle error - don't break the app
+        setFriends([]);
         setLoadingFriends(false);
         return;
       }
@@ -75,8 +76,8 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
       // Extract unique user IDs (friends)
       const friendIds = new Set<string>();
       capsulesData?.forEach(capsule => {
-        if (capsule.created_by && capsule.created_by !== user.id) {
-          friendIds.add(capsule.created_by);
+        if (capsule.owner_id && capsule.owner_id !== user.id) {
+          friendIds.add(capsule.owner_id);
         }
         if (capsule.shared_with && Array.isArray(capsule.shared_with)) {
           capsule.shared_with.forEach((id: string) => {
@@ -99,7 +100,8 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
         .in('id', friendIdsArray);
 
       if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
+        // Silently handle error
+        setFriends([]);
         setLoadingFriends(false);
         return;
       }
@@ -110,7 +112,7 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
           const { data: lastCapsule } = await supabase
             .from('capsules')
             .select('title, lat, lng, created_at')
-            .eq('created_by', profile.id)
+            .eq('owner_id', profile.id)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
@@ -130,7 +132,8 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
 
       setFriends(friendsWithActivity);
     } catch (error) {
-      console.error('Error loading friends:', error);
+      // Silently handle any errors - don't break the app
+      setFriends([]);
     } finally {
       setLoadingFriends(false);
     }

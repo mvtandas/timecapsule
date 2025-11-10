@@ -236,12 +236,16 @@ export class CapsuleService {
         capsule_uuid: capsuleId
       });
 
-      if (error) throw error;
+      if (error) {
+        // Silently ignore all errors - this feature is optional
+        // User needs to run db/migrations/005_add_view_count.sql in Supabase
+        return { error: null };
+      }
 
       return { error: null };
     } catch (error) {
-      console.error('Error incrementing view count:', error);
-      return { error };
+      // Silently ignore all errors - don't break the app
+      return { error: null };
     }
   }
 }

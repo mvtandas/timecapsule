@@ -44,65 +44,116 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
   const inviteModalTranslateY = useRef(new Animated.Value(INVITE_MODAL_HEIGHT)).current;
   const inviteModalBackdropOpacity = useRef(new Animated.Value(0)).current;
   
-  // Bottom sheet animation values
-  // Bottom sheet now extends to the bottom of the screen
-  const COLLAPSED_HEIGHT = height * 0.35; // 35% of screen height
-  const EXPANDED_HEIGHT = height * 0.90; // 90% of screen height
-  const bottomSheetHeight = useRef(new Animated.Value(COLLAPSED_HEIGHT)).current;
-  const [isExpanded, setIsExpanded] = useState(false);
+  // Bottom sheet animation values with multiple snap points
+  const SNAP_POINTS = {
+    COLLAPSED: height * 0.35,  // 35% - Initial collapsed state
+    MEDIUM: height * 0.60,     // 60% - Medium expanded state
+    EXPANDED: height * 0.90,   // 90% - Fully expanded state
+  };
+  
+  const SNAP_POINT_ARRAY = [
+    SNAP_POINTS.COLLAPSED,
+    SNAP_POINTS.MEDIUM,
+    SNAP_POINTS.EXPANDED,
+  ];
+  
+  const bottomSheetHeight = useRef(new Animated.Value(SNAP_POINTS.COLLAPSED)).current;
+  const [currentSnapPoint, setCurrentSnapPoint] = useState(SNAP_POINTS.COLLAPSED);
 
   useEffect(() => {
     loadCapsules();
   }, []);
 
-  // PanResponder for dragging the bottom sheet
+  // Helper function to find nearest snap point
+  const findNearestSnapPoint = (currentHeight: number, velocity: number) => {
+    // If fast swipe, prioritize velocity direction
+    if (Math.abs(velocity) > 0.8) {
+      if (velocity < -0.3) {
+        // Swiping up fast - go to next snap point
+        const nextPoints = SNAP_POINT_ARRAY.filter(p => p > currentHeight);
+        return nextPoints.length > 0 ? nextPoints[0] : SNAP_POINTS.EXPANDED;
+      } else if (velocity > 0.3) {
+        // Swiping down fast - go to previous snap point
+        const prevPoints = SNAP_POINT_ARRAY.filter(p => p < currentHeight);
+        return prevPoints.length > 0 ? prevPoints[prevPoints.length - 1] : SNAP_POINTS.COLLAPSED;
+      }
+    }
+    
+    // Find nearest snap point based on distance
+    let nearest = SNAP_POINTS.COLLAPSED;
+    let minDistance = Math.abs(currentHeight - nearest);
+    
+    SNAP_POINT_ARRAY.forEach(snapPoint => {
+      const distance = Math.abs(currentHeight - snapPoint);
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearest = snapPoint;
+      }
+    });
+    
+    return nearest;
+  };
+
+  // PanResponder for smooth draggable bottom sheet
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only respond to vertical movements with sufficient movement
-        // Prioritize vertical scrolling over horizontal
-        return Math.abs(gestureState.dy) > Math.abs(gestureState.dx) && Math.abs(gestureState.dy) > 10;
+        // Only respond to vertical movements
+        return Math.abs(gestureState.dy) > Math.abs(gestureState.dx) && Math.abs(gestureState.dy) > 5;
       },
-      onPanResponderTerminationRequest: () => false, // Don't allow termination
+      onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
-        bottomSheetHeight.setOffset(bottomSheetHeight._value);
-        bottomSheetHeight.setValue(0);
+        // Store current value as offset for smooth dragging
+        bottomSheetHeight.stopAnimation((value) => {
+          bottomSheetHeight.setOffset(value);
+          bottomSheetHeight.setValue(0);
+        });
       },
       onPanResponderMove: (_, gestureState) => {
-        const currentHeight = bottomSheetHeight._value + bottomSheetHeight._offset;
-        // Invert dy because dragging up should increase height
-        const newHeight = Math.max(
-          COLLAPSED_HEIGHT,
-          Math.min(EXPANDED_HEIGHT, currentHeight - gestureState.dy)
-        );
-        bottomSheetHeight.setValue(newHeight - bottomSheetHeight._offset);
+        // Smooth tracking of finger movement
+        // Negative dy = dragging up = increasing height
+        const newValue = -gestureState.dy;
+        
+        // Calculate what the actual height would be
+        const potentialHeight = bottomSheetHeight._offset + newValue;
+        
+        // Allow free movement between min and max with slight resistance at edges
+        if (potentialHeight < SNAP_POINTS.COLLAPSED) {
+          // Add resistance when dragging below collapsed
+          const resistance = 0.3;
+          const resistedValue = (potentialHeight - SNAP_POINTS.COLLAPSED) * resistance;
+          bottomSheetHeight.setValue(resistedValue);
+        } else if (potentialHeight > SNAP_POINTS.EXPANDED) {
+          // Add resistance when dragging above expanded
+          const resistance = 0.3;
+          const excess = potentialHeight - SNAP_POINTS.EXPANDED;
+          bottomSheetHeight.setValue(SNAP_POINTS.EXPANDED - bottomSheetHeight._offset + (excess * resistance));
+        } else {
+          // Free movement in valid range
+          bottomSheetHeight.setValue(newValue);
+        }
       },
       onPanResponderRelease: (_, gestureState) => {
+        // Flatten offset to get actual value
         bottomSheetHeight.flattenOffset();
         
         const currentHeight = bottomSheetHeight._value;
-        const velocity = gestureState.vy;
+        const velocity = gestureState.vy; // Negative = up, Positive = down
         
-        // Determine target height based on current position and velocity
-        let targetHeight;
-        if (Math.abs(velocity) > 0.5) {
-          // Fast swipe - use velocity to determine direction
-          // Negative velocity means dragging up (expanding)
-          targetHeight = velocity < 0 ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT;
-        } else {
-          // Slow drag - use current position
-          const midPoint = (COLLAPSED_HEIGHT + EXPANDED_HEIGHT) / 2;
-          targetHeight = currentHeight > midPoint ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT;
-        }
+        // Find nearest snap point based on position and velocity
+        const targetHeight = findNearestSnapPoint(currentHeight, velocity);
         
-        setIsExpanded(targetHeight === EXPANDED_HEIGHT);
+        setCurrentSnapPoint(targetHeight);
         
+        // Animate to snap point with natural spring physics
         Animated.spring(bottomSheetHeight, {
           toValue: targetHeight,
+          velocity: -velocity * 500, // Convert gesture velocity to animation velocity
           useNativeDriver: false,
-          tension: 50,
-          friction: 8,
+          tension: 80,
+          friction: 20,
+          overshootClamping: false,
         }).start();
       },
     })
@@ -237,9 +288,13 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
     setShowTimeModal(true);
     openDetailModal();
     
-    // Increment view count
+    // Increment view count (silently fail if not set up)
     if (capsule?.id) {
-      await CapsuleService.incrementViewCount(capsule.id);
+      try {
+        await CapsuleService.incrementViewCount(capsule.id);
+      } catch (error) {
+        // Silently ignore - view count feature not critical
+      }
     }
   };
 
@@ -249,9 +304,13 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
     setShowTimeModal(true);
     openDetailModal();
     
-    // Increment view count
+    // Increment view count (silently fail if not set up)
     if (capsule?.id) {
-      await CapsuleService.incrementViewCount(capsule.id);
+      try {
+        await CapsuleService.incrementViewCount(capsule.id);
+      } catch (error) {
+        // Silently ignore - view count feature not critical
+      }
     }
   };
 
@@ -613,8 +672,8 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
           styles.mapControlContainer,
           {
             bottom: bottomSheetHeight.interpolate({
-              inputRange: [COLLAPSED_HEIGHT, EXPANDED_HEIGHT],
-              outputRange: [COLLAPSED_HEIGHT + 20, EXPANDED_HEIGHT + 20],
+              inputRange: [SNAP_POINTS.COLLAPSED, SNAP_POINTS.EXPANDED],
+              outputRange: [SNAP_POINTS.COLLAPSED + 20, SNAP_POINTS.EXPANDED + 20],
               extrapolate: 'clamp',
             }),
           },

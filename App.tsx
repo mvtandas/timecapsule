@@ -1,7 +1,8 @@
 import 'react-native-url-polyfill/auto';
 import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, StyleSheet, Animated, Dimensions, SafeAreaView } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Animated, Dimensions } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthStore } from './src/store/authStore';
 import WelcomeScreen from './src/screens/auth/WelcomeScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
@@ -242,7 +243,7 @@ export default function App() {
   const shouldShowBottomTabs = ['Dashboard', 'Friends', 'Profile'].includes(currentScreen);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaProvider>
       <View style={styles.container}>
         <Animated.View 
           style={[
@@ -268,22 +269,18 @@ export default function App() {
           {currentScreen === 'AccountSettings' && <AccountSettingsScreen onNavigate={navigate} onGoBack={goBack} />}
         </Animated.View>
         
-        {/* Bottom Tab Bar - Only show on main screens */}
+        {/* Bottom Tab Bar - Fixed at bottom, outside scroll context */}
         {shouldShowBottomTabs && user && (
           <BottomTabBar activeTab={currentScreen} onNavigate={navigate} />
         )}
         
         <StatusBar style="auto" />
       </View>
-    </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
   container: {
     flex: 1,
     backgroundColor: '#f8f8f5',

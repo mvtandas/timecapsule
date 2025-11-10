@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, TextInput, Modal, Image, Dimensions } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, TextInput, Modal, Image, Dimensions, Animated, PanResponder } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../../store/authStore';
@@ -29,6 +29,13 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
   const [photoPickerVisible, setPhotoPickerVisible] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(user?.avatar_url || null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  // Invite modal state
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteIdentifier, setInviteIdentifier] = useState('');
+  const INVITE_MODAL_HEIGHT = height * 0.9;
+  const inviteModalTranslateY = useRef(new Animated.Value(INVITE_MODAL_HEIGHT)).current;
+  const inviteModalBackdropOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadStats();
@@ -247,6 +254,89 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
     }
   };
 
+  // Invite modal functions
+  const openInviteModal = () => {
+    setShowInviteModal(true);
+    Animated.parallel([
+      Animated.spring(inviteModalTranslateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 8,
+      }),
+      Animated.timing(inviteModalBackdropOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const closeInviteModal = () => {
+    Animated.parallel([
+      Animated.spring(inviteModalTranslateY, {
+        toValue: INVITE_MODAL_HEIGHT,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 8,
+      }),
+      Animated.timing(inviteModalBackdropOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowInviteModal(false);
+      setInviteIdentifier('');
+    });
+  };
+
+  const handleSendInvite = () => {
+    if (!inviteIdentifier.trim()) {
+      Alert.alert('Missing Information', 'Please enter a username or email address');
+      return;
+    }
+
+    // Placeholder logic - will be replaced with actual API call
+    Alert.alert(
+      'Invitation Sent!',
+      `Invitation sent to ${inviteIdentifier}. They will receive 5 Premium Capsules when they join!`,
+      [
+        {
+          text: 'OK',
+          onPress: closeInviteModal,
+        },
+      ]
+    );
+  };
+
+  // Pan responder for invite modal drag to dismiss
+  const inviteModalPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dy) > 5;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          inviteModalTranslateY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 150 || gestureState.vy > 0.5) {
+          closeInviteModal();
+        } else {
+          Animated.spring(inviteModalTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 50,
+            friction: 8,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -320,6 +410,19 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
             </View>
           </TouchableOpacity>
         </View>
+
+        {/* Invite Friends Button */}
+        <TouchableOpacity 
+          style={styles.inviteFriendsButton}
+          onPress={openInviteModal}
+          activeOpacity={0.8}
+        >
+          <View style={styles.inviteFriendsIcon}>
+            <Ionicons name="person-add" size={22} color="white" />
+          </View>
+          <Text style={styles.inviteFriendsText}>Invite Friends</Text>
+          <Ionicons name="chevron-forward" size={20} color="white" />
+        </TouchableOpacity>
 
         {/* My Capsules Preview */}
         <TouchableOpacity 
@@ -498,6 +601,136 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
               </TouchableOpacity>
             </View>
           </View>
+        </View>
+      </Modal>
+
+      {/* Invite Friends Modal */}
+      <Modal
+        visible={showInviteModal}
+        transparent
+        animationType="none"
+        onRequestClose={closeInviteModal}
+      >
+        <View style={styles.inviteModalContainer}>
+          {/* Backdrop */}
+          <Animated.View
+            style={[
+              styles.inviteModalBackdrop,
+              { opacity: inviteModalBackdropOpacity }
+            ]}
+          >
+            <TouchableOpacity 
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={closeInviteModal}
+            />
+          </Animated.View>
+
+          {/* Bottom Sheet */}
+          <Animated.View
+            style={[
+              styles.inviteModalSheet,
+              {
+                transform: [{ translateY: inviteModalTranslateY }],
+                height: INVITE_MODAL_HEIGHT,
+              },
+            ]}
+          >
+            {/* Drag Handle */}
+            <View style={styles.inviteModalDragHandle} {...inviteModalPanResponder.panHandlers}>
+              <View style={styles.inviteModalDragBar} />
+            </View>
+
+            {/* Close Button */}
+            <TouchableOpacity 
+              style={styles.inviteModalCloseButton}
+              onPress={closeInviteModal}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={18} color="#64748b" />
+            </TouchableOpacity>
+
+            {/* Scrollable Content */}
+            <ScrollView
+              style={styles.inviteModalContent}
+              contentContainerStyle={styles.inviteModalContentContainer}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Image/Banner Area */}
+              <View style={styles.inviteModalImagePlaceholder}>
+                <Ionicons name="gift" size={64} color="#FAC638" />
+              </View>
+
+              {/* Main Heading */}
+              <Text style={styles.inviteModalTitle}>
+                Invite Friend to TimeCapsule and earn 5 Premium Capsules!
+              </Text>
+
+              {/* Subtext */}
+              <Text style={styles.inviteModalSubtext}>
+                When your friend drops their first Capsule, both of you receive 5 Premium Capsules.
+              </Text>
+
+              {/* Form Section */}
+              <View style={styles.inviteModalForm}>
+                <Text style={styles.inviteModalFormLabel}>Friend's Username or Email</Text>
+                <View style={styles.inviteModalInputContainer}>
+                  <Ionicons name="person-add-outline" size={20} color="#94a3b8" style={styles.inviteModalInputIcon} />
+                  <TextInput
+                    style={styles.inviteModalInput}
+                    placeholder="Enter friend's username or email"
+                    placeholderTextColor="#94a3b8"
+                    value={inviteIdentifier}
+                    onChangeText={setInviteIdentifier}
+                    keyboardType="default"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+                <Text style={styles.inviteModalInputHint}>
+                  Enter either a username (e.g., johndoe) or email address
+                </Text>
+
+                {/* Benefits Section */}
+                <View style={styles.inviteModalBenefits}>
+                  <View style={styles.inviteModalBenefitItem}>
+                    <View style={styles.inviteModalBenefitIcon}>
+                      <Ionicons name="checkmark-circle" size={24} color="#06D6A0" />
+                    </View>
+                    <Text style={styles.inviteModalBenefitText}>
+                      Get 5 Premium Capsules instantly
+                    </Text>
+                  </View>
+                  <View style={styles.inviteModalBenefitItem}>
+                    <View style={styles.inviteModalBenefitIcon}>
+                      <Ionicons name="checkmark-circle" size={24} color="#06D6A0" />
+                    </View>
+                    <Text style={styles.inviteModalBenefitText}>
+                      Help your friend save memories
+                    </Text>
+                  </View>
+                  <View style={styles.inviteModalBenefitItem}>
+                    <View style={styles.inviteModalBenefitIcon}>
+                      <Ionicons name="checkmark-circle" size={24} color="#06D6A0" />
+                    </View>
+                    <Text style={styles.inviteModalBenefitText}>
+                      Build your TimeCapsule community
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Invite Action Button */}
+                <TouchableOpacity 
+                  style={styles.inviteModalActionButton}
+                  onPress={handleSendInvite}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="paper-plane" size={20} color="white" style={styles.inviteModalActionButtonIcon} />
+                  <Text style={styles.inviteModalActionButtonText}>Send Invitation</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </Animated.View>
         </View>
       </Modal>
 
@@ -934,6 +1167,179 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#64748b',
+  },
+  // Invite Friends Button
+  inviteFriendsButton: {
+    backgroundColor: '#06D6A0',
+    marginHorizontal: 16,
+    marginVertical: 12,
+    padding: 18,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    shadowColor: '#06D6A0',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  inviteFriendsIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inviteFriendsText: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '700',
+    color: 'white',
+  },
+  // Invite Modal Styles
+  inviteModalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  inviteModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  inviteModalSheet: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+  },
+  inviteModalDragHandle: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  inviteModalDragBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 2,
+  },
+  inviteModalCloseButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  inviteModalContent: {
+    flex: 1,
+  },
+  inviteModalContentContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  inviteModalImagePlaceholder: {
+    height: 200,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  inviteModalTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#1e293b',
+    textAlign: 'center',
+    lineHeight: 32,
+    marginBottom: 12,
+  },
+  inviteModalSubtext: {
+    fontSize: 15,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 32,
+  },
+  inviteModalForm: {
+    gap: 16,
+  },
+  inviteModalFormLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#475569',
+    marginBottom: 8,
+  },
+  inviteModalInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  inviteModalInputIcon: {
+    marginRight: 12,
+  },
+  inviteModalInput: {
+    flex: 1,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: '#1e293b',
+  },
+  inviteModalInputHint: {
+    fontSize: 13,
+    color: '#94a3b8',
+    marginTop: -8,
+  },
+  inviteModalBenefits: {
+    gap: 16,
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  inviteModalBenefitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  inviteModalBenefitIcon: {
+    width: 32,
+    height: 32,
+  },
+  inviteModalBenefitText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  inviteModalActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FAC638',
+    paddingVertical: 18,
+    borderRadius: 16,
+    marginTop: 32,
+    gap: 8,
+    shadowColor: '#FAC638',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  inviteModalActionButtonIcon: {
+    marginRight: 4,
+  },
+  inviteModalActionButtonText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: 'white',
   },
 });
 
