@@ -72,20 +72,16 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
   const viewedProfileId = friend?.id;
 
   const displayName = useMemo(() => {
-    return (
-      profile?.display_name ||
-      friend.display_name ||
-      friend.name ||
-      friend.username ||
-      'TimeCapsule User'
-    );
-  }, [profile?.display_name, friend.display_name, friend.name, friend.username]);
+    return profile?.display_name || friend?.display_name || friend?.name || 'TimeCapsule User';
+  }, [profile?.display_name, friend?.display_name, friend?.name]);
 
   const username = useMemo(() => {
-    return profile?.username || friend.username || friend.name || 'unknown';
-  }, [profile?.username, friend.username, friend.name]);
+    return profile?.username || friend?.username || 'unknown';
+  }, [profile?.username, friend?.username]);
 
-  const avatarUrl = profile?.avatar_url || friend.avatar_url || null;
+  const avatarUrl = useMemo(() => {
+    return profile?.avatar_url || friend?.avatar_url || null;
+  }, [profile?.avatar_url, friend?.avatar_url]);
 
   const formatTimeAgo = useCallback((dateString?: string | null) => {
     if (!dateString) return '—';
@@ -145,77 +141,78 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
     return `Opens on ${openDate.toLocaleDateString()}`;
   };
 
-  const buildActivityFeed = useCallback(
-    (publicList: CapsuleSummary[], sharedList: CapsuleSummary[]) => {
-      const events: ActivityEvent[] = [];
-      const uniqueCaps = new Map<string, CapsuleSummary>();
+  const buildActivityFeed = (publicList: CapsuleSummary[], sharedList: CapsuleSummary[]) => {
+    const events: ActivityEvent[] = [];
+    const uniqueCaps = new Map<string, CapsuleSummary>();
 
-      publicList.forEach((capsule) => {
+    publicList.forEach((capsule) => {
+      uniqueCaps.set(capsule.id, capsule);
+    });
+
+    sharedList.forEach((capsule) => {
+      if (!uniqueCaps.has(capsule.id)) {
         uniqueCaps.set(capsule.id, capsule);
-      });
-
-      sharedList.forEach((capsule) => {
-        if (!uniqueCaps.has(capsule.id)) {
-          uniqueCaps.set(capsule.id, capsule);
-        } else {
-          const existing = uniqueCaps.get(capsule.id);
-          if (existing && !existing.shared_at && capsule.shared_at) {
-            uniqueCaps.set(capsule.id, { ...existing, shared_at: capsule.shared_at });
-          }
+      } else {
+        const existing = uniqueCaps.get(capsule.id);
+        if (existing && !existing.shared_at && capsule.shared_at) {
+          uniqueCaps.set(capsule.id, { ...existing, shared_at: capsule.shared_at });
         }
+      }
+    });
+
+    uniqueCaps.forEach((capsule) => {
+      events.push({
+        id: `created-${capsule.id}`,
+        icon: '📍',
+        message: `Dropped "${capsule.title || 'Untitled Capsule'}"`,
+        timestamp: capsule.created_at,
       });
 
-      uniqueCaps.forEach((capsule) => {
+      if (capsule.shared_at) {
         events.push({
-          id: `created-${capsule.id}`,
-          icon: '📍',
-          message: `Dropped "${capsule.title || 'Untitled Capsule'}"`,
-          timestamp: capsule.created_at,
+          id: `shared-${capsule.id}-${capsule.shared_at}`,
+          icon: '🤝',
+          message: 'Shared a capsule with you',
+          timestamp: capsule.shared_at,
         });
+      }
 
-        if (capsule.shared_at) {
+      if (capsule.open_at) {
+        const openDate = new Date(capsule.open_at);
+        const now = new Date();
+        if (openDate <= now) {
           events.push({
-            id: `shared-${capsule.id}-${capsule.shared_at}`,
-            icon: '🤝',
-            message: 'Shared a capsule with you',
-            timestamp: capsule.shared_at,
+            id: `opened-${capsule.id}`,
+            icon: '🗝️',
+            message: `Opened "${capsule.title || 'Untitled Capsule'}"`,
+            timestamp: capsule.open_at,
+          });
+        } else {
+          const openLabel = formatOpenLabel(capsule);
+          events.push({
+            id: `unlock-${capsule.id}`,
+            icon: '🔒',
+            message: `Capsule unlocks ${openLabel}`,
+            timestamp: capsule.open_at,
           });
         }
+      }
+    });
 
-        if (capsule.open_at) {
-          const openDate = new Date(capsule.open_at);
-          const now = new Date();
-          if (openDate <= now) {
-            events.push({
-              id: `opened-${capsule.id}`,
-              icon: '🗝️',
-              message: `Opened "${capsule.title || 'Untitled Capsule'}"`,
-              timestamp: capsule.open_at,
-            });
-          } else {
-            events.push({
-              id: `unlock-${capsule.id}`,
-              icon: '🔒',
-              message: `Capsule unlocks ${formatOpenLabel(capsule)}`,
-              timestamp: capsule.open_at,
-            });
-          }
-        }
-      });
+    events.sort((a, b) => {
+      const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+      const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      return timeB - timeA;
+    });
 
-      events.sort((a, b) => {
-        const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-        const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-        return timeB - timeA;
-      });
+    return events.slice(0, 12);
+  };
 
-      return events.slice(0, 12);
-    },
-    [formatOpenLabel]
-  );
-
-  const loadProfileData = useCallback(async () => {
+  const loadProfileData = async () => {
+    console.log('🔍 FriendProfileScreen: Starting loadProfileData for userId:', viewedProfileId);
+    
     if (!viewedProfileId) {
+      console.error('❌ FriendProfileScreen: No viewedProfileId provided');
       setError('Profile not found');
       setLoading(false);
       return;
@@ -226,24 +223,33 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
 
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
+      console.log('👤 Current user:', currentUser?.id);
 
       // Fetch profile basics
-      const { data: profileData } = await supabase
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, display_name, avatar_url')
+        .select('id, display_name, username, avatar_url, created_at')
         .eq('id', viewedProfileId)
         .maybeSingle();
 
+      console.log('📊 Profile data fetched:', profileData);
+      
+      if (profileError) {
+        console.error('❌ Profile fetch error:', profileError.message);
+      }
+
+      if (!profileData) {
+        console.error('❌ No profile data found for userId:', viewedProfileId);
+        setError('Profile not found');
+        setLoading(false);
+        return;
+      }
+
       setProfile({
         id: viewedProfileId,
-        display_name:
-          profileData?.display_name ||
-          friend.display_name ||
-          friend.name ||
-          friend.username ||
-          'TimeCapsule User',
-        username: friend.username || null,
-        avatar_url: profileData?.avatar_url || friend.avatar_url || null,
+        display_name: profileData?.display_name || 'TimeCapsule User',
+        username: profileData?.username || null,
+        avatar_url: profileData?.avatar_url || null,
         created_at: profileData?.created_at || null,
       });
 
@@ -256,8 +262,10 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
         .order('created_at', { ascending: false });
 
       if (publicError) {
-        console.error('Public capsules error:', publicError);
+        console.error('❌ Public capsules error:', publicError);
       }
+
+      console.log('📦 Public capsules:', publicData?.length || 0);
 
       const publicList: CapsuleSummary[] = (publicData || []).map((capsule) => ({
         ...capsule,
@@ -277,8 +285,10 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
           .order('created_at', { ascending: false });
 
         if (sharedError) {
-          console.error('Shared capsules error:', sharedError);
+          console.error('❌ Shared capsules error:', sharedError);
         }
+
+        console.log('🤝 Shared capsules:', sharedData?.length || 0);
 
         sharedList =
           sharedData
@@ -298,17 +308,21 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
 
       const activity = buildActivityFeed(publicList, sharedList);
       setActivityEvents(activity);
+      
+      console.log('✅ Profile data loaded successfully');
     } catch (err) {
-      console.error('Failed to load public profile:', err);
+      console.error('❌ Failed to load public profile:', err);
       setError('Unable to load profile right now. Please try again later.');
     } finally {
       setLoading(false);
     }
-  }, [viewedProfileId, friend.display_name, friend.name, friend.username, friend.avatar_url, buildActivityFeed]);
+  };
 
   useEffect(() => {
+    console.log('🚀 FriendProfileScreen mounted, viewedProfileId:', viewedProfileId);
     loadProfileData();
-  }, [loadProfileData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewedProfileId]);
 
   const renderCapsuleCard = (capsule: CapsuleSummary) => {
     const mediaUrl = getMediaUrl(capsule);
