@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../../store/authStore';
 import { CapsuleService } from '../../services/capsuleService';
-import { MediaService } from '../../lib/media';
+import { MediaService } from '../../services/mediaService';
 
 const { height } = Dimensions.get('window');
 

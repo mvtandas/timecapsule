@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
+import { FriendService, FriendshipStatus } from '../../services/friendService';
 
 const { width } = Dimensions.get('window');
 
@@ -68,6 +69,8 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCapsule, setSelectedCapsule] = useState<CapsuleSummary | null>(null);
+  const [friendshipStatus, setFriendshipStatus] = useState<FriendshipStatus>({ status: 'none' });
+  const [sendingRequest, setSendingRequest] = useState<boolean>(false);
 
   const viewedProfileId = friend?.id;
 
@@ -308,6 +311,13 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
 
       const activity = buildActivityFeed(publicList, sharedList);
       setActivityEvents(activity);
+
+      // Load friendship status
+      if (currentUser && currentUser.id !== viewedProfileId) {
+        const status = await FriendService.getFriendshipStatus(viewedProfileId);
+        setFriendshipStatus(status);
+        console.log('🤝 Friendship status:', status);
+      }
       
       console.log('✅ Profile data loaded successfully');
     } catch (err) {
@@ -323,6 +333,84 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
     loadProfileData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewedProfileId]);
+
+  const handleAddFriend = async () => {
+    if (!viewedProfileId) return;
+
+    try {
+      setSendingRequest(true);
+
+      if (friendshipStatus.status === 'none') {
+        // Send friend request
+        const { error } = await FriendService.sendFriendRequest(viewedProfileId);
+        
+        if (error) {
+          console.error('Error sending friend request:', error);
+          return;
+        }
+
+        // Update local state
+        const newStatus = await FriendService.getFriendshipStatus(viewedProfileId);
+        setFriendshipStatus(newStatus);
+        console.log('✅ Friend request sent successfully');
+      } else if (friendshipStatus.status === 'pending_sent' && friendshipStatus.requestId) {
+        // Cancel friend request
+        const { error } = await FriendService.cancelFriendRequest(friendshipStatus.requestId);
+        
+        if (error) {
+          console.error('Error canceling friend request:', error);
+          return;
+        }
+
+        setFriendshipStatus({ status: 'none' });
+        console.log('✅ Friend request canceled');
+      }
+    } catch (error) {
+      console.error('Error handling friend request:', error);
+    } finally {
+      setSendingRequest(false);
+    }
+  };
+
+  const getButtonConfig = () => {
+    const isOwnProfile = user?.id === viewedProfileId;
+
+    if (isOwnProfile) {
+      return null; // Don't show button on own profile
+    }
+
+    switch (friendshipStatus.status) {
+      case 'friends':
+        return {
+          label: 'Friends',
+          icon: 'checkmark-circle' as const,
+          disabled: true,
+          style: styles.friendButton,
+        };
+      case 'pending_sent':
+        return {
+          label: 'Request Sent',
+          icon: 'time' as const,
+          disabled: false,
+          style: styles.pendingButton,
+        };
+      case 'pending_received':
+        return {
+          label: 'Accept Request',
+          icon: 'person-add' as const,
+          disabled: false,
+          style: styles.addButton,
+        };
+      case 'none':
+      default:
+        return {
+          label: 'Add Friend',
+          icon: 'person-add' as const,
+          disabled: false,
+          style: styles.addButton,
+        };
+    }
+  };
 
   const renderCapsuleCard = (capsule: CapsuleSummary) => {
     const mediaUrl = getMediaUrl(capsule);
@@ -467,6 +555,30 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
                   Joined {new Date(profile.created_at).toLocaleDateString()}
                 </Text>
               ) : null}
+              
+              {/* Add Friend Button */}
+              {(() => {
+                const buttonConfig = getButtonConfig();
+                if (!buttonConfig) return null;
+
+                return (
+                  <TouchableOpacity
+                    style={[styles.actionButton, buttonConfig.style]}
+                    onPress={handleAddFriend}
+                    disabled={buttonConfig.disabled || sendingRequest}
+                    activeOpacity={0.7}
+                  >
+                    {sendingRequest ? (
+                      <ActivityIndicator size="small" color="white" />
+                    ) : (
+                      <>
+                        <Ionicons name={buttonConfig.icon} size={18} color="white" />
+                        <Text style={styles.actionButtonText}>{buttonConfig.label}</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                );
+              })()}
             </View>
 
             {renderCapsuleSection(
@@ -646,6 +758,32 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#94a3b8',
     marginTop: 4,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+    marginTop: 16,
+    gap: 8,
+    minWidth: 160,
+  },
+  actionButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: 'white',
+  },
+  addButton: {
+    backgroundColor: '#FAC638',
+  },
+  pendingButton: {
+    backgroundColor: '#94a3b8',
+  },
+  friendButton: {
+    backgroundColor: '#10b981',
+    opacity: 0.8,
   },
   section: {
     paddingHorizontal: 20,

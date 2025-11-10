@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabase';
-import * as FileSystem from 'expo-file-system';
 
 export interface MediaUploadResult {
   url: string;
@@ -9,6 +8,7 @@ export interface MediaUploadResult {
 
 export class MediaService {
   private static BUCKET_NAME = 'capsules_media';
+  private static AVATARS_BUCKET_NAME = 'avatars';
 
   /**
    * Upload a single media file to Supabase Storage
@@ -38,17 +38,36 @@ export class MediaService {
         ? `video/${fileExtension}` 
         : `image/${fileExtension}`;
 
-      // Read file as base64
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
+      // Read file using fetch (works in React Native without deprecated warnings)
+      console.log('📥 Fetching file...');
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      console.log('🔄 Converting blob to base64...');
+      // Convert blob to base64 using FileReader
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          // Remove data URL prefix (data:image/jpeg;base64,)
+          const base64String = result.split(',')[1];
+          resolve(base64String);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
       });
 
+      console.log('✅ Base64 length:', base64.length);
+
       // Convert base64 to Uint8Array
+      console.log('🔄 Converting to Uint8Array...');
       const binaryString = atob(base64);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
+      
+      console.log('✅ Uint8Array size:', bytes.byteLength);
 
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
@@ -104,6 +123,95 @@ export class MediaService {
 
     // Filter out failed uploads
     return uploads.filter((result): result is MediaUploadResult => result !== null);
+  }
+
+  /**
+   * Upload profile avatar
+   * @param uri - Local file URI from ImagePicker
+   * @param userId - User ID for folder organization
+   * @returns Upload result with public URL
+   */
+  static async uploadAvatar(
+    uri: string,
+    userId: string
+  ): Promise<{ url: string | null; error: any }> {
+    try {
+      console.log('🔵 Starting avatar upload for user:', userId);
+      
+      // Determine file type from URI
+      const fileExtension = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      
+      // Generate unique file name
+      const timestamp = Date.now();
+      const fileName = `avatar_${userId}_${timestamp}.${fileExtension}`;
+      const filePath = `${userId}/${fileName}`;
+
+      // Determine content type
+      const contentType = `image/${fileExtension === 'jpg' ? 'jpeg' : fileExtension}`;
+
+      // Read file using fetch (works in React Native without deprecated warnings)
+      console.log('📥 Fetching file...');
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      console.log('🔄 Converting blob to base64...');
+      // Convert blob to base64 using FileReader
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          // Remove data URL prefix (data:image/jpeg;base64,)
+          const base64String = result.split(',')[1];
+          resolve(base64String);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+
+      console.log('✅ Base64 length:', base64.length);
+
+      // Convert base64 to Uint8Array
+      console.log('🔄 Converting to Uint8Array...');
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      console.log('✅ Uint8Array size:', bytes.byteLength);
+
+      // Upload to Supabase Storage
+      console.log('☁️  Uploading to Supabase Storage...');
+      const { data, error } = await supabase.storage
+        .from(this.AVATARS_BUCKET_NAME)
+        .upload(filePath, bytes, {
+          contentType,
+          upsert: true,
+        });
+
+      if (error) {
+        console.error('❌ Supabase upload error:', error);
+        throw error;
+      }
+
+      console.log('✅ Upload successful:', data);
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from(this.AVATARS_BUCKET_NAME)
+        .getPublicUrl(filePath);
+
+      if (!urlData?.publicUrl) {
+        throw new Error('Failed to get public URL');
+      }
+
+      console.log('✅ Avatar uploaded successfully:', urlData.publicUrl);
+
+      return { url: urlData.publicUrl, error: null };
+    } catch (error: any) {
+      console.error('❌ Error uploading avatar:', error?.message || error);
+      return { url: null, error };
+    }
   }
 
   /**

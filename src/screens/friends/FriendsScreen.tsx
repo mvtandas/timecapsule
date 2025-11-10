@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Image, Platform, StatusBar } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Image, Platform, StatusBar, Modal, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { supabase } from '../../lib/supabase';
 import { getRecentVisits, addRecentVisit, RecentVisit } from '../../utils/recentVisits';
+import { FriendService, FriendRequest } from '../../services/friendService';
 
 interface FriendsScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -36,15 +38,113 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Friend requests state
+  const [pendingRequests, setPendingRequests] = useState<FriendRequest[]>([]);
+  const [showRequestsModal, setShowRequestsModal] = useState(false);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
   // Load recent visits and friends on mount
   useEffect(() => {
     loadRecentVisits();
     loadFriends();
+    loadPendingRequests();
   }, []);
 
   const loadRecentVisits = async () => {
     const visits = await getRecentVisits();
     setRecentVisits(visits);
+  };
+
+  // Load pending friend requests
+  const loadPendingRequests = async () => {
+    try {
+      const { data, error } = await FriendService.getPendingRequests();
+      if (error) {
+        console.error('Error loading pending requests:', error);
+        return;
+      }
+      setPendingRequests(data || []);
+      console.log('🔔 Pending requests loaded:', data?.length || 0);
+    } catch (error) {
+      console.error('Error loading pending requests:', error);
+    }
+  };
+
+  // Open requests modal with animation
+  const openRequestsModal = () => {
+    setShowRequestsModal(true);
+    Animated.spring(slideAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 65,
+      friction: 11,
+    }).start();
+  };
+
+  // Close requests modal with animation
+  const closeRequestsModal = () => {
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowRequestsModal(false);
+    });
+  };
+
+  // Accept friend request
+  const handleAcceptRequest = async (requestId: string, senderId: string) => {
+    try {
+      setProcessingRequestId(requestId);
+      
+      const { error } = await FriendService.acceptFriendRequest(requestId);
+      
+      if (error) {
+        console.error('Error accepting request:', error);
+        return;
+      }
+
+      console.log('✅ Friend request accepted');
+      
+      // Reload requests and friends
+      await loadPendingRequests();
+      await loadFriends();
+      
+      // Remove from pending list
+      setPendingRequests(prev => prev.filter(req => req.id !== requestId));
+    } catch (error) {
+      console.error('Error accepting request:', error);
+    } finally {
+      setProcessingRequestId(null);
+    }
+  };
+
+  // Decline friend request
+  const handleDeclineRequest = async (requestId: string) => {
+    try {
+      setProcessingRequestId(requestId);
+      
+      const { error } = await FriendService.rejectFriendRequest(requestId);
+      
+      if (error) {
+        console.error('Error declining request:', error);
+        return;
+      }
+
+      console.log('✅ Friend request declined');
+      
+      // Reload requests
+      await loadPendingRequests();
+      
+      // Remove from pending list
+      setPendingRequests(prev => prev.filter(req => req.id !== requestId));
+    } catch (error) {
+      console.error('Error declining request:', error);
+    } finally {
+      setProcessingRequestId(null);
+    }
   };
 
   // Load friends with their last activity
@@ -255,6 +355,22 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Friends</Text>
+        
+        {/* Friend Requests Notification Icon */}
+        <TouchableOpacity
+          style={styles.notificationButton}
+          onPress={openRequestsModal}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="person-add" size={24} color="#1e293b" />
+          {pendingRequests.length > 0 && (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationBadgeText}>
+                {pendingRequests.length > 9 ? '9+' : pendingRequests.length}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -449,6 +565,197 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
         {/* Bottom padding for tab bar */}
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Friend Requests Modal */}
+      <Modal
+        visible={showRequestsModal}
+        transparent
+        animationType="none"
+        onRequestClose={closeRequestsModal}
+      >
+        <View style={styles.modalContainer}>
+          {/* Blur Background */}
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={closeRequestsModal}
+          >
+            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+          </TouchableOpacity>
+
+          {/* Bottom Sheet */}
+          <Animated.View
+            style={[
+              styles.modalContent,
+              {
+                transform: [
+                  {
+                    translateY: slideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [600, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Friend Requests</Text>
+              <TouchableOpacity onPress={closeRequestsModal} style={styles.modalCloseButton}>
+                <Ionicons name="close" size={24} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Requests List */}
+            <ScrollView
+              style={styles.requestsList}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.requestsListContent}
+            >
+              {loadingRequests ? (
+                <View style={styles.modalLoadingState}>
+                  <ActivityIndicator size="large" color="#FAC638" />
+                  <Text style={styles.modalLoadingText}>Loading requests...</Text>
+                </View>
+              ) : pendingRequests.length === 0 ? (
+                <View style={styles.modalEmptyState}>
+                  <Ionicons name="people-outline" size={64} color="#cbd5e1" />
+                  <Text style={styles.modalEmptyText}>No new friend requests</Text>
+                  <Text style={styles.modalEmptySubtext}>
+                    When someone sends you a friend request, it will appear here
+                  </Text>
+                </View>
+              ) : (
+                pendingRequests.map((request) => (
+                  <FriendRequestItem
+                    key={request.id}
+                    request={request}
+                    onAccept={handleAcceptRequest}
+                    onDecline={handleDeclineRequest}
+                    isProcessing={processingRequestId === request.id}
+                  />
+                ))
+              )}
+            </ScrollView>
+          </Animated.View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
+
+// Friend Request Item Component
+interface FriendRequestItemProps {
+  request: FriendRequest;
+  onAccept: (requestId: string, senderId: string) => void;
+  onDecline: (requestId: string) => void;
+  isProcessing: boolean;
+}
+
+const FriendRequestItem: React.FC<FriendRequestItemProps> = ({
+  request,
+  onAccept,
+  onDecline,
+  isProcessing,
+}) => {
+  const [senderProfile, setSenderProfile] = useState<any>(null);
+
+  useEffect(() => {
+    loadSenderProfile();
+  }, [request.sender_id]);
+
+  const loadSenderProfile = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .eq('id', request.sender_id)
+        .single();
+
+      if (error) {
+        console.error('Error loading sender profile:', error);
+        return;
+      }
+
+      setSenderProfile(data);
+    } catch (error) {
+      console.error('Error loading sender profile:', error);
+    }
+  };
+
+  const formatTimeAgo = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  if (!senderProfile) {
+    return (
+      <View style={styles.requestItem}>
+        <ActivityIndicator size="small" color="#94a3b8" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.requestItem}>
+      {/* Avatar */}
+      {senderProfile.avatar_url ? (
+        <Image source={{ uri: senderProfile.avatar_url }} style={styles.requestAvatar} />
+      ) : (
+        <View style={[styles.requestAvatar, styles.requestAvatarPlaceholder]}>
+          <Ionicons name="person" size={24} color="#94a3b8" />
+        </View>
+      )}
+
+      {/* Info */}
+      <View style={styles.requestInfo}>
+        <Text style={styles.requestName} numberOfLines={1}>
+          {senderProfile.display_name || `@${senderProfile.username}`}
+        </Text>
+        {senderProfile.display_name && (
+          <Text style={styles.requestUsername} numberOfLines={1}>
+            @{senderProfile.username}
+          </Text>
+        )}
+        <Text style={styles.requestTime}>{formatTimeAgo(request.created_at)}</Text>
+      </View>
+
+      {/* Actions */}
+      <View style={styles.requestActions}>
+        <TouchableOpacity
+          style={[styles.requestButton, styles.acceptButton]}
+          onPress={() => onAccept(request.id, request.sender_id)}
+          disabled={isProcessing}
+          activeOpacity={0.7}
+        >
+          {isProcessing ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <Ionicons name="checkmark" size={20} color="white" />
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.requestButton, styles.declineButton]}
+          onPress={() => onDecline(request.id)}
+          disabled={isProcessing}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="close" size={20} color="white" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -459,6 +766,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: 'white',
     paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight ? StatusBar.currentHeight + 16 : 16,
     paddingHorizontal: 20,
@@ -470,6 +780,31 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: '#1e293b',
+    flex: 1,
+  },
+  notificationButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  notificationBadgeText: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: '700',
   },
   content: {
     flex: 1,
@@ -699,6 +1034,135 @@ const styles = StyleSheet.create({
   },
   friendListChevron: {
     marginLeft: 4,
+  },
+  // Modal Styles
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  modalCloseButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  requestsList: {
+    maxHeight: 500,
+  },
+  requestsListContent: {
+    paddingBottom: 32,
+  },
+  modalLoadingState: {
+    paddingVertical: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalLoadingText: {
+    fontSize: 14,
+    color: '#64748b',
+    marginTop: 12,
+  },
+  modalEmptyState: {
+    paddingVertical: 80,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalEmptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#64748b',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  modalEmptySubtext: {
+    fontSize: 14,
+    color: '#94a3b8',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  requestItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  requestAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    marginRight: 12,
+  },
+  requestAvatarPlaceholder: {
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  requestInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  requestName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  requestUsername: {
+    fontSize: 14,
+    color: '#64748b',
+    marginBottom: 4,
+  },
+  requestTime: {
+    fontSize: 12,
+    color: '#94a3b8',
+  },
+  requestActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  requestButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  acceptButton: {
+    backgroundColor: '#10b981',
+  },
+  declineButton: {
+    backgroundColor: '#ef4444',
   },
 });
 
