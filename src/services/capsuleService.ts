@@ -14,6 +14,9 @@ export interface Capsule {
   blockchain_hash: string | null;
   created_at: string;
   view_count?: number;
+  media_url?: string | null;
+  media_type?: 'image' | 'video' | 'none';
+  is_locked?: boolean;
 }
 
 export interface CreateCapsuleData {
@@ -24,6 +27,9 @@ export interface CreateCapsuleData {
   lng?: number;
   is_public?: boolean;
   content_refs?: any[];
+  media_url?: string;
+  media_type?: 'image' | 'video' | 'none';
+  is_locked?: boolean;
 }
 
 export class CapsuleService {
@@ -89,6 +95,9 @@ export class CapsuleService {
           lng: capsuleData.lng || null,
           is_public: capsuleData.is_public || false,
           content_refs: capsuleData.content_refs || null,
+          media_url: capsuleData.media_url || null,
+          media_type: capsuleData.media_type || 'none',
+          is_locked: capsuleData.is_locked || false,
         })
         .select()
         .single();
