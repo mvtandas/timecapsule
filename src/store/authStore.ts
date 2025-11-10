@@ -3,10 +3,11 @@ import { AuthState, User } from '../types';
 import { AuthService } from '../lib/auth';
 
 interface AuthStore extends AuthState {
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, displayName?: string) => Promise<{ error: any }>;
+  signIn: (identifier: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, displayName?: string, username?: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
+  updateEmail: (newEmail: string) => Promise<{ error: any }>;
   updateProfile: (updates: Partial<User>) => Promise<{ error: any }>;
   resetPassword: (email: string) => Promise<{ error: any }>;
 }
@@ -16,10 +17,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   session: null,
   loading: true,
 
-  signIn: async (email: string, password: string) => {
+  signIn: async (identifier: string, password: string) => {
     try {
       set({ loading: true });
-      const { error } = await AuthService.signIn(email, password);
+      const { error } = await AuthService.signIn(identifier, password);
       set({ loading: false });
       return { error };
     } catch (error) {
@@ -28,10 +29,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  signUp: async (email: string, password: string, displayName?: string) => {
+  signUp: async (email: string, password: string, displayName?: string, username?: string) => {
     try {
       set({ loading: true });
-      const { error } = await AuthService.signUp(email, password, displayName);
+      const { error } = await AuthService.signUp(email, password, displayName, username);
       set({ loading: false });
       return { error };
     } catch (error) {
@@ -69,12 +70,30 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
+  updateEmail: async (newEmail: string) => {
+    try {
+      const { data, error } = await AuthService.updateEmail(newEmail);
+      
+      if (!error) {
+        // Refresh user data to get updated email
+        const { user } = await AuthService.getCurrentUser();
+        if (user) {
+          set({ user });
+        }
+      }
+      
+      return { error };
+    } catch (error) {
+      return { error };
+    }
+  },
+
   updateProfile: async (updates) => {
     try {
       const { data, error } = await AuthService.updateProfile(updates);
       
       if (!error && data) {
-        set({ user: { ...get().user, ...data } });
+        set({ user: { ...get().user, ...data } as User });
       }
       
       return { error };

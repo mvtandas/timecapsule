@@ -14,6 +14,7 @@ import DashboardScreen from '../screens/dashboard/DashboardScreen';
 import CreateCapsuleScreen from '../screens/capsules/CreateCapsuleScreen';
 import ExploreScreen from '../screens/explore/ExploreScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
+import FriendsScreen from '../screens/friends/FriendsScreen';
 
 // Detail Screens
 import CapsuleDetailsScreen from '../screens/capsules/CapsuleDetailsScreen';
@@ -29,12 +30,10 @@ const MainTabNavigator = () => {
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof MaterialIcons.glyphMap;
 
-          if (route.name === 'Dashboard') {
-            iconName = 'inventory-2';
-          } else if (route.name === 'Create') {
-            iconName = 'add-box';
-          } else if (route.name === 'Explore') {
-            iconName = 'location-on';
+          if (route.name === 'Friends') {
+            iconName = 'people';
+          } else if (route.name === 'Map') {
+            iconName = 'map';
           } else if (route.name === 'Profile') {
             iconName = 'person';
           } else {
@@ -44,18 +43,43 @@ const MainTabNavigator = () => {
           return <MaterialIcons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#FAC638',
-        tabBarInactiveTintColor: 'gray',
+        tabBarInactiveTintColor: '#94a3b8',
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#f8f8f5',
-          borderTopColor: '#e5e7eb',
+          backgroundColor: 'white',
+          borderTopColor: '#e2e8f0',
+          borderTopWidth: 1,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
         },
       })}
     >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} />
-      <Tab.Screen name="Create" component={CreateCapsuleScreen} />
-      <Tab.Screen name="Explore" component={ExploreScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen 
+        name="Friends" 
+        component={FriendsScreen}
+        options={{
+          tabBarLabel: 'Friends',
+        }}
+      />
+      <Tab.Screen 
+        name="Map" 
+        component={DashboardScreen}
+        options={{
+          tabBarLabel: 'Map',
+        }}
+      />
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileScreen}
+        options={{
+          tabBarLabel: 'Profile',
+        }}
+      />
     </Tab.Navigator>
   );
 };

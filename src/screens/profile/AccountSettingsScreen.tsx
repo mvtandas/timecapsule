@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/authStore';
+import { AuthService } from '../../lib/auth';
 
 interface AccountSettingsScreenProps {
   onNavigate: (screen: string, data?: any) => void;
+  onGoBack?: () => void;
 }
 
-const AccountSettingsScreen = ({ onNavigate }: AccountSettingsScreenProps) => {
+const AccountSettingsScreen = ({ onNavigate, onGoBack }: AccountSettingsScreenProps) => {
   const { user, updateProfile } = useAuthStore();
   
   // User info edit state
@@ -76,22 +78,57 @@ const AccountSettingsScreen = ({ onNavigate }: AccountSettingsScreenProps) => {
     try {
       setSavingInfo(true);
 
-      // Update user profile
-      const { error } = await updateProfile({
-        email: editEmail,
-        username: editUsername,
-        phone_number: editPhoneNumber,
-      });
+      const emailChanged = editEmail !== user?.email;
+      const usernameChanged = editUsername !== user?.username;
+      const phoneChanged = editPhoneNumber !== user?.phone_number;
 
-      if (error) {
-        throw error;
+      // Update email separately via auth if changed
+      if (emailChanged) {
+        const { error: emailError } = await AuthService.updateEmail(editEmail);
+        if (emailError) {
+          throw new Error(emailError.message || 'Failed to update email');
+        }
       }
 
-      Alert.alert('Success', 'Profile information updated successfully!');
+      // Update username and phone via profiles if changed
+      if (usernameChanged || phoneChanged) {
+        const profileUpdates: any = {};
+        
+        if (usernameChanged) {
+          profileUpdates.username = editUsername;
+        }
+        
+        if (phoneChanged) {
+          profileUpdates.phone_number = editPhoneNumber;
+        }
+
+        const { error: profileError } = await updateProfile(profileUpdates);
+        
+        if (profileError) {
+          const errorMsg = profileError.message || '';
+          // Provide specific error messages
+          if (errorMsg.toLowerCase().includes('username') && errorMsg.toLowerCase().includes('already')) {
+            throw new Error('Username is already taken. Please choose a different one.');
+          }
+          throw new Error(errorMsg || 'Failed to update profile');
+        }
+      }
+
+      // Refresh user data to reflect changes
+      const { user: updatedUser } = await AuthService.getCurrentUser();
+      if (updatedUser) {
+        // The auth store will automatically update via the listener
+        // but we can manually update if needed
+      }
+
+      Alert.alert('Success', 'Account information updated successfully!');
       setIsEditingInfo(false);
     } catch (error: any) {
-      console.error('Error updating profile info:', error);
-      Alert.alert('Error', error.message || 'Failed to update profile information. Please try again.');
+      console.error('Error updating account info:', error);
+      Alert.alert(
+        'Update Failed', 
+        error.message || 'Failed to update account information. Please try again.'
+      );
     } finally {
       setSavingInfo(false);
     }
@@ -103,7 +140,7 @@ const AccountSettingsScreen = ({ onNavigate }: AccountSettingsScreenProps) => {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => onNavigate('Profile')}
+          onPress={() => onGoBack && onGoBack()}
         >
           <Ionicons name="arrow-back" size={24} color="#1e293b" />
         </TouchableOpacity>

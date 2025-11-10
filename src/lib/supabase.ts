@@ -57,6 +57,10 @@ export type Database = {
           allowed_users: any[] | null;
           blockchain_hash: string | null;
           created_at: string;
+          media_url: string | null;
+          media_type: 'image' | 'video' | 'none' | null;
+          is_locked: boolean;
+          view_count: number;
         };
         Insert: {
           id?: string;
@@ -71,6 +75,10 @@ export type Database = {
           allowed_users?: any[] | null;
           blockchain_hash?: string | null;
           created_at?: string;
+          media_url?: string | null;
+          media_type?: 'image' | 'video' | 'none' | null;
+          is_locked?: boolean;
+          view_count?: number;
         };
         Update: {
           id?: string;
@@ -85,6 +93,10 @@ export type Database = {
           allowed_users?: any[] | null;
           blockchain_hash?: string | null;
           created_at?: string;
+          media_url?: string | null;
+          media_type?: 'image' | 'video' | 'none' | null;
+          is_locked?: boolean;
+          view_count?: number;
         };
       };
       capsule_contents: {

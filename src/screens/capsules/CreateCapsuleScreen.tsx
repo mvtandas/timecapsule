@@ -22,15 +22,18 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import DatePickerModal from '../../components/DatePickerModal';
 import { CapsuleService } from '../../services/capsuleService';
+import { MediaService } from '../../services/mediaService';
 import { Friend } from '../../types';
+import { supabase } from '../../lib/supabase';
 
 const { width, height } = Dimensions.get('window');
 
 interface CreateCapsuleScreenProps {
   onNavigate: (screen: string) => void;
+  onGoBack?: () => void;
 }
 
-const CreateCapsuleScreen = ({ onNavigate }: CreateCapsuleScreenProps) => {
+const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps) => {
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -162,19 +165,64 @@ const CreateCapsuleScreen = ({ onNavigate }: CreateCapsuleScreenProps) => {
         }
       }
 
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert('Error', 'You must be logged in to create a capsule.');
+        setSaving(false);
+        return;
+      }
+
+      // Generate temporary capsule ID for media upload
+      const tempCapsuleId = `temp_${Date.now()}`;
+
+      // Upload media if exists
+      let mediaUrl: string | null = null;
+      let mediaType: 'image' | 'video' | 'none' = 'none';
+
+      if (capsuleData.media.length > 0) {
+        // Upload the first media item (you can extend this to support multiple)
+        const firstMedia = capsuleData.media[0];
+        const uploadResult = await MediaService.uploadMedia(
+          firstMedia.uri,
+          user.id,
+          tempCapsuleId
+        );
+
+        if (uploadResult) {
+          mediaUrl = uploadResult.url;
+          mediaType = uploadResult.type;
+        } else {
+          // Silently continue without media if upload fails
+          console.warn('Media upload failed, creating capsule without media');
+        }
+      }
+
+      // Determine if capsule should be locked
+      const isLocked = capsuleData.openDate ? new Date(capsuleData.openDate) > new Date() : false;
+
       const { data, error } = await CapsuleService.createCapsule({
         title: capsuleData.title,
         description: capsuleData.message || null,
         open_at: capsuleData.openDate?.toISOString() || null,
         lat: capsuleData.location?.lat || null,
         lng: capsuleData.location?.lng || null,
-        is_public: true,
+        is_public: capsuleData.isPublic,
         content_refs: capsuleData.media,
+        media_url: mediaUrl,
+        media_type: mediaType,
+        is_locked: isLocked,
       });
 
       if (error) {
         console.error('Error creating capsule:', error);
         Alert.alert('Error', 'Failed to create capsule. Please try again.');
+        
+        // Clean up uploaded media if capsule creation failed
+        if (mediaUrl) {
+          const path = MediaService.extractPathFromUrl(mediaUrl);
+          if (path) await MediaService.deleteMedia(path);
+        }
       } else {
         Alert.alert('Success!', 'Your time capsule has been created!', [
           { text: 'OK', onPress: () => onNavigate('Dashboard') },
@@ -206,7 +254,7 @@ const CreateCapsuleScreen = ({ onNavigate }: CreateCapsuleScreenProps) => {
     if (step > 1) {
       setStep(step - 1);
     } else {
-      onNavigate('Dashboard');
+      onGoBack && onGoBack();
     }
   };
 

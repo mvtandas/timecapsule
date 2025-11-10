@@ -6,6 +6,7 @@ const { height } = Dimensions.get('window');
 
 interface WelcomeScreenProps {
   onNavigate: (screen: 'Welcome' | 'Login' | 'Signup') => void;
+  onGoBack?: () => void;
 }
 
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onNavigate }) => {

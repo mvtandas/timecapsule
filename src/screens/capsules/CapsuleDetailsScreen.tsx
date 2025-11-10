@@ -1,44 +1,54 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet, Alert, Dimensions } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet, Alert, Dimensions, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import MapView, { Marker } from 'react-native-maps';
+import { CapsuleService, Capsule } from '../../services/capsuleService';
+import { MediaService } from '../../services/mediaService';
 
 interface CapsuleDetailsScreenProps {
   onBack: () => void;
+  capsuleId?: string;
 }
 
 const { width } = Dimensions.get('window');
 
-const CapsuleDetailsScreen = ({ onBack }: CapsuleDetailsScreenProps) => {
-  const capsule = {
-    title: 'Beach Memories',
-    description: 'A wonderful day at the beach with friends. The sun was shining, waves were perfect, and we had the best time!',
-    openDate: '2025-12-25',
-    createdDate: '2024-10-18',
-    location: 'Santa Monica Beach, CA',
-    isLocked: false, // Change to false to see unlocked state
-    daysUntilOpen: 68,
-    emoji: '🏖️',
-    color: '#FFD166',
-    mediaUri: 'https://picsum.photos/400/600?random=1', // Main media for top display
-    mediaType: 'image', // or 'video'
-    media: [
-      { id: '1', type: 'image', uri: 'https://picsum.photos/400/300?random=1' },
-      { id: '2', type: 'image', uri: 'https://picsum.photos/400/300?random=2' },
-      { id: '3', type: 'video', uri: 'https://picsum.photos/400/300?random=3' },
-    ],
-    sharedWith: [
-      { id: '1', name: 'Sarah Johnson', email: 'sarah@example.com', avatar: null, isCurrentUser: false },
-      { id: '2', name: 'Mike Chen', email: 'mike@example.com', avatar: null, isCurrentUser: false },
-      { id: '3', name: 'You', email: 'you@example.com', avatar: null, isCurrentUser: true },
-    ],
-    sharedOn: '2024-10-18T14:30:00Z',
-    sharedLocation: 'Santa Monica Beach, CA',
-    coordinates: {
-      latitude: 34.0195,
-      longitude: -118.4912,
-    },
+const CapsuleDetailsScreen = ({ onBack, capsuleId }: CapsuleDetailsScreenProps) => {
+  const [capsule, setCapsule] = useState<Capsule | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadCapsule();
+  }, [capsuleId]);
+
+  const loadCapsule = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (!capsuleId) {
+        setError('No capsule ID provided');
+        setLoading(false);
+        return;
+      }
+
+      const { data, error: fetchError } = await CapsuleService.getCapsule(capsuleId);
+
+      if (fetchError || !data) {
+        setError('Failed to load capsule');
+        console.error('Error loading capsule:', fetchError);
+      } else {
+        setCapsule(data);
+        // Increment view count
+        await CapsuleService.incrementViewCount(capsuleId);
+      }
+    } catch (err) {
+      console.error('Error:', err);
+      setError('Something went wrong');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleShare = () => {
@@ -49,7 +59,9 @@ const CapsuleDetailsScreen = ({ onBack }: CapsuleDetailsScreenProps) => {
     Alert.alert('Edit Capsule', 'Edit functionality will be available soon!');
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
+    if (!capsule) return;
+
     Alert.alert(
       'Delete Capsule',
       'Are you sure you want to delete this capsule? This action cannot be undone.',
@@ -58,14 +70,87 @@ const CapsuleDetailsScreen = ({ onBack }: CapsuleDetailsScreenProps) => {
         { 
           text: 'Delete', 
           style: 'destructive',
-          onPress: () => {
-            Alert.alert('Deleted', 'Capsule has been deleted');
-            onBack();
+          onPress: async () => {
+            try {
+              // Delete media from storage if exists
+              if (capsule.media_url) {
+                const path = MediaService.extractPathFromUrl(capsule.media_url);
+                if (path) await MediaService.deleteMedia(path);
+              }
+
+              // Delete capsule from database
+              const { error } = await CapsuleService.deleteCapsule(capsule.id);
+              
+              if (error) {
+                Alert.alert('Error', 'Failed to delete capsule');
+              } else {
+                Alert.alert('Deleted', 'Capsule has been deleted');
+                onBack();
+              }
+            } catch (error) {
+              console.error('Error deleting capsule:', error);
+              Alert.alert('Error', 'Failed to delete capsule');
+            }
           }
         },
       ]
     );
   };
+
+  const calculateDaysUntilOpen = (openDate: string | null): number => {
+    if (!openDate) return 0;
+    const now = new Date();
+    const open = new Date(openDate);
+    const diff = open.getTime() - now.getTime();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  };
+
+  const getLocationString = (lat: number | null, lng: number | null): string => {
+    if (!lat || !lng) return 'Location not set';
+    return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Capsule Details</Text>
+          <View style={styles.editButton} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FAC638" />
+          <Text style={styles.loadingText}>Loading capsule...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (error || !capsule) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Capsule Details</Text>
+          <View style={styles.editButton} />
+        </View>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={64} color="#FF6B6B" />
+          <Text style={styles.errorText}>{error || 'Capsule not found'}</Text>
+          <TouchableOpacity onPress={onBack} style={styles.errorButton}>
+            <Text style={styles.errorButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  const daysUntilOpen = calculateDaysUntilOpen(capsule.open_at);
+  const locationString = getLocationString(capsule.lat, capsule.lng);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -94,69 +179,57 @@ const CapsuleDetailsScreen = ({ onBack }: CapsuleDetailsScreenProps) => {
       <ScrollView style={styles.content}>
         {/* Top Section - Media Display */}
         <View style={styles.mediaContainer}>
-          {capsule.mediaUri ? (
+          {capsule.media_url && capsule.media_type !== 'none' ? (
             <View style={styles.mediaWrapper}>
               <Image 
-                source={{ uri: capsule.mediaUri }} 
+                source={{ uri: capsule.media_url }} 
                 style={styles.heroMedia}
                 resizeMode="cover"
               />
-              {capsule.mediaType === 'video' && !capsule.isLocked && (
+              {capsule.media_type === 'video' && !capsule.is_locked && (
                 <View style={styles.playIconOverlay}>
                   <Ionicons name="play-circle" size={64} color="white" />
                 </View>
               )}
-              {capsule.isLocked && (
+              {capsule.is_locked && (
                 <BlurView intensity={80} style={styles.blurOverlay}>
                   <View style={styles.lockedOverlay}>
                     <Ionicons name="lock-closed" size={48} color="white" />
                     <Text style={styles.lockedLabel}>Locked</Text>
-                    <Text style={styles.lockedSubtext}>Opens in {capsule.daysUntilOpen} days</Text>
+                    <Text style={styles.lockedSubtext}>
+                      {daysUntilOpen > 0 ? `Opens in ${daysUntilOpen} days` : 'Opening soon'}
+                    </Text>
                   </View>
                 </BlurView>
               )}
             </View>
           ) : (
-            <View style={[styles.placeholderMedia, { backgroundColor: capsule.color }]}>
-              <Text style={styles.placeholderEmoji}>{capsule.emoji}</Text>
+            <View style={[styles.placeholderMedia, { backgroundColor: '#FAC638' }]}>
+              <Ionicons name="time-outline" size={80} color="white" />
             </View>
           )}
         </View>
 
         {/* Textual Content */}
         <View style={styles.contentSection}>
-          <Text style={styles.capsuleTitle}>{capsule.title}</Text>
-          <Text style={styles.capsuleDescription}>{capsule.description}</Text>
-        </View>
-
-        {/* Sharing Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Shared With</Text>
-          <View style={styles.sharedWithContainer}>
-            {capsule.sharedWith.map((person) => (
-              <View key={person.id} style={styles.avatarItem}>
-                <View style={[
-                  styles.avatar,
-                  person.isCurrentUser && styles.avatarCurrent
-                ]}>
-                  {person.avatar ? (
-                    <Image source={{ uri: person.avatar }} style={styles.avatarImage} />
-                  ) : (
-                    <Text style={styles.avatarText}>
-                      {person.name.charAt(0).toUpperCase()}
-                    </Text>
-                  )}
-                </View>
-                <Text style={styles.avatarName} numberOfLines={1}>
-                  {person.isCurrentUser ? 'You' : person.name.split(' ')[0]}
-                </Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.capsuleTitle}>{capsule.title}</Text>
+            {capsule.is_public && (
+              <View style={styles.publicBadge}>
+                <Ionicons name="globe-outline" size={16} color="#06D6A0" />
+                <Text style={styles.publicBadgeText}>Public</Text>
               </View>
-            ))}
+            )}
           </View>
-          {capsule.sharedWith.some(p => p.isCurrentUser) && (
-            <View style={styles.sharedWithYouBadge}>
-              <Ionicons name="checkmark-circle" size={16} color="#06D6A0" />
-              <Text style={styles.sharedWithYouText}>Shared with you</Text>
+          <Text style={styles.capsuleDescription}>
+            {capsule.description || 'No description provided'}
+          </Text>
+          {capsule.view_count !== undefined && capsule.view_count > 0 && (
+            <View style={styles.viewCountContainer}>
+              <Ionicons name="eye-outline" size={16} color="#94a3b8" />
+              <Text style={styles.viewCountText}>
+                {capsule.view_count} {capsule.view_count === 1 ? 'view' : 'views'}
+              </Text>
             </View>
           )}
         </View>
@@ -168,55 +241,75 @@ const CapsuleDetailsScreen = ({ onBack }: CapsuleDetailsScreenProps) => {
             <View style={styles.metaRow}>
               <Ionicons name="calendar-outline" size={20} color="#94a3b8" />
               <View style={styles.metaTextContainer}>
-                <Text style={styles.metaLabel}>Shared On</Text>
-                <Text style={styles.metaValue}>{formatDate(capsule.sharedOn)}</Text>
+                <Text style={styles.metaLabel}>Created On</Text>
+                <Text style={styles.metaValue}>{formatDate(capsule.created_at)}</Text>
               </View>
             </View>
-            <View style={styles.metaRow}>
-              <Ionicons name="location-outline" size={20} color="#94a3b8" />
-              <View style={styles.metaTextContainer}>
-                <Text style={styles.metaLabel}>Shared Location</Text>
-                <Text style={styles.metaValue}>{capsule.sharedLocation}</Text>
+            {capsule.open_at && (
+              <View style={styles.metaRow}>
+                <Ionicons name="time-outline" size={20} color="#94a3b8" />
+                <View style={styles.metaTextContainer}>
+                  <Text style={styles.metaLabel}>Opens On</Text>
+                  <Text style={styles.metaValue}>{formatDate(capsule.open_at)}</Text>
+                </View>
               </View>
-            </View>
-            <View style={styles.metaRow}>
-              <Ionicons name="time-outline" size={20} color="#94a3b8" />
-              <View style={styles.metaTextContainer}>
-                <Text style={styles.metaLabel}>Opens On</Text>
-                <Text style={styles.metaValue}>{capsule.openDate}</Text>
+            )}
+            {(capsule.lat && capsule.lng) && (
+              <View style={styles.metaRow}>
+                <Ionicons name="location-outline" size={20} color="#94a3b8" />
+                <View style={styles.metaTextContainer}>
+                  <Text style={styles.metaLabel}>Location</Text>
+                  <Text style={styles.metaValue}>{locationString}</Text>
+                </View>
               </View>
-            </View>
+            )}
+            {capsule.is_locked && (
+              <View style={styles.metaRow}>
+                <Ionicons name="lock-closed-outline" size={20} color="#FAC638" />
+                <View style={styles.metaTextContainer}>
+                  <Text style={styles.metaLabel}>Status</Text>
+                  <Text style={[styles.metaValue, styles.lockedStatus]}>
+                    Locked - {daysUntilOpen > 0 ? `Opens in ${daysUntilOpen} days` : 'Opening soon'}
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         </View>
 
         {/* Mini Map */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Drop Location</Text>
-          <View style={styles.mapContainer}>
-            <MapView
-              style={styles.map}
-              initialRegion={{
-                latitude: capsule.coordinates.latitude,
-                longitude: capsule.coordinates.longitude,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-              }}
-              scrollEnabled={false}
-              zoomEnabled={false}
-              pitchEnabled={false}
-              rotateEnabled={false}
-            >
-              <Marker
-                coordinate={capsule.coordinates}
-                title={capsule.title}
+        {capsule.lat && capsule.lng && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Drop Location</Text>
+            <View style={styles.mapContainer}>
+              <MapView
+                style={styles.map}
+                initialRegion={{
+                  latitude: capsule.lat,
+                  longitude: capsule.lng,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                }}
+                scrollEnabled={false}
+                zoomEnabled={false}
+                pitchEnabled={false}
+                rotateEnabled={false}
               >
-                <View style={styles.customMarker}>
-                  <Text style={styles.markerEmoji}>{capsule.emoji}</Text>
-                </View>
-              </Marker>
-            </MapView>
+                <Marker
+                  coordinate={{
+                    latitude: capsule.lat,
+                    longitude: capsule.lng,
+                  }}
+                  title={capsule.title}
+                >
+                  <View style={styles.customMarker}>
+                    <Ionicons name="location" size={24} color="white" />
+                  </View>
+                </Marker>
+              </MapView>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Delete Button */}
         <TouchableOpacity onPress={handleDelete} style={styles.deleteButton}>
@@ -474,6 +567,80 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 20,
+  },
+  // Loading & Error States
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#64748b',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  errorText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  errorButton: {
+    marginTop: 24,
+    backgroundColor: '#FAC638',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  errorButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+  },
+  // Title Row
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  publicBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(6, 214, 160, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 4,
+  },
+  publicBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#06D6A0',
+  },
+  viewCountContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  viewCountText: {
+    fontSize: 14,
+    color: '#94a3b8',
+  },
+  lockedStatus: {
+    color: '#FAC638',
+    fontWeight: '600',
   },
 });
 

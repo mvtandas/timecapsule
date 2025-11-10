@@ -9,6 +9,7 @@ const { width, height } = Dimensions.get('window');
 
 interface ExploreScreenProps {
   onNavigate: (screen: string) => void;
+  onGoBack?: () => void;
 }
 
 const RADIUS_KM = 50; // 50km radius to view capsules
