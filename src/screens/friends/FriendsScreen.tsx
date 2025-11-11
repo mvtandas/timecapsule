@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Activi
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { supabase } from '../../lib/supabase';
-import { getRecentVisits, addRecentVisit, RecentVisit } from '../../utils/recentVisits';
+import { ProfileVisitService, RecentVisitProfile } from '../../services/profileVisitService';
 import { FriendService, FriendRequest } from '../../services/friendService';
 
 interface FriendsScreenProps {
@@ -24,8 +24,8 @@ interface FriendWithActivity {
 }
 
 const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
-  // Recent visits (replaces static friends data)
-  const [recentVisits, setRecentVisits] = useState<RecentVisit[]>([]);
+  // Recent visits from database
+  const [recentVisits, setRecentVisits] = useState<RecentVisitProfile[]>([]);
 
   // Friends list state
   const [friends, setFriends] = useState<FriendWithActivity[]>([]);
@@ -53,8 +53,14 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
   }, []);
 
   const loadRecentVisits = async () => {
-    const visits = await getRecentVisits();
-    setRecentVisits(visits);
+    const { data, error } = await ProfileVisitService.getRecentVisits(10);
+    if (error) {
+      console.error('Error loading recent visits:', error);
+      setRecentVisits([]);
+      return;
+    }
+    setRecentVisits(data || []);
+    console.log('📋 Recent visits loaded:', data?.length || 0);
   };
 
   // Load pending friend requests
@@ -62,12 +68,24 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
     try {
       const { data, error } = await FriendService.getPendingRequests();
       if (error) {
+        // Silently handle if table doesn't exist yet (migration not run)
+        if (error.code === 'PGRST205' || error.message?.includes('friend_requests')) {
+          console.warn('⚠️ Friend requests table not found. Run migration 009 to enable this feature.');
+          setPendingRequests([]);
+          return;
+        }
         console.error('Error loading pending requests:', error);
         return;
       }
       setPendingRequests(data || []);
       console.log('🔔 Pending requests loaded:', data?.length || 0);
-    } catch (error) {
+    } catch (error: any) {
+      // Silently handle if table doesn't exist
+      if (error?.code === 'PGRST205' || error?.message?.includes('friend_requests')) {
+        console.warn('⚠️ Friend requests table not found. Run migration 009 to enable this feature.');
+        setPendingRequests([]);
+        return;
+      }
       console.error('Error loading pending requests:', error);
     }
   };
@@ -159,48 +177,41 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
         return;
       }
 
-      // For now, get users who have interacted with current user's capsules
-      // or users the current user has shared capsules with
-      const { data: capsulesData, error: capsulesError } = await supabase
-        .from('capsules')
-        .select('owner_id, shared_with')
-        .or(`owner_id.eq.${user.id},shared_with.cs.{${user.id}}`);
-
-      if (capsulesError) {
-        // Silently handle error - don't break the app
+      // Get accepted friends from friend_requests table
+      const { data: friendIds, error: friendsError } = await FriendService.getFriends();
+      
+      if (friendsError) {
+        // Silently handle if table doesn't exist yet
+        if (friendsError.code === 'PGRST205' || friendsError.message?.includes('friend_requests')) {
+          console.warn('⚠️ Friend requests table not found. Using fallback method.');
+          // Fallback: Get users from capsule interactions
+          await loadFriendsFromCapsules(user.id);
+          return;
+        }
+        console.error('Error loading friends:', friendsError);
         setFriends([]);
         setLoadingFriends(false);
         return;
       }
 
-      // Extract unique user IDs (friends)
-      const friendIds = new Set<string>();
-      capsulesData?.forEach(capsule => {
-        if (capsule.owner_id && capsule.owner_id !== user.id) {
-          friendIds.add(capsule.owner_id);
-        }
-        if (capsule.shared_with && Array.isArray(capsule.shared_with)) {
-          capsule.shared_with.forEach((id: string) => {
-            if (id !== user.id) friendIds.add(id);
-          });
-        }
-      });
+      // If no friends, show empty state
+      if (!friendIds || friendIds.length === 0) {
+        console.log('📭 No friends yet');
+        setFriends([]);
+        setLoadingFriends(false);
+        return;
+      }
+
+      console.log('👥 Loading', friendIds.length, 'friends...');
 
       // Get friend profiles
-      const friendIdsArray = Array.from(friendIds);
-      if (friendIdsArray.length === 0) {
-        setFriends([]);
-        setLoadingFriends(false);
-        return;
-      }
-
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('id, username, display_name, avatar_url')
-        .in('id', friendIdsArray);
+        .in('id', friendIds);
 
       if (profilesError) {
-        // Silently handle error
+        console.error('Error loading friend profiles:', profilesError);
         setFriends([]);
         setLoadingFriends(false);
         return;
@@ -230,11 +241,89 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
         })
       );
 
+      console.log('✅ Loaded', friendsWithActivity.length, 'friends with activity');
       setFriends(friendsWithActivity);
-    } catch (error) {
+    } catch (error: any) {
       // Silently handle any errors - don't break the app
+      console.error('Error in loadFriends:', error);
       setFriends([]);
     } finally {
+      setLoadingFriends(false);
+    }
+  };
+
+  // Fallback: Load friends from capsule interactions (if friend_requests table doesn't exist)
+  const loadFriendsFromCapsules = async (userId: string) => {
+    try {
+      const { data: capsulesData, error: capsulesError } = await supabase
+        .from('capsules')
+        .select('owner_id, shared_with')
+        .or(`owner_id.eq.${userId},shared_with.cs.{${userId}}`);
+
+      if (capsulesError) {
+        setFriends([]);
+        setLoadingFriends(false);
+        return;
+      }
+
+      // Extract unique user IDs (friends)
+      const friendIds = new Set<string>();
+      capsulesData?.forEach(capsule => {
+        if (capsule.owner_id && capsule.owner_id !== userId) {
+          friendIds.add(capsule.owner_id);
+        }
+        if (capsule.shared_with && Array.isArray(capsule.shared_with)) {
+          capsule.shared_with.forEach((id: string) => {
+            if (id !== userId) friendIds.add(id);
+          });
+        }
+      });
+
+      const friendIdsArray = Array.from(friendIds);
+      if (friendIdsArray.length === 0) {
+        setFriends([]);
+        setLoadingFriends(false);
+        return;
+      }
+
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .in('id', friendIdsArray);
+
+      if (profilesError) {
+        setFriends([]);
+        setLoadingFriends(false);
+        return;
+      }
+
+      const friendsWithActivity: FriendWithActivity[] = await Promise.all(
+        (profilesData || []).map(async (profile) => {
+          const { data: lastCapsule } = await supabase
+            .from('capsules')
+            .select('title, lat, lng, created_at')
+            .eq('owner_id', profile.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          return {
+            ...profile,
+            lastCapsule: lastCapsule ? {
+              title: lastCapsule.title || 'Untitled',
+              location: lastCapsule.lat && lastCapsule.lng 
+                ? `${lastCapsule.lat.toFixed(2)}, ${lastCapsule.lng.toFixed(2)}`
+                : undefined,
+              created_at: lastCapsule.created_at,
+            } : null,
+          };
+        })
+      );
+
+      setFriends(friendsWithActivity);
+      setLoadingFriends(false);
+    } catch (error) {
+      setFriends([]);
       setLoadingFriends(false);
     }
   };
@@ -288,49 +377,19 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
     setUserSearchQuery('');
     setSearchResults([]);
     
-    // Add to recent visits
-    await addRecentVisit({
-      id: user.id,
-      username: user.username,
-      display_name: user.display_name,
-      avatar_url: user.avatar_url,
-    });
-    
-    // Reload recent visits
-    await loadRecentVisits();
-    
+    // Navigate to profile (profile screen will track the visit)
     onNavigate('FriendProfile', { friend: user });
   };
 
   // Handle recent visit press
-  const handleRecentVisitPress = async (visit: RecentVisit) => {
-    // Update visit timestamp
-    await addRecentVisit({
-      id: visit.id,
-      username: visit.username,
-      display_name: visit.display_name,
-      avatar_url: visit.avatar_url,
-    });
-    
-    // Reload recent visits
-    await loadRecentVisits();
-    
+  const handleRecentVisitPress = async (visit: RecentVisitProfile) => {
+    // Navigate to profile (profile screen will track the visit)
     onNavigate('FriendProfile', { friend: visit });
   };
 
   // Handle friend press
   const handleFriendPress = async (friend: FriendWithActivity) => {
-    // Add to recent visits
-    await addRecentVisit({
-      id: friend.id,
-      username: friend.username,
-      display_name: friend.display_name,
-      avatar_url: friend.avatar_url,
-    });
-    
-    // Reload recent visits
-    await loadRecentVisits();
-    
+    // Navigate to profile (profile screen will track the visit)
     onNavigate('FriendProfile', { friend });
   };
 

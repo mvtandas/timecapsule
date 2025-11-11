@@ -48,55 +48,106 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
     location: null as { lat: number; lng: number; address: string } | null,
     media: [] as any[],
     isPublic: true,
-    allowedUsers: [] as string[],
+    allowedUsers: [] as string[], // Deprecated: use sharedWith
+    sharedWith: [] as string[], // User IDs who can access this private capsule
   });
 
   const [newUsername, setNewUsername] = useState('');
-  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<any[]>([]); // {id, username, avatar_url, display_name}
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   
-  // Mock friends data - sorted by interaction frequency
-  const [friends] = useState<Friend[]>([
-    {
-      id: '1',
-      name: 'Elif Yılmaz',
-      username: 'elifyilmaz',
-      avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
-      friends_since: '2021',
-    },
-    {
-      id: '2',
-      name: 'Ahmet Demir',
-      username: 'ahmetdemir',
-      avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
-      friends_since: '2022',
-    },
-    {
-      id: '3',
-      name: 'Zeynep Kaya',
-      username: 'zeynepkaya',
-      avatar_url: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400',
-      friends_since: '2020',
-    },
-    {
-      id: '4',
-      name: 'Mehmet Öztürk',
-      username: 'mehmetozturk',
-      avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
-      friends_since: '2023',
-    },
-    {
-      id: '5',
-      name: 'Ayşe Şahin',
-      username: 'aysesahin',
-      avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400',
-      friends_since: '2021',
-    },
-  ]);
+  // Load current user and friends on mount
+  useEffect(() => {
+    loadCurrentUser();
+  }, []);
+
+  const loadCurrentUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      setCurrentUser(user);
+    }
+  };
 
   useEffect(() => {
     // Get current location on mount
     getCurrentLocation();
   }, []);
+
+  // Search users by username
+  const searchUsers = async (query: string) => {
+    if (!query || query.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    if (!currentUser) {
+      console.warn('No current user');
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .ilike('username', `%${query.trim()}%`)
+        .neq('id', currentUser.id) // Exclude self
+        .limit(10);
+
+      if (error) {
+        console.error('Error searching users:', error);
+        setSearchResults([]);
+        return;
+      }
+
+      console.log('🔍 Search results:', data?.length || 0);
+      setSearchResults(data || []);
+    } catch (error) {
+      console.error('Error in searchUsers:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Handle username input change with debouncing
+  const handleUsernameChange = (text: string) => {
+    setNewUsername(text);
+    searchUsers(text);
+  };
+
+  // Add user to selected list
+  const handleSelectUser = (user: any) => {
+    if (selectedUsers.find(u => u.id === user.id)) {
+      // Already selected, deselect
+      setSelectedUsers(selectedUsers.filter(u => u.id !== user.id));
+      setCapsuleData({
+        ...capsuleData,
+        sharedWith: capsuleData.sharedWith.filter(id => id !== user.id),
+      });
+    } else {
+      // Select user
+      setSelectedUsers([...selectedUsers, user]);
+      setCapsuleData({
+        ...capsuleData,
+        sharedWith: [...capsuleData.sharedWith, user.id],
+      });
+    }
+    // Clear search
+    setNewUsername('');
+    setSearchResults([]);
+  };
+
+  // Remove selected user
+  const handleRemoveUser = (userId: string) => {
+    setSelectedUsers(selectedUsers.filter(u => u.id !== userId));
+    setCapsuleData({
+      ...capsuleData,
+      sharedWith: capsuleData.sharedWith.filter(id => id !== userId),
+    });
+  };
 
   const getCurrentLocation = async () => {
     try {
@@ -201,6 +252,14 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
       // Determine if capsule should be locked
       const isLocked = capsuleData.openDate ? new Date(capsuleData.openDate) > new Date() : false;
 
+      // Prepare shared_with array for private capsules
+      const sharedWithUsers = !capsuleData.isPublic ? capsuleData.sharedWith : [];
+      
+      console.log('📦 Creating capsule:', {
+        isPublic: capsuleData.isPublic,
+        sharedWith: sharedWithUsers.length,
+      });
+
       const { data, error } = await CapsuleService.createCapsule({
         title: capsuleData.title,
         description: capsuleData.message || null,
@@ -208,6 +267,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
         lat: capsuleData.location?.lat || null,
         lng: capsuleData.location?.lng || null,
         is_public: capsuleData.isPublic,
+        shared_with: sharedWithUsers, // Array of user IDs
         content_refs: capsuleData.media,
         media_url: mediaUrl,
         media_type: mediaType,
@@ -488,103 +548,89 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
               {/* Authorized Users List - Only show when private */}
               {!capsuleData.isPublic && (
                 <>
-                  {/* Username Input */}
+                  {/* Username Search Input */}
                   <View style={styles.addContactContainer}>
                     <View style={styles.usernameInputContainer}>
-                      <Ionicons name="at-outline" size={20} color="#94a3b8" style={styles.usernameIcon} />
+                      <Ionicons name="search-outline" size={20} color="#94a3b8" style={styles.usernameIcon} />
                       <TextInput
                         style={styles.usernameInput}
                         value={newUsername}
-                        onChangeText={setNewUsername}
-                        placeholder="Enter username"
+                        onChangeText={handleUsernameChange}
+                        placeholder="Search users by username..."
                         placeholderTextColor="#94a3b8"
                         autoCapitalize="none"
                         autoCorrect={false}
                       />
+                      {isSearching && (
+                        <ActivityIndicator size="small" color="#FAC638" style={styles.searchingIndicator} />
+                      )}
                     </View>
-                    <TouchableOpacity
-                      style={styles.addButton}
-                      onPress={() => {
-                        if (newUsername.trim()) {
-                          const username = newUsername.trim().toLowerCase();
-                          if (!capsuleData.allowedUsers.includes(username)) {
-                            setCapsuleData({
-                              ...capsuleData,
-                              allowedUsers: [...capsuleData.allowedUsers, username],
-                            });
-                          }
-                          setNewUsername('');
-                        }
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="add-circle" size={24} color="#FAC638" />
-                    </TouchableOpacity>
                   </View>
 
-                  {/* Friend Picker - Horizontal Scrollable */}
-                  <View style={styles.friendPickerSection}>
-                    <Text style={styles.friendPickerTitle}>Quick Select Friends</Text>
-                    <ScrollView 
-                      horizontal 
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.friendPickerScrollContent}
-                    >
-                      {friends.map((friend) => {
-                        const isSelected = selectedFriends.includes(friend.username);
+                  {/* Search Results */}
+                  {searchResults.length > 0 && (
+                    <View style={styles.searchResultsContainer}>
+                      <Text style={styles.searchResultsTitle}>Found Users:</Text>
+                      {searchResults.map((user) => {
+                        const isSelected = selectedUsers.find(u => u.id === user.id);
                         return (
                           <TouchableOpacity
-                            key={friend.id}
-                            style={styles.friendPickerItem}
-                            onPress={() => {
-                              let newSelectedFriends: string[];
-                              let newAllowedUsers: string[];
-                              
-                              if (isSelected) {
-                                // Deselect friend
-                                newSelectedFriends = selectedFriends.filter(u => u !== friend.username);
-                                newAllowedUsers = capsuleData.allowedUsers.filter(u => u !== friend.username);
-                              } else {
-                                // Select friend
-                                newSelectedFriends = [...selectedFriends, friend.username];
-                                newAllowedUsers = capsuleData.allowedUsers.includes(friend.username)
-                                  ? capsuleData.allowedUsers
-                                  : [...capsuleData.allowedUsers, friend.username];
-                              }
-                              
-                              setSelectedFriends(newSelectedFriends);
-                              setCapsuleData({
-                                ...capsuleData,
-                                allowedUsers: newAllowedUsers,
-                              });
-                            }}
+                            key={user.id}
+                            style={styles.searchResultItem}
+                            onPress={() => handleSelectUser(user)}
                             activeOpacity={0.7}
                           >
-                            <View style={[
-                              styles.friendPickerAvatar,
-                              isSelected && styles.friendPickerAvatarSelected
-                            ]}>
-                              {friend.avatar_url ? (
-                                <Image source={{ uri: friend.avatar_url }} style={styles.friendPickerAvatarImage} />
-                              ) : (
-                                <View style={styles.friendPickerAvatarPlaceholder}>
-                                  <Ionicons name="person" size={32} color="#94a3b8" />
-                                </View>
-                              )}
-                              {isSelected && (
-                                <View style={styles.selectionCheckmark}>
-                                  <Ionicons name="checkmark-circle" size={24} color="#FAC638" />
-                                </View>
-                              )}
+                            {user.avatar_url ? (
+                              <Image source={{ uri: user.avatar_url }} style={styles.searchResultAvatar} />
+                            ) : (
+                              <View style={[styles.searchResultAvatar, styles.searchResultAvatarPlaceholder]}>
+                                <Ionicons name="person" size={20} color="#94a3b8" />
+                              </View>
+                            )}
+                            <View style={styles.searchResultInfo}>
+                              <Text style={styles.searchResultName}>{user.display_name || user.username}</Text>
+                              <Text style={styles.searchResultUsername}>@{user.username}</Text>
                             </View>
-                            <Text style={styles.friendPickerName} numberOfLines={1}>
-                              {friend.name.split(' ')[0]}
-                            </Text>
+                            {isSelected && (
+                              <Ionicons name="checkmark-circle" size={24} color="#10b981" />
+                            )}
                           </TouchableOpacity>
                         );
                       })}
-                    </ScrollView>
-                  </View>
+                    </View>
+                  )}
+
+                  {/* Selected Users Chips */}
+                  {selectedUsers.length > 0 && (
+                    <View style={styles.selectedUsersContainer}>
+                      <Text style={styles.selectedUsersTitle}>
+                        Shared with ({selectedUsers.length}):
+                      </Text>
+                      <View style={styles.selectedUsersChips}>
+                        {selectedUsers.map((user) => (
+                          <View key={user.id} style={styles.userChip}>
+                            {user.avatar_url ? (
+                              <Image source={{ uri: user.avatar_url }} style={styles.chipAvatar} />
+                            ) : (
+                              <View style={[styles.chipAvatar, styles.chipAvatarPlaceholder]}>
+                                <Ionicons name="person" size={16} color="#94a3b8" />
+                              </View>
+                            )}
+                            <Text style={styles.chipUsername} numberOfLines={1}>
+                              @{user.username}
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => handleRemoveUser(user.id)}
+                              style={styles.chipRemoveButton}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <Ionicons name="close-circle" size={18} color="#64748b" />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
 
                   {/* List of Authorized Users */}
                   {capsuleData.allowedUsers.length > 0 && (
@@ -1163,6 +1209,98 @@ const styles = StyleSheet.create({
     right: -2,
     backgroundColor: 'white',
     borderRadius: 12,
+  },
+  searchingIndicator: {
+    marginLeft: 8,
+  },
+  searchResultsContainer: {
+    marginTop: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 12,
+    maxHeight: 300,
+  },
+  searchResultsTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748b',
+    marginBottom: 8,
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  searchResultAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  searchResultAvatarPlaceholder: {
+    backgroundColor: '#e2e8f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchResultInfo: {
+    flex: 1,
+  },
+  searchResultName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+  searchResultUsername: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  selectedUsersContainer: {
+    marginTop: 16,
+  },
+  selectedUsersTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 8,
+  },
+  selectedUsersChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  userChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  chipAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginRight: 6,
+  },
+  chipAvatarPlaceholder: {
+    backgroundColor: '#cbd5e1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chipUsername: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#475569',
+    maxWidth: 100,
+  },
+  chipRemoveButton: {
+    marginLeft: 4,
   },
   friendPickerName: {
     fontSize: 12,

@@ -5,6 +5,7 @@ import { BlurView } from 'expo-blur';
 import MapView, { Marker } from 'react-native-maps';
 import { CapsuleService, Capsule } from '../../services/capsuleService';
 import { MediaService } from '../../services/mediaService';
+import { supabase } from '../../lib/supabase';
 
 interface CapsuleDetailsScreenProps {
   onBack: () => void;
@@ -17,6 +18,7 @@ const CapsuleDetailsScreen = ({ onBack, capsuleId }: CapsuleDetailsScreenProps) 
   const [capsule, setCapsule] = useState<Capsule | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sharedUsers, setSharedUsers] = useState<any[]>([]); // Users capsule is shared with
 
   useEffect(() => {
     loadCapsule();
@@ -40,6 +42,12 @@ const CapsuleDetailsScreen = ({ onBack, capsuleId }: CapsuleDetailsScreenProps) 
         console.error('Error loading capsule:', fetchError);
       } else {
         setCapsule(data);
+        
+        // Fetch shared users info if capsule is private and has shared_with
+        if (!data.is_public && data.shared_with && data.shared_with.length > 0) {
+          await loadSharedUsers(data.shared_with);
+        }
+        
         // Increment view count
         await CapsuleService.incrementViewCount(capsuleId);
       }
@@ -48,6 +56,25 @@ const CapsuleDetailsScreen = ({ onBack, capsuleId }: CapsuleDetailsScreenProps) 
       setError('Something went wrong');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSharedUsers = async (userIds: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .in('id', userIds);
+
+      if (error) {
+        console.error('Error loading shared users:', error);
+        return;
+      }
+
+      setSharedUsers(data || []);
+      console.log('📋 Loaded shared users:', data?.length || 0);
+    } catch (error) {
+      console.error('Error in loadSharedUsers:', error);
     }
   };
 
@@ -271,6 +298,30 @@ const CapsuleDetailsScreen = ({ onBack, capsuleId }: CapsuleDetailsScreenProps) 
                   <Text style={[styles.metaValue, styles.lockedStatus]}>
                     Locked - {daysUntilOpen > 0 ? `Opens in ${daysUntilOpen} days` : 'Opening soon'}
                   </Text>
+                </View>
+              </View>
+            )}
+            {!capsule.is_public && sharedUsers.length > 0 && (
+              <View style={styles.metaRow}>
+                <Ionicons name="people-outline" size={20} color="#94a3b8" />
+                <View style={styles.metaTextContainer}>
+                  <Text style={styles.metaLabel}>Shared With</Text>
+                  <View style={styles.sharedUsersContainer}>
+                    {sharedUsers.map((user, index) => (
+                      <View key={user.id} style={styles.sharedUserChip}>
+                        {user.avatar_url ? (
+                          <Image source={{ uri: user.avatar_url }} style={styles.sharedUserAvatar} />
+                        ) : (
+                          <View style={[styles.sharedUserAvatar, styles.sharedUserAvatarPlaceholder]}>
+                            <Ionicons name="person" size={12} color="#94a3b8" />
+                          </View>
+                        )}
+                        <Text style={styles.sharedUserText}>
+                          @{user.username}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               </View>
             )}
@@ -641,6 +692,38 @@ const styles = StyleSheet.create({
   lockedStatus: {
     color: '#FAC638',
     fontWeight: '600',
+  },
+  sharedUsersContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  sharedUserChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  sharedUserAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginRight: 6,
+  },
+  sharedUserAvatarPlaceholder: {
+    backgroundColor: '#e2e8f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sharedUserText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#475569',
   },
 });
 

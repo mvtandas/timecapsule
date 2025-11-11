@@ -162,22 +162,76 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
   const loadCapsules = async () => {
     try {
       setLoading(true);
+      
+      // Get user's current location
+      let currentLocation = userLocation;
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          currentLocation = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          };
+          setUserLocation(currentLocation);
+          console.log('📍 User location:', currentLocation.latitude, currentLocation.longitude);
+        }
+      } catch (locError) {
+        console.warn('⚠️ Could not get location, using default:', locError);
+      }
+      
       // Fetch all accessible capsules (owned + public + shared)
       const { data, error } = await CapsuleService.getAllAccessibleCapsules();
+      
       if (error) {
         console.error('Error loading capsules:', error);
+        setCapsules([]);
       } else {
-        // Generate stable coordinates for each capsule (only once)
-        const capsulesWithCoordinates = (data || []).map((capsule, index) => ({
-          ...capsule,
-          // Use capsule ID to generate consistent coordinates
-          displayLat: capsule.lat || (userLocation.latitude + (Math.sin(index) * 0.005)),
-          displayLng: capsule.lng || (userLocation.longitude + (Math.cos(index) * 0.005)),
-        }));
-        setCapsules(capsulesWithCoordinates);
+        // Filter capsules within 4km radius and with valid coordinates
+        const RADIUS_KM = 4;
+        const capsulesWithDistance = (data || [])
+          .filter(capsule => {
+            // Must have valid coordinates
+            if (!capsule.lat || !capsule.lng) {
+              console.log('⚠️ Capsule missing coordinates:', capsule.id);
+              return false;
+            }
+            return true;
+          })
+          .map(capsule => {
+            const distance = calculateDistance(
+              currentLocation.latitude,
+              currentLocation.longitude,
+              capsule.lat,
+              capsule.lng
+            );
+            return {
+              ...capsule,
+              displayLat: capsule.lat,
+              displayLng: capsule.lng,
+              distance: distance,
+            };
+          })
+          .filter(capsule => {
+            // Only show capsules within 4km radius
+            const inRadius = capsule.distance <= RADIUS_KM;
+            if (!inRadius) {
+              console.log('📍 Capsule outside 4km radius:', capsule.title, capsule.distance.toFixed(2), 'km');
+            }
+            return inRadius;
+          })
+          .sort((a, b) => a.distance - b.distance); // Sort by distance (nearest first)
+
+        console.log(`📦 Loaded ${capsulesWithDistance.length} capsules within ${RADIUS_KM}km radius`);
+        setCapsules(capsulesWithDistance);
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error loading capsules:', error);
+      setCapsules([]);
     } finally {
       setLoading(false);
     }
@@ -768,7 +822,8 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
         ) : capsules.length > 0 ? (
           <View style={styles.capsuleGrid}>
             {capsules
-              .filter(capsule => capsule.is_public)
+              // Show all capsules (public + private/shared that user can access)
+              // getAllAccessibleCapsules already filters by access rights
               .sort((a, b) => {
                 if (activeTab === 'recent') {
                   // Recent: sort by creation date (newest first)
@@ -781,12 +836,8 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                 }
               })
               .map((capsule, index) => {
-                const distance = calculateDistance(
-                  userLocation.latitude,
-                  userLocation.longitude,
-                  capsule.displayLat || capsule.lat || userLocation.latitude,
-                  capsule.displayLng || capsule.lng || userLocation.longitude
-                );
+                // Distance is already calculated in loadCapsules
+                const distance = capsule.distance || 0;
 
                 return (
                   <TouchableOpacity
@@ -827,8 +878,8 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
         ) : (
           <View style={styles.feedEmptyState}>
             <Ionicons name="file-tray-outline" size={48} color="#cbd5e1" />
-            <Text style={styles.feedEmptyText}>No nearby capsules</Text>
-            <Text style={styles.feedEmptySubtext}>Be the first to create one here!</Text>
+            <Text style={styles.feedEmptyText}>No capsules within 4km</Text>
+            <Text style={styles.feedEmptySubtext}>Create a capsule nearby or explore further!</Text>
           </View>
         )}
       </View>

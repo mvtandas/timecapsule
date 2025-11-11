@@ -15,6 +15,8 @@ import { BlurView } from 'expo-blur';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { FriendService, FriendshipStatus } from '../../services/friendService';
+import { ProfileVisitService } from '../../services/profileVisitService';
+import { CapsuleService } from '../../services/capsuleService';
 
 const { width } = Dimensions.get('window');
 
@@ -51,6 +53,8 @@ type CapsuleSummary = {
   lat: number | null;
   lng: number | null;
   shared_at?: string | null;
+  media_url?: string | null;
+  media_type?: 'image' | 'video' | 'none';
 };
 
 type ActivityEvent = {
@@ -228,6 +232,11 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       console.log('👤 Current user:', currentUser?.id);
 
+      // Track profile visit (only if not viewing own profile)
+      if (currentUser && currentUser.id !== viewedProfileId) {
+        await ProfileVisitService.trackVisit(viewedProfileId);
+      }
+
       // Fetch profile basics
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -256,58 +265,51 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
         created_at: profileData?.created_at || null,
       });
 
-      // Fetch public capsules
-      const { data: publicData, error: publicError } = await supabase
-        .from('capsules')
-        .select('id, owner_id, title, description, content_refs, open_at, created_at, is_public, lat, lng')
-        .eq('owner_id', viewedProfileId)
-        .eq('is_public', true)
-        .order('created_at', { ascending: false });
+      // Fetch accessible capsules (public + shared with current user)
+      // RLS policy will automatically filter:
+      // 1. Public capsules by this user
+      // 2. Private capsules shared with current user (via shared_with array)
+      const { data: accessibleData, error: capsulesError } = await CapsuleService.getAccessibleCapsulesForUser(viewedProfileId);
 
-      if (publicError) {
-        console.error('❌ Public capsules error:', publicError);
+      if (capsulesError) {
+        console.error('❌ Capsules error:', capsulesError);
       }
 
-      console.log('📦 Public capsules:', publicData?.length || 0);
+      console.log('📦 Accessible capsules:', accessibleData?.length || 0);
 
-      const publicList: CapsuleSummary[] = (publicData || []).map((capsule) => ({
-        ...capsule,
-        shared_at: null,
-      }));
+      // Separate into public and shared lists
+      const publicList: CapsuleSummary[] = [];
+      const sharedList: CapsuleSummary[] = [];
+
+      (accessibleData || []).forEach((capsule) => {
+        const capsuleSummary: CapsuleSummary = {
+          id: capsule.id,
+          owner_id: capsule.owner_id,
+          title: capsule.title,
+          description: capsule.description,
+          content_refs: capsule.content_refs,
+          open_at: capsule.open_at,
+          created_at: capsule.created_at,
+          is_public: capsule.is_public,
+          lat: capsule.lat,
+          lng: capsule.lng,
+          shared_at: null,
+          media_url: capsule.media_url,
+          media_type: capsule.media_type,
+        };
+
+        if (capsule.is_public) {
+          publicList.push(capsuleSummary);
+        } else {
+          // Private capsule shared with current user
+          sharedList.push({ ...capsuleSummary, shared_at: capsule.created_at });
+        }
+      });
 
       setPublicCapsules(publicList);
+      setSharedCapsules(sharedList);
 
-      // Fetch shared capsules (only if current user is different from viewed profile)
-      let sharedList: CapsuleSummary[] = [];
-      if (currentUser && currentUser.id !== viewedProfileId) {
-        const { data: sharedData, error: sharedError } = await supabase
-          .from('shared_capsules')
-          .select('capsule_id, created_at, capsules (id, owner_id, title, description, content_refs, open_at, created_at, is_public, lat, lng)')
-          .eq('user_id', currentUser.id)
-          .eq('capsules.owner_id', viewedProfileId)
-          .order('created_at', { ascending: false });
-
-        if (sharedError) {
-          console.error('❌ Shared capsules error:', sharedError);
-        }
-
-        console.log('🤝 Shared capsules:', sharedData?.length || 0);
-
-        sharedList =
-          sharedData
-            ?.map((item: any) => {
-              if (!item.capsules) return null;
-              return {
-                ...(item.capsules as CapsuleSummary),
-                shared_at: item.created_at as string,
-              };
-            })
-            .filter(Boolean) ?? [];
-
-        setSharedCapsules(sharedList);
-      } else {
-        setSharedCapsules([]);
-      }
+      console.log('📊 Public:', publicList.length, 'Shared:', sharedList.length);
 
       const activity = buildActivityFeed(publicList, sharedList);
       setActivityEvents(activity);
@@ -364,6 +366,17 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
 
         setFriendshipStatus({ status: 'none' });
         console.log('✅ Friend request canceled');
+      } else if (friendshipStatus.status === 'friends' && friendshipStatus.requestId) {
+        // Unfriend
+        const { error } = await FriendService.unfriend(friendshipStatus.requestId);
+        
+        if (error) {
+          console.error('Error unfriending:', error);
+          return;
+        }
+
+        setFriendshipStatus({ status: 'none' });
+        console.log('✅ Unfriended successfully');
       }
     } catch (error) {
       console.error('Error handling friend request:', error);
@@ -383,8 +396,8 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
       case 'friends':
         return {
           label: 'Friends',
-          icon: 'checkmark-circle' as const,
-          disabled: true,
+          icon: 'person-remove' as const,
+          disabled: false,
           style: styles.friendButton,
         };
       case 'pending_sent':
