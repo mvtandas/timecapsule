@@ -1,8 +1,8 @@
 -- Create friend_requests table
 CREATE TABLE IF NOT EXISTS friend_requests (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  sender_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  receiver_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sender_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  receiver_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -43,11 +43,15 @@ ON friend_requests FOR UPDATE
 USING (auth.uid() = receiver_id)
 WITH CHECK (auth.uid() = receiver_id);
 
--- Policy: Users can delete their own sent requests (cancel)
+-- Policy: Users can delete their own sent requests (cancel) or unfriend
 DROP POLICY IF EXISTS "Users can delete their sent requests" ON friend_requests;
 CREATE POLICY "Users can delete their sent requests"
 ON friend_requests FOR DELETE
-USING (auth.uid() = sender_id);
+USING (
+  auth.uid() = sender_id OR 
+  (auth.uid() = receiver_id AND status = 'accepted') OR
+  (auth.uid() = sender_id AND status = 'accepted')
+);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_friend_requests_updated_at()

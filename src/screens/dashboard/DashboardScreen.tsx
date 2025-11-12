@@ -6,6 +6,17 @@ import * as Location from 'expo-location';
 import { BlurView } from 'expo-blur';
 import { CapsuleService } from '../../services/capsuleService';
 import { CapsuleIcon } from '../../components/common/CapsuleIcon';
+import { supabase } from '../../lib/supabase';
+import { NotificationService } from '../../services/notificationService';
+import { 
+  getDistanceInKm, 
+  getDistanceStatus, 
+  formatDistance, 
+  hasMovedSignificantly,
+  VISIBILITY_RADIUS_KM,
+  OPEN_RADIUS_KM,
+  type Coordinates 
+} from '../../utils/distance';
 
 interface DashboardScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -27,8 +38,10 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
   const [capsules, setCapsules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCapsule, setSelectedCapsule] = useState<any>(null);
+  const [selectedCapsuleSharedUsers, setSelectedCapsuleSharedUsers] = useState<any[]>([]); // Shared users for selected capsule
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [lastTappedCapsule, setLastTappedCapsule] = useState<string | null>(null);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0); // Unread notification count
   const modalOpacity = useRef(new Animated.Value(0)).current;
   const mapRef = useRef<MapView>(null);
   
@@ -62,6 +75,96 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
 
   useEffect(() => {
     loadCapsules();
+    loadUnreadNotifications();
+  }, []);
+
+  // Listen for auth state changes to reload capsules on login/logout
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔐 Dashboard: Auth state changed:', event, session?.user?.id);
+      
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        // User logged in or token refreshed - reload capsules
+        console.log('✅ Dashboard: User logged in, reloading capsules...');
+        loadCapsules();
+        loadUnreadNotifications();
+      } else if (event === 'SIGNED_OUT') {
+        // User logged out - clear capsules
+        console.log('🚪 Dashboard: User logged out, clearing capsules...');
+        setCapsules([]);
+        setUnreadNotifCount(0);
+      }
+    });
+
+    // Cleanup subscription on unmount
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, []);
+
+  // Periodically reload notifications to catch updates from other screens
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      loadUnreadNotifications();
+    }, 3000); // Check every 3 seconds
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
+
+  // Subscribe to real-time notifications
+  useEffect(() => {
+    const setupNotificationSubscription = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          console.log('⚠️ No user found, skipping notification subscription');
+          return null;
+        }
+
+        console.log('🔔 Setting up real-time notification subscription...');
+        console.log('   → User ID:', user.id);
+
+        // Subscribe to new notifications
+        const channel = NotificationService.subscribeToNotifications(user.id, (notification) => {
+          console.log('🔔 REALTIME: New notification received!');
+          console.log('   → Type:', notification.type);
+          console.log('   → Sender:', notification.sender_id);
+          console.log('   → Message:', notification.message);
+          console.log('   → Incrementing badge count...');
+          
+          // Increment unread count
+          setUnreadNotifCount(prev => {
+            const newCount = prev + 1;
+            console.log(`   → New badge count: ${newCount}`);
+            return newCount;
+          });
+        });
+
+        console.log('✅ Real-time notification subscription active');
+        return channel;
+      } catch (error: any) {
+        console.error('⚠️ Error setting up notification subscription!');
+        console.error('   → Error:', error?.message || error);
+        return null;
+      }
+    };
+
+    let channel: any = null;
+    setupNotificationSubscription().then(ch => {
+      channel = ch;
+    }).catch(err => {
+      console.error('⚠️ Failed to setup notification subscription:', err);
+    });
+
+    // Cleanup subscription
+    return () => {
+      if (channel) {
+        console.log('🔌 Unsubscribing from notifications...');
+        channel?.unsubscribe();
+      }
+    };
   }, []);
 
   // Helper function to find nearest snap point
@@ -159,25 +262,115 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
     })
   ).current;
 
+  const loadUnreadNotifications = async () => {
+    try {
+      console.log('🔔 Loading unread notifications...');
+      const { count, error } = await NotificationService.getUnreadCount();
+      
+      if (error) {
+        // Silently handle if table doesn't exist
+        if (error.code === 'PGRST205' || error.code === 'PGRST204' || error.message?.includes('notifications')) {
+          console.warn('⚠️ Notifications table not found!');
+          console.warn('   → Please run migration: db/migrations/012_add_notifications.sql');
+          setUnreadNotifCount(0);
+          return;
+        }
+        console.error('⚠️ Error loading unread notifications!');
+        console.error('   → Error code:', error.code);
+        console.error('   → Error message:', error.message);
+        console.error('   → Full error:', error);
+        return;
+      }
+      
+      setUnreadNotifCount(count);
+      console.log(`✅ Unread notifications loaded: ${count}`);
+      
+      if (count > 0) {
+        console.log(`   → ${count} unread notification(s) found`);
+        console.log('   → Badge should be visible on notification icon');
+      } else {
+        console.log('   → No unread notifications');
+      }
+    } catch (error: any) {
+      console.error('⚠️ Exception in loadUnreadNotifications!');
+      console.error('   → Error:', error?.message || error);
+      setUnreadNotifCount(0);
+    }
+  };
+
   const loadCapsules = async () => {
     try {
       setLoading(true);
+      
+      // Get user's current location
+      let currentLocation = userLocation;
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          currentLocation = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          };
+          setUserLocation(currentLocation);
+          console.log('📍 User location:', currentLocation.latitude, currentLocation.longitude);
+        }
+      } catch (locError) {
+        console.warn('⚠️ Could not get location, using default:', locError);
+      }
+      
       // Fetch all accessible capsules (owned + public + shared)
       const { data, error } = await CapsuleService.getAllAccessibleCapsules();
+      
       if (error) {
         console.error('Error loading capsules:', error);
+        setCapsules([]);
       } else {
-        // Generate stable coordinates for each capsule (only once)
-        const capsulesWithCoordinates = (data || []).map((capsule, index) => ({
-          ...capsule,
-          // Use capsule ID to generate consistent coordinates
-          displayLat: capsule.lat || (userLocation.latitude + (Math.sin(index) * 0.005)),
-          displayLng: capsule.lng || (userLocation.longitude + (Math.cos(index) * 0.005)),
-        }));
-        setCapsules(capsulesWithCoordinates);
+        // Filter capsules within 4km radius and with valid coordinates
+        const RADIUS_KM = 4;
+        const capsulesWithDistance = (data || [])
+          .filter(capsule => {
+            // Must have valid coordinates
+            if (!capsule.lat || !capsule.lng) {
+              console.log('⚠️ Capsule missing coordinates:', capsule.id);
+              return false;
+            }
+            return true;
+          })
+          .map(capsule => {
+            const distance = calculateDistance(
+              currentLocation.latitude,
+              currentLocation.longitude,
+              capsule.lat,
+              capsule.lng
+            );
+            return {
+              ...capsule,
+              displayLat: capsule.lat,
+              displayLng: capsule.lng,
+              distance: distance,
+            };
+          })
+          .filter(capsule => {
+            // Only show capsules within 4km radius
+            const inRadius = capsule.distance <= RADIUS_KM;
+            if (!inRadius) {
+              console.log('📍 Capsule outside 4km radius:', capsule.title, capsule.distance.toFixed(2), 'km');
+            }
+            return inRadius;
+          })
+          .sort((a, b) => a.distance - b.distance); // Sort by distance (nearest first)
+
+        console.log(`📦 Loaded ${capsulesWithDistance.length} capsules within ${RADIUS_KM}km radius`);
+        setCapsules(capsulesWithDistance);
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error loading capsules:', error);
+      setCapsules([]);
     } finally {
       setLoading(false);
     }
@@ -283,8 +476,46 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
   };
 
   const handleCalloutPress = async (capsule: any) => {
-    // Tapping "Tap for details" should always open the detail modal
+    // Check distance before allowing interaction
+    if (capsule.lat && capsule.lng) {
+      const userCoords: Coordinates = {
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+      };
+      const capsuleCoords = { lat: capsule.lat, lng: capsule.lng };
+      const distanceStatus = getDistanceStatus(userCoords, capsuleCoords);
+
+      if (!distanceStatus.withinViewRadius) {
+        // Too far - show warning
+        Alert.alert(
+          '🌍 Too Far Away',
+          distanceStatus.message,
+          [{ text: 'OK', style: 'default' }]
+        );
+        return;
+      }
+
+      if (!distanceStatus.withinOpenRadius) {
+        // Within view radius but can't open yet
+        Alert.alert(
+          '📍 Get Closer',
+          distanceStatus.message,
+          [{ text: 'OK', style: 'default' }]
+        );
+        return;
+      }
+    }
+
+    // Within range - open detail modal
     setSelectedCapsule(capsule);
+    
+    // Load shared users if private capsule
+    if (!capsule.is_public && capsule.shared_with && capsule.shared_with.length > 0) {
+      await loadSharedUsersForCapsule(capsule.shared_with);
+    } else {
+      setSelectedCapsuleSharedUsers([]);
+    }
+    
     setShowTimeModal(true);
     openDetailModal();
     
@@ -299,8 +530,46 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
   };
 
   const handleMarkerPress = async (capsule: any) => {
-    // When grid item or marker is tapped, open detail modal
+    // Check distance before allowing interaction
+    if (capsule.lat && capsule.lng) {
+      const userCoords: Coordinates = {
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+      };
+      const capsuleCoords = { lat: capsule.lat, lng: capsule.lng };
+      const distanceStatus = getDistanceStatus(userCoords, capsuleCoords);
+
+      if (!distanceStatus.withinViewRadius) {
+        // Too far - show warning
+        Alert.alert(
+          '🌍 Too Far Away',
+          distanceStatus.message,
+          [{ text: 'OK', style: 'default' }]
+        );
+        return;
+      }
+
+      if (!distanceStatus.withinOpenRadius) {
+        // Within view radius but can't open yet
+        Alert.alert(
+          '📍 Get Closer',
+          distanceStatus.message,
+          [{ text: 'OK', style: 'default' }]
+        );
+        return;
+      }
+    }
+
+    // Within range - open detail modal
     setSelectedCapsule(capsule);
+    
+    // Load shared users if private capsule
+    if (!capsule.is_public && capsule.shared_with && capsule.shared_with.length > 0) {
+      await loadSharedUsersForCapsule(capsule.shared_with);
+    } else {
+      setSelectedCapsuleSharedUsers([]);
+    }
+    
     setShowTimeModal(true);
     openDetailModal();
     
@@ -311,6 +580,27 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
       } catch (error) {
         // Silently ignore - view count feature not critical
       }
+    }
+  };
+
+  const loadSharedUsersForCapsule = async (userIds: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .in('id', userIds);
+
+      if (error) {
+        console.error('Error loading shared users:', error);
+        setSelectedCapsuleSharedUsers([]);
+        return;
+      }
+
+      setSelectedCapsuleSharedUsers(data || []);
+      console.log('📋 Loaded shared users for modal:', data?.length || 0);
+    } catch (error) {
+      console.error('Error in loadSharedUsersForCapsule:', error);
+      setSelectedCapsuleSharedUsers([]);
     }
   };
 
@@ -629,6 +919,22 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
               longitude: capsule.displayLng || capsule.lng || userLocation.longitude,
             };
             
+            // Calculate distance for visual effects
+            const userCoords: Coordinates = {
+              latitude: userLocation.latitude,
+              longitude: userLocation.longitude,
+            };
+            const capsuleCoords = { 
+              lat: capsule.lat || userLocation.latitude, 
+              lng: capsule.lng || userLocation.longitude 
+            };
+            const distanceStatus = getDistanceStatus(userCoords, capsuleCoords);
+            
+            // Visual state based on distance
+            const isVisible = distanceStatus.withinViewRadius;
+            const canOpen = distanceStatus.withinOpenRadius;
+            const markerOpacity = isVisible ? (canOpen ? 1.0 : 0.6) : 0.3;
+            
             return (
             <Marker
                 key={`capsule-${capsule.id || index}`}
@@ -641,21 +947,41 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                 tracksViewChanges={false}
                 stopPropagation={true}
                 flat={true}
+                opacity={markerOpacity}
             >
-              <View style={styles.capsuleMarker}>
-                  <View style={styles.capsulePill}>
+              <View style={[
+                styles.capsuleMarker,
+                !isVisible && styles.capsuleMarkerBlurred
+              ]}>
+                  <View style={[
+                    styles.capsulePill,
+                    !canOpen && isVisible && styles.capsulePillNearby,
+                    !isVisible && styles.capsulePillDistant
+                  ]}>
                     <View style={styles.capsulePillTop} />
                     <View style={styles.capsulePillBottom} />
               </View>
+              {!isVisible && (
+                <View style={styles.distanceIconOverlay}>
+                  <Ionicons name="lock-closed" size={12} color="#fff" />
+                </View>
+              )}
                 </View>
                 <Callout tooltip onPress={() => handleCalloutPress(capsule)}>
                   <View style={styles.calloutContainer}>
                     <Text style={styles.calloutTitle} numberOfLines={2} ellipsizeMode="tail">
                       {capsule.title}
                     </Text>
+                    {!isVisible && (
+                      <Text style={styles.calloutDistance}>
+                        {formatDistance(distanceStatus.distance)}
+                      </Text>
+                    )}
                     <View style={styles.infoButton}>
                       <Ionicons name="information-circle" size={16} color="#FAC638" style={styles.infoIcon} />
-                      <Text style={styles.infoButtonText}>Tap for details</Text>
+                      <Text style={styles.infoButtonText}>
+                        {isVisible ? (canOpen ? 'Tap for details' : 'Too far to open') : 'Too far away'}
+                      </Text>
                     </View>
                   </View>
                 </Callout>
@@ -664,6 +990,24 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
           })}
         </MapView>
         
+      </View>
+
+      {/* Notification Icon - Fixed Top Right */}
+      <View style={styles.notificationIconContainer}>
+        <TouchableOpacity 
+          style={styles.notificationButton}
+          onPress={() => onNavigate('MyCapsules', { initialTab: 'shared' })}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="notifications-outline" size={24} color="#1e293b" />
+          {unreadNotifCount > 0 && (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationBadgeText}>
+                {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       {/* Navigation/Location Button - Fixed on Map, Moves with Bottom Sheet */}
@@ -768,7 +1112,8 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
         ) : capsules.length > 0 ? (
           <View style={styles.capsuleGrid}>
             {capsules
-              .filter(capsule => capsule.is_public)
+              // Show all capsules (public + private/shared that user can access)
+              // getAllAccessibleCapsules already filters by access rights
               .sort((a, b) => {
                 if (activeTab === 'recent') {
                   // Recent: sort by creation date (newest first)
@@ -781,12 +1126,19 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                 }
               })
               .map((capsule, index) => {
-                const distance = calculateDistance(
-                  userLocation.latitude,
-                  userLocation.longitude,
-                  capsule.displayLat || capsule.lat || userLocation.latitude,
-                  capsule.displayLng || capsule.lng || userLocation.longitude
-                );
+                // Calculate distance status for visual effects
+                const userCoords: Coordinates = {
+                  latitude: userLocation.latitude,
+                  longitude: userLocation.longitude,
+                };
+                const capsuleCoords = { 
+                  lat: capsule.lat || userLocation.latitude, 
+                  lng: capsule.lng || userLocation.longitude 
+                };
+                const distanceStatus = getDistanceStatus(userCoords, capsuleCoords);
+                const distance = capsule.distance || distanceStatus.distance;
+                const isVisible = distanceStatus.withinViewRadius;
+                const canOpen = distanceStatus.withinOpenRadius;
 
                 return (
                   <TouchableOpacity
@@ -797,11 +1149,25 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                   >
                     {/* Square Image Preview */}
                     {getMediaUrl(capsule) ? (
-                      <Image
-                        source={{ uri: getMediaUrl(capsule)! }}
-                        style={styles.gridImage}
-                        resizeMode="cover"
-                      />
+                      <View>
+                        <Image
+                          source={{ uri: getMediaUrl(capsule)! }}
+                          style={[
+                            styles.gridImage,
+                            !isVisible && styles.gridImageBlurred
+                          ]}
+                          resizeMode="cover"
+                        />
+                        {/* Blur overlay for distant capsules */}
+                        {!isVisible && (
+                          <BlurView intensity={80} style={styles.gridBlurOverlay}>
+                            <Ionicons name="lock-closed" size={24} color="white" />
+                            <Text style={styles.gridBlurText}>
+                              {formatDistance(distance)}
+                            </Text>
+                          </BlurView>
+                        )}
+                      </View>
                     ) : (
                       <View style={[styles.gridImage, styles.gridImagePlaceholder]}>
                         <Ionicons name="image-outline" size={32} color="#cbd5e1" />
@@ -809,14 +1175,18 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                     )}
                     
                     {/* Locked Overlay */}
-                    {isCapsuleLocked(capsule.open_at) && (
+                    {isCapsuleLocked(capsule.open_at) && isVisible && (
                       <View style={styles.gridLockedOverlay}>
                         <Ionicons name="lock-closed" size={16} color="white" />
                       </View>
                     )}
 
-                    {/* Distance Badge */}
-                    <View style={styles.distanceBadge}>
+                    {/* Distance Badge - colored by proximity */}
+                    <View style={[
+                      styles.distanceBadge,
+                      canOpen && styles.distanceBadgeNear,
+                      !isVisible && styles.distanceBadgeFar
+                    ]}>
                       <Ionicons name="location" size={10} color="white" />
                       <Text style={styles.distanceText}>{formatDistance(distance)}</Text>
                     </View>
@@ -827,8 +1197,8 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
         ) : (
           <View style={styles.feedEmptyState}>
             <Ionicons name="file-tray-outline" size={48} color="#cbd5e1" />
-            <Text style={styles.feedEmptyText}>No nearby capsules</Text>
-            <Text style={styles.feedEmptySubtext}>Be the first to create one here!</Text>
+            <Text style={styles.feedEmptyText}>No capsules within 4km</Text>
+            <Text style={styles.feedEmptySubtext}>Create a capsule nearby or explore further!</Text>
           </View>
         )}
       </View>
@@ -906,59 +1276,59 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.detailModalSharedScrollContent}
                       >
-                        {selectedCapsule.allowed_users && selectedCapsule.allowed_users.map((username: string, index: number) => {
-                          // Check if this is the current user
-                          const isCurrentUser = username === 'you' || index === 0; // Mock check
-                          const friend = friends.find(f => f.username === username);
-                          
-                          return (
-                            <View key={index} style={styles.detailModalSharedUser}>
+                        {selectedCapsuleSharedUsers.length > 0 ? (
+                          selectedCapsuleSharedUsers.map((user, index) => (
+                            <View key={user.id} style={styles.detailModalSharedUser}>
                               <View style={styles.detailModalSharedAvatar}>
-                                {friend?.avatar_url ? (
-                                  <Image source={{ uri: friend.avatar_url }} style={styles.detailModalSharedAvatarImage} />
+                                {user.avatar_url ? (
+                                  <Image source={{ uri: user.avatar_url }} style={styles.detailModalSharedAvatarImage} />
                                 ) : (
                                   <View style={styles.detailModalSharedAvatarPlaceholder}>
           <Ionicons name="person" size={24} color="#94a3b8" />
           </View>
                                 )}
-                                {isCurrentUser && (
-                                  <View style={styles.detailModalSharedBadge}>
-                                    <Ionicons name="checkmark-circle" size={16} color="#FAC638" />
-                                  </View>
-                                )}
                               </View>
                               <Text style={styles.detailModalSharedName} numberOfLines={1}>
-                                {friend?.name.split(' ')[0] || username}
+                                {user.display_name || user.username}
                               </Text>
-                              {isCurrentUser && (
-                                <Text style={styles.detailModalSharedYouBadge}>You</Text>
-                              )}
                             </View>
-                          );
-                        })}
+                          ))
+                        ) : (
+                          <Text style={styles.detailModalSharedEmpty}>
+                            Loading shared users...
+                          </Text>
+                        )}
                       </ScrollView>
                     )}
                   </View>
 
                   {/* Media Preview Section - Hidden when locked */}
-                  {isMediaShared(selectedCapsule) && !isCapsuleLocked(selectedCapsule.open_at) && (
+                  {(selectedCapsule.media_url || isMediaShared(selectedCapsule)) && !isCapsuleLocked(selectedCapsule.open_at) && (
                     <View style={styles.detailModalMediaHeader}>
                       <View style={styles.detailModalMediaPreview}>
-                        {selectedCapsule.content_refs.slice(0, 1).map((item: any, index: number) => {
-                          const mediaUrl = item.uri || item.url || item;
-                          const isImage = typeof mediaUrl === 'string' && 
-                            (mediaUrl.includes('image') || 
-                             mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i));
-                          
-                          return (
-                            <Image 
-                              key={index}
-                              source={{ uri: isImage ? mediaUrl : undefined }} 
-                              style={styles.detailModalHeaderImage}
-                              resizeMode="cover"
-                            />
-                          );
-                        })}
+                        {selectedCapsule.media_url ? (
+                          <Image 
+                            source={{ uri: selectedCapsule.media_url }} 
+                            style={styles.detailModalHeaderImage}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          selectedCapsule.content_refs?.slice(0, 1).map((item: any, index: number) => {
+                            const mediaUrl = item.uri || item.url || item;
+                            const isImage = typeof mediaUrl === 'string' && 
+                              (mediaUrl.includes('image') || 
+                               mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i));
+                            
+                            return (
+                              <Image 
+                                key={index}
+                                source={{ uri: isImage ? mediaUrl : undefined }} 
+                                style={styles.detailModalHeaderImage}
+                                resizeMode="cover"
+                              />
+                            );
+                          })
+                        )}
             </View>
           </View>
                   )}
@@ -1283,6 +1653,51 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
+  notificationIconContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 50,
+    right: 16,
+    zIndex: 600,
+  },
+  notificationButton: {
+    backgroundColor: 'white',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#FF6B6B',
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  notificationBadgeText: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
   mapControlContainer: {
     position: 'absolute',
     right: 16,
@@ -1314,6 +1729,9 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 4,
   },
+  capsuleMarkerBlurred: {
+    opacity: 0.5,
+  },
   capsulePill: {
     width: 28,
     height: 28,
@@ -1322,6 +1740,13 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FAC638',
   },
+  capsulePillNearby: {
+    borderColor: '#FFA726', // Orange for nearby but not openable
+  },
+  capsulePillDistant: {
+    borderColor: '#94a3b8', // Gray for distant
+    opacity: 0.5,
+  },
   capsulePillTop: {
     flex: 1,
     backgroundColor: '#FF6B6B',
@@ -1329,6 +1754,23 @@ const styles = StyleSheet.create({
   capsulePillBottom: {
     flex: 1,
     backgroundColor: '#FAC638',
+  },
+  distanceIconOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: '#64748b',
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calloutDistance: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+    fontWeight: '500',
   },
   calloutContainer: {
     width: 220,
@@ -1637,6 +2079,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     color: '#64748b',
+  },
+  detailModalSharedEmpty: {
+    fontSize: 13,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+    paddingVertical: 12,
     textAlign: 'center',
     marginBottom: 2,
   },
@@ -1849,10 +2297,29 @@ const styles = StyleSheet.create({
     height: '100%',
     resizeMode: 'cover',
   },
+  gridImageBlurred: {
+    opacity: 0.5,
+  },
   gridImagePlaceholder: {
     backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  gridBlurOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  gridBlurText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'white',
+    marginTop: 4,
   },
   gridLockedOverlay: {
     position: 'absolute',
@@ -1873,6 +2340,12 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 10,
     gap: 2,
+  },
+  distanceBadgeNear: {
+    backgroundColor: 'rgba(6, 214, 160, 0.8)', // Green for nearby
+  },
+  distanceBadgeFar: {
+    backgroundColor: 'rgba(100, 116, 139, 0.8)', // Gray for distant
   },
   distanceText: {
     fontSize: 10,

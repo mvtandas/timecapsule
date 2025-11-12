@@ -394,15 +394,8 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
             activeOpacity={0.7}
           >
             <View style={styles.userInfoWrapper}>
-              <Text style={styles.userInfoText} numberOfLines={2}>
-                <Text style={styles.infoLabel}>Email: </Text>
-                <Text style={styles.infoValue}>{user?.email || 'Not set'}</Text>
-                <Text style={styles.infoDivider}> • </Text>
-                <Text style={styles.infoLabel}>Username: </Text>
-                <Text style={styles.infoValue}>{user?.username || 'Not set'}</Text>
-                <Text style={styles.infoDivider}> • </Text>
-                <Text style={styles.infoLabel}>Phone: </Text>
-                <Text style={styles.infoValue}>{user?.phone_number || 'Not set'}</Text>
+              <Text style={styles.userInfoText} numberOfLines={1}>
+                <Text style={styles.infoValue}>@{user?.username || 'Not set'}</Text>
               </Text>
             </View>
             <View style={styles.chevronContainer}>

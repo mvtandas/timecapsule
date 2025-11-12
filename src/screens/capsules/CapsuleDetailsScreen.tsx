@@ -3,8 +3,15 @@ import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet, Alert, Dim
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import MapView, { Marker } from 'react-native-maps';
+import * as Location from 'expo-location';
 import { CapsuleService, Capsule } from '../../services/capsuleService';
 import { MediaService } from '../../services/mediaService';
+import { supabase } from '../../lib/supabase';
+import { 
+  getDistanceStatus, 
+  formatDistance, 
+  type Coordinates 
+} from '../../utils/distance';
 
 interface CapsuleDetailsScreenProps {
   onBack: () => void;
@@ -17,10 +24,35 @@ const CapsuleDetailsScreen = ({ onBack, capsuleId }: CapsuleDetailsScreenProps) 
   const [capsule, setCapsule] = useState<Capsule | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sharedUsers, setSharedUsers] = useState<any[]>([]); // Users capsule is shared with
+  const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
+  const [distanceInfo, setDistanceInfo] = useState<any>(null);
 
   useEffect(() => {
+    loadUserLocation();
     loadCapsule();
   }, [capsuleId]);
+
+  const loadUserLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.warn('Location permission not granted');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      setUserLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+    } catch (error) {
+      console.error('Error getting location:', error);
+    }
+  };
 
   const loadCapsule = async () => {
     try {
@@ -40,6 +72,20 @@ const CapsuleDetailsScreen = ({ onBack, capsuleId }: CapsuleDetailsScreenProps) 
         console.error('Error loading capsule:', fetchError);
       } else {
         setCapsule(data);
+        
+        // Calculate distance if capsule and user locations are available
+        if (data.lat && data.lng && userLocation) {
+          const capsuleCoords = { lat: data.lat, lng: data.lng };
+          const distanceStatus = getDistanceStatus(userLocation, capsuleCoords);
+          setDistanceInfo(distanceStatus);
+          console.log('📍 Distance status:', distanceStatus);
+        }
+        
+        // Fetch shared users info if capsule is private and has shared_with
+        if (!data.is_public && data.shared_with && data.shared_with.length > 0) {
+          await loadSharedUsers(data.shared_with);
+        }
+        
         // Increment view count
         await CapsuleService.incrementViewCount(capsuleId);
       }
@@ -48,6 +94,25 @@ const CapsuleDetailsScreen = ({ onBack, capsuleId }: CapsuleDetailsScreenProps) 
       setError('Something went wrong');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSharedUsers = async (userIds: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .in('id', userIds);
+
+      if (error) {
+        console.error('Error loading shared users:', error);
+        return;
+      }
+
+      setSharedUsers(data || []);
+      console.log('📋 Loaded shared users:', data?.length || 0);
+    } catch (error) {
+      console.error('Error in loadSharedUsers:', error);
     }
   };
 
@@ -177,6 +242,33 @@ const CapsuleDetailsScreen = ({ onBack, capsuleId }: CapsuleDetailsScreenProps) 
       </View>
 
       <ScrollView style={styles.content}>
+        {/* Distance Warning Banner */}
+        {distanceInfo && !distanceInfo.withinOpenRadius && (
+          <View style={[
+            styles.distanceWarningBanner,
+            !distanceInfo.withinViewRadius ? styles.distanceWarningBannerDanger : styles.distanceWarningBannerWarning
+          ]}>
+            <Ionicons 
+              name={distanceInfo.withinViewRadius ? "warning-outline" : "lock-closed"} 
+              size={20} 
+              color="white" 
+            />
+            <View style={styles.distanceWarningText}>
+              <Text style={styles.distanceWarningTitle}>
+                {distanceInfo.withinViewRadius ? 'Get Closer to Open' : 'Too Far Away'}
+              </Text>
+              <Text style={styles.distanceWarningMessage}>
+                {distanceInfo.message}
+              </Text>
+              {capsule.lat && capsule.lng && (
+                <Text style={styles.distanceWarningDistance}>
+                  📍 {formatDistance(distanceInfo.distance)}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+        
         {/* Top Section - Media Display */}
         <View style={styles.mediaContainer}>
           {capsule.media_url && capsule.media_type !== 'none' ? (
@@ -271,6 +363,30 @@ const CapsuleDetailsScreen = ({ onBack, capsuleId }: CapsuleDetailsScreenProps) 
                   <Text style={[styles.metaValue, styles.lockedStatus]}>
                     Locked - {daysUntilOpen > 0 ? `Opens in ${daysUntilOpen} days` : 'Opening soon'}
                   </Text>
+                </View>
+              </View>
+            )}
+            {!capsule.is_public && sharedUsers.length > 0 && (
+              <View style={styles.metaRow}>
+                <Ionicons name="people-outline" size={20} color="#94a3b8" />
+                <View style={styles.metaTextContainer}>
+                  <Text style={styles.metaLabel}>Shared With</Text>
+                  <View style={styles.sharedUsersContainer}>
+                    {sharedUsers.map((user, index) => (
+                      <View key={user.id} style={styles.sharedUserChip}>
+                        {user.avatar_url ? (
+                          <Image source={{ uri: user.avatar_url }} style={styles.sharedUserAvatar} />
+                        ) : (
+                          <View style={[styles.sharedUserAvatar, styles.sharedUserAvatarPlaceholder]}>
+                            <Ionicons name="person" size={12} color="#94a3b8" />
+                          </View>
+                        )}
+                        <Text style={styles.sharedUserText}>
+                          @{user.username}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               </View>
             )}
@@ -641,6 +757,73 @@ const styles = StyleSheet.create({
   lockedStatus: {
     color: '#FAC638',
     fontWeight: '600',
+  },
+  sharedUsersContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  sharedUserChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  sharedUserAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginRight: 6,
+  },
+  sharedUserAvatarPlaceholder: {
+    backgroundColor: '#e2e8f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sharedUserText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#475569',
+  },
+  distanceWarningBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    borderRadius: 12,
+    gap: 12,
+  },
+  distanceWarningBannerWarning: {
+    backgroundColor: '#FFA726', // Orange for nearby but not open radius
+  },
+  distanceWarningBannerDanger: {
+    backgroundColor: '#FF6B6B', // Red for too far away
+  },
+  distanceWarningText: {
+    flex: 1,
+  },
+  distanceWarningTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+    marginBottom: 4,
+  },
+  distanceWarningMessage: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 4,
+  },
+  distanceWarningDistance: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
 });
 

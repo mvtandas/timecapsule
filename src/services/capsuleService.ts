@@ -11,6 +11,7 @@ export interface Capsule {
   lng: number | null;
   is_public: boolean;
   allowed_users: any[] | null;
+  shared_with: string[] | null; // Array of user IDs who can access this private capsule
   blockchain_hash: string | null;
   created_at: string;
   view_count?: number;
@@ -26,6 +27,7 @@ export interface CreateCapsuleData {
   lat?: number;
   lng?: number;
   is_public?: boolean;
+  shared_with?: string[]; // Array of user IDs for private capsules
   content_refs?: any[];
   media_url?: string;
   media_type?: 'image' | 'video' | 'none';
@@ -94,6 +96,7 @@ export class CapsuleService {
           lat: capsuleData.lat || null,
           lng: capsuleData.lng || null,
           is_public: capsuleData.is_public || false,
+          shared_with: capsuleData.shared_with || null, // Array of user IDs for private capsules
           content_refs: capsuleData.content_refs || null,
           media_url: capsuleData.media_url || null,
           media_type: capsuleData.media_type || 'none',
@@ -195,17 +198,25 @@ export class CapsuleService {
       
       if (!user) throw new Error('No user logged in');
 
+      // Fetch capsules where current user is in shared_with array
+      // RLS policy will automatically filter these
       const { data, error } = await supabase
-        .from('shared_capsules')
-        .select('capsule_id, capsules(*)')
-        .eq('user_id', user.id);
+        .from('capsules')
+        .select('*')
+        .eq('is_public', false)
+        .neq('owner_id', user.id) // Exclude user's own capsules
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Extract capsules from the result
-      const capsules = data?.map((item: any) => item.capsules) || [];
+      // Additional client-side filtering to ensure user is in shared_with array
+      const sharedCapsules = (data || []).filter(capsule => 
+        capsule.shared_with && 
+        Array.isArray(capsule.shared_with) && 
+        capsule.shared_with.includes(user.id)
+      );
 
-      return { data: capsules, error: null };
+      return { data: sharedCapsules, error: null };
     } catch (error) {
       return { data: null, error };
     }
@@ -218,15 +229,43 @@ export class CapsuleService {
       
       if (!user) throw new Error('No user logged in');
 
-      // Fetch capsules that are:
+      // Fetch all capsules (RLS will handle permissions)
+      // RLS policy allows:
       // 1. Owned by user (owner_id = user.id)
       // 2. Public (is_public = true)
-      // 3. Shared with user (via shared_capsules table)
+      // 3. Shared with user (auth.uid() = ANY(shared_with))
       
       const { data, error } = await supabase
         .from('capsules')
         .select('*')
-        .or(`owner_id.eq.${user.id},is_public.eq.true`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  }
+
+  // Get accessible capsules for a specific user's profile
+  // Returns: public capsules by this user + private capsules shared with current user
+  static async getAccessibleCapsulesForUser(userId: string) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) throw new Error('No user logged in');
+
+      // Fetch capsules created by this user that current user can see
+      // RLS policy will automatically filter based on:
+      // 1. Public capsules (is_public = true)
+      // 2. Private capsules where current user is in shared_with array
+      // 3. Current user's own capsules
+      
+      const { data, error } = await supabase
+        .from('capsules')
+        .select('*')
+        .eq('owner_id', userId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

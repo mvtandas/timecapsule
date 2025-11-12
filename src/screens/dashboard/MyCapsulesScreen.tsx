@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import MapView, { Marker } from 'react-native-maps';
 import { CapsuleService } from '../../services/capsuleService';
+import { NotificationService } from '../../services/notificationService';
+import { supabase } from '../../lib/supabase';
 
 const { width, height } = Dimensions.get('window');
 
@@ -11,16 +13,18 @@ interface MyCapsulesScreenProps {
   onNavigate: (screen: string, data?: any) => void;
   onLogout?: () => void;
   onGoBack?: () => void;
+  initialTab?: 'created' | 'shared'; // Allow initial tab to be set from navigation
 }
 
-const MyCapsulesScreen = ({ onNavigate, onGoBack }: MyCapsulesScreenProps) => {
-  const [activeTab, setActiveTab] = useState<'created' | 'shared'>('created');
+const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreenProps) => {
+  const [activeTab, setActiveTab] = useState<'created' | 'shared'>(initialTab || 'created');
   const [capsules, setCapsules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
   // Detail modal state
   const [selectedCapsule, setSelectedCapsule] = useState<any>(null);
+  const [selectedCapsuleSharedUsers, setSelectedCapsuleSharedUsers] = useState<any[]>([]); // Real user data for shared_with
   const [showDetailModal, setShowDetailModal] = useState(false);
   const DETAIL_MODAL_HEIGHT = height * 0.9;
   const detailModalTranslateY = useRef(new Animated.Value(DETAIL_MODAL_HEIGHT)).current;
@@ -28,6 +32,52 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack }: MyCapsulesScreenProps) => {
 
   useEffect(() => {
     loadCapsules();
+    
+    // Mark private capsule notifications as read when viewing Shared tab
+    if (activeTab === 'shared') {
+      markPrivateCapsuleNotificationsAsRead();
+    }
+  }, [activeTab]);
+
+  const markPrivateCapsuleNotificationsAsRead = async () => {
+    try {
+      // Mark all private_capsule type notifications as read
+      const { error } = await NotificationService.markAllAsRead();
+      if (error) {
+        // Silently handle if table doesn't exist
+        if (error.code === 'PGRST205' || error.message?.includes('notifications')) {
+          console.warn('⚠️ Notifications table not found.');
+          return;
+        }
+        console.error('Error marking notifications as read:', error);
+      } else {
+        console.log('✅ Marked private capsule notifications as read');
+      }
+    } catch (error) {
+      console.error('Error in markPrivateCapsuleNotificationsAsRead:', error);
+    }
+  };
+
+  // Listen for auth state changes to reload capsules on login/logout
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔐 Auth state changed:', event, session?.user?.id);
+      
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        // User logged in or token refreshed - reload capsules
+        console.log('✅ User logged in, reloading capsules...');
+        loadCapsules();
+      } else if (event === 'SIGNED_OUT') {
+        // User logged out - clear capsules
+        console.log('🚪 User logged out, clearing capsules...');
+        setCapsules([]);
+      }
+    });
+
+    // Cleanup subscription on unmount
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
   }, [activeTab]);
 
   const loadCapsules = async () => {
@@ -99,9 +149,38 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack }: MyCapsulesScreenProps) => {
     return colors[Math.floor(Math.random() * colors.length)];
   };
 
-  const handleCapsuleTap = (capsule: any) => {
+  const handleCapsuleTap = async (capsule: any) => {
     setSelectedCapsule(capsule);
+    
+    // Load shared users if capsule is private and has shared_with
+    if (!capsule.is_public && capsule.shared_with && capsule.shared_with.length > 0) {
+      await loadSharedUsersForCapsule(capsule.shared_with);
+    } else {
+      setSelectedCapsuleSharedUsers([]);
+    }
+    
     openDetailModal();
+  };
+
+  const loadSharedUsersForCapsule = async (userIds: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .in('id', userIds);
+
+      if (error) {
+        console.error('Error loading shared users:', error);
+        setSelectedCapsuleSharedUsers([]);
+        return;
+      }
+
+      setSelectedCapsuleSharedUsers(data || []);
+      console.log('📋 Loaded shared users for modal:', data?.length || 0);
+    } catch (error) {
+      console.error('Error in loadSharedUsersForCapsule:', error);
+      setSelectedCapsuleSharedUsers([]);
+    }
   };
 
   const openDetailModal = () => {
@@ -136,6 +215,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack }: MyCapsulesScreenProps) => {
     ]).start(() => {
       setShowDetailModal(false);
       setSelectedCapsule(null);
+      setSelectedCapsuleSharedUsers([]);
     });
   };
 
@@ -387,11 +467,18 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack }: MyCapsulesScreenProps) => {
               {/* Media Section */}
               <View style={styles.detailModalMediaSection}>
                 {(() => {
-                  // Get the first media item from content_refs
-                  const contentRefs = selectedCapsule?.content_refs;
-                  const hasMedia = contentRefs && contentRefs.length > 0;
+                  // Prioritize media_url from database (new field)
+                  const mediaUrl = selectedCapsule?.media_url;
+                  const mediaType = selectedCapsule?.media_type || 'image';
                   
-                  if (!hasMedia) {
+                  // Fallback to content_refs if media_url doesn't exist (backward compatibility)
+                  const contentRefs = selectedCapsule?.content_refs;
+                  const fallbackMedia = contentRefs && contentRefs.length > 0 ? contentRefs[0] : null;
+                  const fallbackUrl = typeof fallbackMedia === 'string' ? fallbackMedia : fallbackMedia?.file_url || fallbackMedia?.uri;
+                  
+                  const finalMediaUrl = mediaUrl || fallbackUrl;
+                  
+                  if (!finalMediaUrl) {
                     return (
                       <View style={styles.detailModalMediaPlaceholder}>
                         <Ionicons name="image-outline" size={48} color="#cbd5e1" />
@@ -400,27 +487,12 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack }: MyCapsulesScreenProps) => {
                     );
                   }
 
-                  // Get first media item - can be string URL or object with file_url
-                  const firstMedia = contentRefs[0];
-                  const mediaUrl = typeof firstMedia === 'string' ? firstMedia : firstMedia?.file_url || firstMedia?.uri;
-                  const mediaType = typeof firstMedia === 'object' ? firstMedia?.content_type || firstMedia?.type : null;
-                  
-                  // Determine if it's a video
                   const isVideo = mediaType === 'video' || 
-                                  (typeof mediaUrl === 'string' && (
-                                    mediaUrl.includes('.mp4') || 
-                                    mediaUrl.includes('.mov') || 
-                                    mediaUrl.includes('.avi')
+                                  (typeof finalMediaUrl === 'string' && (
+                                    finalMediaUrl.includes('.mp4') || 
+                                    finalMediaUrl.includes('.mov') || 
+                                    finalMediaUrl.includes('.avi')
                                   ));
-
-                  if (!mediaUrl) {
-                    return (
-                      <View style={styles.detailModalMediaPlaceholder}>
-                        <Ionicons name="image-outline" size={48} color="#cbd5e1" />
-                        <Text style={styles.detailModalMediaPlaceholderText}>Media unavailable</Text>
-                      </View>
-                    );
-                  }
 
                   return (
                     <View style={styles.detailModalMediaContainer}>
@@ -428,14 +500,14 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack }: MyCapsulesScreenProps) => {
                         <View style={styles.detailModalMediaVideoContainer}>
                           <Ionicons name="play-circle" size={64} color="#ffffff" style={styles.detailModalVideoIcon} />
                           <Image 
-                            source={{ uri: mediaUrl }}
+                            source={{ uri: finalMediaUrl }}
                             style={styles.detailModalMediaImage}
                             resizeMode="cover"
                           />
                         </View>
                       ) : (
                         <Image 
-                          source={{ uri: mediaUrl }}
+                          source={{ uri: finalMediaUrl }}
                           style={styles.detailModalMediaImage}
                           resizeMode="cover"
                         />
@@ -513,15 +585,32 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack }: MyCapsulesScreenProps) => {
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.detailModalSharedList}
                       >
-                        {/* Mock shared users - replace with actual data */}
-                        {[1, 2, 3].map((item, index) => (
-                          <View key={index} style={styles.detailModalSharedUser}>
-                            <View style={styles.detailModalSharedAvatar}>
-                              <Ionicons name="person" size={20} color="#94a3b8" />
+                        {selectedCapsuleSharedUsers.length > 0 ? (
+                          selectedCapsuleSharedUsers.map((user) => (
+                            <View key={user.id} style={styles.detailModalSharedUser}>
+                              {user.avatar_url ? (
+                                <Image 
+                                  source={{ uri: user.avatar_url }} 
+                                  style={styles.detailModalSharedAvatarImage}
+                                />
+                              ) : (
+                                <View style={styles.detailModalSharedAvatar}>
+                                  <Ionicons name="person" size={20} color="#94a3b8" />
+                                </View>
+                              )}
+                              <Text style={styles.detailModalSharedName}>
+                                {user.display_name || user.username}
+                              </Text>
                             </View>
-                            <Text style={styles.detailModalSharedName}>User {item}</Text>
+                          ))
+                        ) : (
+                          <View style={styles.detailModalSharedUser}>
+                            <View style={styles.detailModalSharedAvatar}>
+                              <Ionicons name="people-outline" size={20} color="#94a3b8" />
+                            </View>
+                            <Text style={styles.detailModalSharedName}>Loading...</Text>
                           </View>
-                        ))}
+                        )}
                       </ScrollView>
                     )}
                   </View>
@@ -1001,6 +1090,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#e2e8f0',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  detailModalSharedAvatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   detailModalSharedName: {
     fontSize: 12,

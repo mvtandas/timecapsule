@@ -246,5 +246,38 @@ export class FriendService {
       return { data: [], error };
     }
   }
+
+  /**
+   * Unfriend a user (delete accepted friend request)
+   * Both users can unfriend each other
+   */
+  static async unfriend(requestId: string): Promise<{ error: any }> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        return { error: { message: 'Not authenticated' } };
+      }
+
+      // Delete the friend request (both sender and receiver can unfriend)
+      // RLS policy allows deletion if user is sender OR receiver (and status is accepted)
+      const { error } = await supabase
+        .from('friend_requests')
+        .delete()
+        .eq('id', requestId)
+        .eq('status', 'accepted'); // Only delete accepted friendships
+
+      if (error) {
+        console.error('Error unfriending user:', error);
+        return { error };
+      }
+
+      console.log('✅ Unfriended successfully');
+      return { error: null };
+    } catch (error: any) {
+      console.error('Error in unfriend:', error);
+      return { error };
+    }
+  }
 }
 
