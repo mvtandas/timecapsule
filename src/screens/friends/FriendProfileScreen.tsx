@@ -11,12 +11,14 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { FriendService, FriendshipStatus } from '../../services/friendService';
 import { ProfileVisitService } from '../../services/profileVisitService';
 import { CapsuleService } from '../../services/capsuleService';
+import { COLORS, GRADIENTS, SHADOWS } from '../../constants/colors';
 
 const { width } = Dimensions.get('window');
 
@@ -442,7 +444,7 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
             <Image source={{ uri: mediaUrl }} style={styles.capsuleImage} resizeMode="cover" />
           ) : (
             <View style={styles.capsulePlaceholder}>
-              <Ionicons name="image-outline" size={32} color="#94a3b8" />
+              <Ionicons name="image-outline" size={32} color={COLORS.text.tertiary} />
             </View>
           )}
           {locked && (
@@ -488,7 +490,7 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
       {helperText ? <Text style={styles.sectionHelper}>{helperText}</Text> : null}
       {capsules.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="sparkles-outline" size={24} color="#94a3b8" />
+          <Ionicons name="sparkles-outline" size={24} color={COLORS.text.tertiary} />
           <Text style={styles.emptyStateText}>{emptyMessage}</Text>
         </View>
       ) : (
@@ -504,7 +506,7 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
       </View>
       {activityEvents.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="time-outline" size={24} color="#94a3b8" />
+          <Ionicons name="time-outline" size={24} color={COLORS.text.tertiary} />
           <Text style={styles.emptyStateText}>No recent activity yet.</Text>
         </View>
       ) : (
@@ -527,7 +529,7 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => onGoBack && onGoBack()}>
-          <Ionicons name="arrow-back" size={24} color="#1e293b" />
+          <Ionicons name="arrow-back" size={24} color={COLORS.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{displayName}</Text>
         <View style={styles.headerSpacer} />
@@ -540,7 +542,7 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
       >
         {loading ? (
           <View style={styles.loadingState}>
-            <ActivityIndicator size="large" color="#FAC638" />
+            <ActivityIndicator size="large" color={COLORS.gradient.pink} />
             <Text style={styles.loadingText}>Loading profile…</Text>
           </View>
         ) : error ? (
@@ -555,7 +557,7 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
                 <Image source={{ uri: avatarUrl }} style={styles.avatar} />
               ) : (
                 <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                  <Ionicons name="person" size={60} color="#94a3b8" />
+                  <Ionicons name="person" size={60} color={COLORS.text.tertiary} />
                 </View>
               )}
               <Text style={styles.name}>{displayName}</Text>
@@ -574,19 +576,41 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
                 const buttonConfig = getButtonConfig();
                 if (!buttonConfig) return null;
 
+                const isAddButton = friendshipStatus.status === 'none' || friendshipStatus.status === 'pending_received';
+
                 return (
                   <TouchableOpacity
-                    style={[styles.actionButton, buttonConfig.style]}
+                    style={[styles.actionButton, !isAddButton && buttonConfig.style]}
                     onPress={handleAddFriend}
                     disabled={buttonConfig.disabled || sendingRequest}
                     activeOpacity={0.7}
                   >
-                    {sendingRequest ? (
-                      <ActivityIndicator size="small" color="white" />
+                    {isAddButton ? (
+                      <LinearGradient
+                        colors={['#ED62EF', '#6A56FF']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.gradientButton}
+                      >
+                        {sendingRequest ? (
+                          <ActivityIndicator size="small" color={COLORS.text.primary} />
+                        ) : (
+                          <>
+                            <Ionicons name={buttonConfig.icon} size={18} color={COLORS.text.primary} />
+                            <Text style={styles.actionButtonText}>{buttonConfig.label}</Text>
+                          </>
+                        )}
+                      </LinearGradient>
                     ) : (
                       <>
-                        <Ionicons name={buttonConfig.icon} size={18} color="white" />
-                        <Text style={styles.actionButtonText}>{buttonConfig.label}</Text>
+                        {sendingRequest ? (
+                          <ActivityIndicator size="small" color={COLORS.text.primary} />
+                        ) : (
+                          <>
+                            <Ionicons name={buttonConfig.icon} size={18} color={COLORS.text.primary} />
+                            <Text style={styles.actionButtonText}>{buttonConfig.label}</Text>
+                          </>
+                        )}
                       </>
                     )}
                   </TouchableOpacity>
@@ -658,7 +682,7 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
                     </View>
                   ) : (
                     <View style={styles.detailPlaceholder}>
-                      <Ionicons name="image-outline" size={40} color="#94a3b8" />
+                      <Ionicons name="image-outline" size={40} color={COLORS.text.tertiary} />
                       <Text style={styles.detailPlaceholderText}>No preview available</Text>
                     </View>
                   );
@@ -680,7 +704,7 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.background.tertiary,
   },
   header: {
     flexDirection: 'row',
@@ -689,13 +713,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 52,
     paddingBottom: 12,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.background.tertiary,
   },
   backButton: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: COLORS.background.tertiary,
+    borderRadius: 20,
+    ...SHADOWS.soft,
   },
   headerSpacer: {
     width: 40,
@@ -703,7 +730,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   content: {
     flex: 1,
@@ -719,57 +746,71 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#64748b',
+    color: COLORS.text.secondary,
   },
   errorState: {
     padding: 32,
     margin: 16,
     borderRadius: 16,
-    backgroundColor: '#fee2e2',
+    backgroundColor: COLORS.background.tertiary,
     alignItems: 'center',
     gap: 12,
   },
   errorText: {
     fontSize: 16,
-    color: '#b91c1c',
+    color: COLORS.status.error,
     textAlign: 'center',
   },
   profileSection: {
     alignItems: 'center',
     paddingVertical: 32,
     paddingHorizontal: 20,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.background.tertiary,
   },
   avatar: {
     width: 140,
     height: 140,
     borderRadius: 70,
     marginBottom: 16,
+    borderWidth: 3,
+    borderColor: COLORS.gradient.purple,
+    shadowColor: COLORS.gradient.purple,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 10,
   },
   avatarPlaceholder: {
-    backgroundColor: '#e2e8f0',
+    backgroundColor: COLORS.background.tertiary,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: COLORS.gradient.purple,
+    shadowColor: COLORS.gradient.purple,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 10,
   },
   name: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 6,
     textAlign: 'center',
   },
   username: {
     fontSize: 16,
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginBottom: 8,
   },
   metaText: {
     fontSize: 14,
-    color: '#475569',
+    color: COLORS.text.secondary,
   },
   metaSubtext: {
     fontSize: 13,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
     marginTop: 4,
   },
   actionButton: {
@@ -782,26 +823,39 @@ const styles = StyleSheet.create({
     marginTop: 16,
     gap: 8,
     minWidth: 160,
+    ...SHADOWS.pink,
   },
   actionButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: 'white',
+    color: COLORS.text.primary,
+  },
+  gradientButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+    gap: 8,
+    minWidth: 160,
   },
   addButton: {
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.gradient.pink,
+    shadowColor: COLORS.gradient.pink,
   },
   pendingButton: {
-    backgroundColor: '#94a3b8',
+    backgroundColor: COLORS.text.tertiary,
   },
   friendButton: {
-    backgroundColor: '#10b981',
-    opacity: 0.8,
+    backgroundColor: COLORS.background.tertiary,
+    borderWidth: 1,
+    borderColor: COLORS.gradient.purple,
   },
   section: {
     paddingHorizontal: 20,
     paddingVertical: 20,
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.background.secondary,
     marginHorizontal: 16,
     marginBottom: 16,
     borderRadius: 20,
@@ -820,16 +874,16 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#0f172a',
+    color: COLORS.text.primary,
   },
   sectionCount: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
   },
   sectionHelper: {
     fontSize: 13,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
     marginBottom: 12,
   },
   capsuleList: {
@@ -837,7 +891,7 @@ const styles = StyleSheet.create({
   },
   capsuleCard: {
     flexDirection: 'row',
-    backgroundColor: '#f8fafc',
+    backgroundColor: COLORS.background.tertiary,
     borderRadius: 18,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -849,7 +903,7 @@ const styles = StyleSheet.create({
   capsuleMedia: {
     width: width * 0.28,
     height: width * 0.28,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: COLORS.background.tertiary,
   },
   capsuleImage: {
     width: '100%',
@@ -859,7 +913,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#e2e8f0',
+    backgroundColor: COLORS.background.tertiary,
   },
   capsuleLockOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -882,28 +936,28 @@ const styles = StyleSheet.create({
   capsuleTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#0f172a',
+    color: COLORS.text.primary,
   },
   capsuleTimestamp: {
     fontSize: 13,
-    color: '#64748b',
+    color: COLORS.text.secondary,
   },
   tag: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: COLORS.background.tertiary,
     alignSelf: 'flex-start',
     borderRadius: 999,
     paddingVertical: 4,
     paddingHorizontal: 10,
   },
   openTag: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: COLORS.background.tertiary,
   },
   tagText: {
     fontSize: 12,
-    color: '#0f172a',
+    color: COLORS.text.primary,
     fontWeight: '600',
   },
   emptyState: {
@@ -913,7 +967,7 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 15,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -933,12 +987,12 @@ const styles = StyleSheet.create({
   },
   activityMessage: {
     fontSize: 15,
-    color: '#0f172a',
+    color: COLORS.text.primary,
     fontWeight: '600',
   },
   activityTimestamp: {
     fontSize: 13,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
     marginTop: 2,
   },
   detailOverlay: {
@@ -950,7 +1004,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   detailCard: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 24,
@@ -966,13 +1020,13 @@ const styles = StyleSheet.create({
   detailTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#0f172a',
+    color: COLORS.text.primary,
     flex: 1,
     marginRight: 16,
   },
   detailSubtitle: {
     fontSize: 14,
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginBottom: 4,
   },
   detailImageWrapper: {
@@ -982,7 +1036,7 @@ const styles = StyleSheet.create({
   detailImageContainer: {
     borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: '#e2e8f0',
+    backgroundColor: COLORS.background.tertiary,
     height: width * 0.6,
   },
   detailImage: {
@@ -1003,22 +1057,22 @@ const styles = StyleSheet.create({
   detailPlaceholder: {
     height: width * 0.6,
     borderRadius: 20,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: COLORS.background.tertiary,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
   detailPlaceholderText: {
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
   },
   detailFooter: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: COLORS.background.tertiary,
     padding: 14,
     borderRadius: 16,
   },
   detailFooterText: {
     fontSize: 13,
-    color: '#64748b',
+    color: COLORS.text.secondary,
     textAlign: 'center',
   },
 });

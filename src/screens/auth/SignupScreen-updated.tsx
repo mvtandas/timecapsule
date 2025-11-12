@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAuthStore } from '../../store/authStore';
-import { COLORS, GRADIENTS, SHADOWS } from '../../constants/colors';
 
 interface SignupScreenProps {
   onNavigate: (screen: 'Welcome' | 'Login' | 'Signup') => void;
@@ -243,18 +241,11 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
             disabled={loading}
             activeOpacity={0.8}
           >
-            <LinearGradient
-              colors={['#6A56FF', '#00C9FF']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.buttonGradient}
-            >
-              {loading ? (
-                <Text style={styles.buttonText}>Creating Account...</Text>
-              ) : (
-                <Text style={styles.buttonText}>Sign Up</Text>
-              )}
-            </LinearGradient>
+            {loading ? (
+              <Text style={styles.buttonText}>Creating Account...</Text>
+            ) : (
+              <Text style={styles.buttonText}>Sign Up</Text>
+            )}
           </TouchableOpacity>
 
           <Text style={styles.termsText}>
@@ -372,8 +363,10 @@ const styles = StyleSheet.create({
   button: {
     width: '100%',
     height: 56,
+    backgroundColor: '#00C9FF',
     borderRadius: 16,
-    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginTop: 8,
     marginBottom: 16,
     shadowColor: '#00C9FF',
@@ -384,12 +377,6 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.6,
-  },
-  buttonGradient: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   buttonText: {
     color: COLORS.text.primary,

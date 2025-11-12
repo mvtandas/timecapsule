@@ -1,6 +1,8 @@
 import React from 'react';
-import { TouchableOpacity, Text, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
+import { TouchableOpacity, Text, ActivityIndicator, ViewStyle, TextStyle, View, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ButtonProps } from '../../types';
+import { COLORS, GRADIENTS, SHADOWS } from '../../constants/colors';
 
 export const Button: React.FC<ButtonProps> = ({
   title,
@@ -14,9 +16,10 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
   const getButtonStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
-      borderRadius: 8,
+      borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
+      overflow: 'hidden',
     };
 
     const sizeStyles = {
@@ -27,15 +30,17 @@ export const Button: React.FC<ButtonProps> = ({
 
     const variantStyles = {
       primary: {
-        backgroundColor: '#FAC638',
+        ...SHADOWS.pink,
       },
       secondary: {
-        backgroundColor: '#f3f4f6',
+        backgroundColor: COLORS.background.tertiary,
+        borderWidth: 1,
+        borderColor: COLORS.border.primary,
       },
       outline: {
         backgroundColor: 'transparent',
         borderWidth: 1,
-        borderColor: '#FAC638',
+        borderColor: COLORS.gradient.pink,
       },
     };
 
@@ -50,7 +55,8 @@ export const Button: React.FC<ButtonProps> = ({
 
   const getTextStyle = (): TextStyle => {
     const baseStyle: TextStyle = {
-      fontWeight: '600',
+      fontWeight: '700',
+      letterSpacing: 0.5,
     };
 
     const sizeStyles = {
@@ -61,13 +67,13 @@ export const Button: React.FC<ButtonProps> = ({
 
     const variantStyles = {
       primary: {
-        color: '#000000',
+        color: COLORS.text.primary,
       },
       secondary: {
-        color: '#000000',
+        color: COLORS.text.primary,
       },
       outline: {
-        color: '#FAC638',
+        color: COLORS.gradient.pink,
       },
     };
 
@@ -79,19 +85,56 @@ export const Button: React.FC<ButtonProps> = ({
     };
   };
 
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <ActivityIndicator 
+          color={variant === 'outline' || variant === 'secondary' ? COLORS.gradient.pink : COLORS.text.primary} 
+        />
+      );
+    }
+    return <Text style={getTextStyle()}>{title}</Text>;
+  };
+
+  if (variant === 'primary') {
+    return (
+      <TouchableOpacity
+        style={getButtonStyle()}
+        onPress={onPress}
+        disabled={disabled || loading}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={GRADIENTS.primaryHorizontal}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.gradientButton}
+        >
+          {renderContent()}
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <TouchableOpacity
       style={getButtonStyle()}
       onPress={onPress}
       disabled={disabled || loading}
+      activeOpacity={0.8}
     >
-      {loading ? (
-        <ActivityIndicator 
-          color={variant === 'outline' ? '#FAC638' : '#000000'} 
-        />
-      ) : (
-        <Text style={getTextStyle()}>{title}</Text>
-      )}
+      {renderContent()}
     </TouchableOpacity>
   );
 };
+
+const styles = StyleSheet.create({
+  gradientButton: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+});

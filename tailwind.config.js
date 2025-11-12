@@ -4,15 +4,15 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: '#FAC638',
-        'primary-light': '#A7F3D0',
-        'primary-dark': '#047857',
-        'background-light': '#f8f8f5',
-        'background-dark': '#231e0f',
-        'text-light': '#111827',
-        'text-dark': '#F9FAFB',
-        'accent-light': '#FFD166',
-        'accent-dark': '#06D6A0',
+        primary: '#ED62EF',
+        'primary-light': '#6A56FF',
+        'primary-dark': '#00C9FF',
+        'background-light': '#0B0B0B',
+        'background-dark': '#0B0B0B',
+        'text-light': '#FFFFFF',
+        'text-dark': '#CCCCCC',
+        'accent-light': '#FFD500',
+        'accent-dark': '#00C9FF',
       },
       fontFamily: {
         'display': ['PlusJakartaSans_400Regular', 'PlusJakartaSans_500Medium', 'PlusJakartaSans_700Bold', 'PlusJakartaSans_800ExtraBold'],

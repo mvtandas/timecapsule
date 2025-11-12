@@ -17,10 +17,12 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import MapView, { Marker, Circle } from 'react-native-maps';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import DatePickerModal from '../../components/DatePickerModal';
+import { COLORS, GRADIENTS, SHADOWS } from '../../constants/colors';
 import { CapsuleService } from '../../services/capsuleService';
 import { MediaService } from '../../services/mediaService';
 import { NotificationService } from '../../services/notificationService';
@@ -534,7 +536,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
               style={styles.dateButton}
               onPress={() => setShowDatePicker(true)}
             >
-              <Ionicons name="calendar-outline" size={24} color="#FAC638" />
+              <Ionicons name="calendar-outline" size={24} color={COLORS.gradient.pink} />
               <Text style={styles.dateButtonText}>
                 {capsuleData.openDate 
                   ? capsuleData.openDate.toLocaleDateString('en-US', {
@@ -544,11 +546,11 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
                     })
                   : 'Select Date'}
               </Text>
-              <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+              <Ionicons name="chevron-forward" size={20} color={COLORS.text.tertiary} />
             </TouchableOpacity>
 
             <View style={styles.infoBox}>
-              <Ionicons name="information-circle" size={20} color="#FAC638" />
+              <Ionicons name="information-circle" size={20} color={COLORS.gradient.pink} />
               <Text style={styles.infoText}>
                 Your capsule will be locked until this date
               </Text>
@@ -566,7 +568,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
               style={styles.locationButton}
               onPress={handleSelectLocation}
             >
-              <Ionicons name="location" size={24} color="#FAC638" />
+              <Ionicons name="location" size={24} color={COLORS.gradient.pink} />
               <View style={styles.locationInfo}>
                 <Text style={styles.locationTitle}>
                   {capsuleData.location?.address || 'Select Location'}
@@ -575,7 +577,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
                   Tap to choose on map (within 5km)
                 </Text>
               </View>
-              <Ionicons name="map-outline" size={20} color="#94a3b8" />
+              <Ionicons name="map-outline" size={20} color={COLORS.text.tertiary} />
             </TouchableOpacity>
 
             {/* Access Control Section */}
@@ -594,7 +596,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
                   <Ionicons 
                     name={capsuleData.isPublic ? "globe-outline" : "lock-closed-outline"} 
                     size={24} 
-                    color="#FAC638" 
+                    color={COLORS.gradient.pink} 
                   />
                   <View style={styles.toggleTextContainer}>
                     <Text style={styles.toggleTitle}>
@@ -618,7 +620,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
                   {/* Username Search Input */}
                   <View style={styles.addContactContainer}>
                     <View style={styles.usernameInputContainer}>
-                      <Ionicons name="search-outline" size={20} color="#94a3b8" style={styles.usernameIcon} />
+                      <Ionicons name="search-outline" size={20} color={COLORS.text.tertiary} style={styles.usernameIcon} />
                       <TextInput
                         style={styles.usernameInput}
                         value={newUsername}
@@ -629,7 +631,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
                         autoCorrect={false}
                       />
                       {isSearching && (
-                        <ActivityIndicator size="small" color="#FAC638" style={styles.searchingIndicator} />
+                        <ActivityIndicator size="small" color={COLORS.gradient.pink} style={styles.searchingIndicator} />
                       )}
                     </View>
                   </View>
@@ -651,7 +653,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
                               <Image source={{ uri: user.avatar_url }} style={styles.searchResultAvatar} />
                             ) : (
                               <View style={[styles.searchResultAvatar, styles.searchResultAvatarPlaceholder]}>
-                                <Ionicons name="person" size={20} color="#94a3b8" />
+                                <Ionicons name="person" size={20} color={COLORS.text.tertiary} />
                               </View>
                             )}
                             <View style={styles.searchResultInfo}>
@@ -659,7 +661,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
                               <Text style={styles.searchResultUsername}>@{user.username}</Text>
                             </View>
                             {isSelected && (
-                              <Ionicons name="checkmark-circle" size={24} color="#10b981" />
+                              <Ionicons name="checkmark-circle" size={24} color={COLORS.status.success} />
                             )}
                           </TouchableOpacity>
                         );
@@ -680,7 +682,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
                               <Image source={{ uri: user.avatar_url }} style={styles.chipAvatar} />
                             ) : (
                               <View style={[styles.chipAvatar, styles.chipAvatarPlaceholder]}>
-                                <Ionicons name="person" size={16} color="#94a3b8" />
+                                <Ionicons name="person" size={16} color={COLORS.text.tertiary} />
                               </View>
                             )}
                             <Text style={styles.chipUsername} numberOfLines={1}>
@@ -691,7 +693,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
                               style={styles.chipRemoveButton}
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                             >
-                              <Ionicons name="close-circle" size={18} color="#64748b" />
+                              <Ionicons name="close-circle" size={18} color={COLORS.text.secondary} />
                             </TouchableOpacity>
                           </View>
                         ))}
@@ -713,7 +715,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
                               {friend?.avatar_url ? (
                                 <Image source={{ uri: friend.avatar_url }} style={styles.userAvatarImage} />
                               ) : (
-                                <Ionicons name="person" size={20} color="#64748b" />
+                                <Ionicons name="person" size={20} color={COLORS.text.secondary} />
                               )}
                             </View>
                             <View style={styles.userInfo}>
@@ -731,7 +733,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
                               }}
                               style={styles.removeButton}
                             >
-                              <Ionicons name="close-circle" size={20} color="#FF6B6B" />
+                              <Ionicons name="close-circle" size={20} color={COLORS.status.error} />
                             </TouchableOpacity>
                           </View>
                         );
@@ -741,7 +743,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
 
                   {capsuleData.allowedUsers.length === 0 && (
                     <View style={styles.emptyState}>
-                      <Ionicons name="people-outline" size={32} color="#cbd5e1" />
+                      <Ionicons name="people-outline" size={32} color={COLORS.text.tertiary} />
                       <Text style={styles.emptyStateText}>
                         No users selected yet. Select friends or enter a username to share with specific people.
                       </Text>
@@ -772,7 +774,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
                         setCapsuleData({ ...capsuleData, media: newMedia });
                       }}
                     >
-                      <Ionicons name="close-circle" size={24} color="#FF6B6B" />
+                      <Ionicons name="close-circle" size={24} color={COLORS.status.error} />
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -781,11 +783,11 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
 
             <View style={styles.mediaGrid}>
               <TouchableOpacity style={styles.mediaButton} onPress={handleTakePhoto}>
-                <Ionicons name="camera" size={32} color="#FAC638" />
+                <Ionicons name="camera" size={32} color={COLORS.gradient.pink} />
                 <Text style={styles.mediaButtonText}>Take Photo</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.mediaButton} onPress={handlePickImage}>
-                <Ionicons name="images" size={32} color="#FAC638" />
+                <Ionicons name="images" size={32} color={COLORS.gradient.pink} />
                 <Text style={styles.mediaButtonText}>Choose from Library</Text>
               </TouchableOpacity>
             </View>
@@ -844,7 +846,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={24} color={COLORS.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Create Capsule</Text>
         <View style={styles.placeholder} />
@@ -885,22 +887,29 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
       <View style={styles.footer}>
         <TouchableOpacity
           onPress={handleNext}
-          style={[styles.nextButton, saving && styles.nextButtonDisabled]}
           disabled={saving}
+          activeOpacity={0.8}
         >
-          {saving ? (
-            <>
-              <ActivityIndicator size="small" color="white" />
-              <Text style={styles.nextButtonText}>Creating...</Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.nextButtonText}>
-                {step === 5 ? 'Create Capsule' : 'Continue'}
-              </Text>
-              <Ionicons name="arrow-forward" size={20} color="white" />
-            </>
-          )}
+          <LinearGradient
+            colors={['#ED62EF', '#6A56FF']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[styles.nextButton, saving && styles.nextButtonDisabled]}
+          >
+            {saving ? (
+              <>
+                <ActivityIndicator size="small" color="white" />
+                <Text style={styles.nextButtonText}>Creating...</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.nextButtonText}>
+                  {step === 5 ? 'Create Capsule' : 'Continue'}
+                </Text>
+                <Ionicons name="arrow-forward" size={20} color="white" />
+              </>
+            )}
+          </LinearGradient>
         </TouchableOpacity>
       </View>
 
@@ -920,11 +929,11 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
         <View style={styles.mapModalContainer}>
           <View style={styles.mapHeader}>
             <TouchableOpacity onPress={() => setShowMapModal(false)} style={styles.mapCloseButton}>
-              <Ionicons name="close" size={28} color="#333" />
+              <Ionicons name="close" size={28} color={COLORS.text.primary} />
             </TouchableOpacity>
             <Text style={styles.mapTitle}>Select Location</Text>
             <TouchableOpacity onPress={handleConfirmLocation} style={styles.mapConfirmButton}>
-              <Ionicons name="checkmark" size={28} color="#FAC638" />
+              <Ionicons name="checkmark" size={28} color={COLORS.gradient.pink} />
             </TouchableOpacity>
           </View>
 
@@ -973,7 +982,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
           )}
 
           <View style={styles.mapInfo}>
-            <Ionicons name="information-circle" size={20} color="#FAC638" />
+            <Ionicons name="information-circle" size={20} color={COLORS.gradient.pink} />
             <Text style={styles.mapInfoText}>
               Tap anywhere within the yellow circle (5km radius)
             </Text>
@@ -987,7 +996,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.background.primary,
   },
   header: {
     flexDirection: 'row',
@@ -996,9 +1005,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 60,
     paddingBottom: 16,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: COLORS.border.primary,
   },
   backButton: {
     padding: 8,
@@ -1006,14 +1015,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   placeholder: {
     width: 40,
   },
   progressContainer: {
     padding: 20,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
   },
   progressBar: {
     flexDirection: 'row',
@@ -1023,19 +1032,19 @@ const styles = StyleSheet.create({
   progressDot: {
     width: 60,
     height: 4,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: COLORS.background.tertiary,
     borderRadius: 2,
   },
   progressDotActive: {
-    backgroundColor: '#FFD166',
+    backgroundColor: COLORS.gradient.pink,
   },
   progressDotCurrent: {
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.gradient.pink,
   },
   progressText: {
     textAlign: 'center',
     fontSize: 14,
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginTop: 8,
   },
   content: {
@@ -1051,7 +1060,7 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 8,
   },
   sectionTitle: {
@@ -1060,23 +1069,23 @@ const styles = StyleSheet.create({
   },
   stepSubtitle: {
     fontSize: 16,
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginBottom: 32,
   },
   subsectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 16,
   },
   input: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: '#1e293b',
+    color: COLORS.text.primary,
     borderWidth: 2,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border.primary,
   },
   textArea: {
     height: 160,
@@ -1085,11 +1094,11 @@ const styles = StyleSheet.create({
   dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderRadius: 12,
     padding: 20,
     borderWidth: 2,
-    borderColor: '#FAC638',
+    borderColor: COLORS.gradient.pink,
     gap: 12,
     marginBottom: 16,
   },
@@ -1097,7 +1106,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   infoBox: {
     flexDirection: 'row',
@@ -1111,16 +1120,16 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     fontSize: 14,
-    color: '#64748b',
+    color: COLORS.text.secondary,
   },
   locationButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderRadius: 12,
     padding: 20,
     borderWidth: 2,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border.primary,
     gap: 12,
   },
   locationInfo: {
@@ -1129,12 +1138,12 @@ const styles = StyleSheet.create({
   locationTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 4,
   },
   locationSubtext: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
   },
   // Access Control Styles
   accessControlSection: {
@@ -1144,7 +1153,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.background.tertiary,
     padding: 16,
     borderRadius: 12,
     marginBottom: 20,
@@ -1161,29 +1170,29 @@ const styles = StyleSheet.create({
   toggleTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 2,
   },
   toggleSubtext: {
     fontSize: 13,
-    color: '#64748b',
+    color: COLORS.text.secondary,
   },
   switchToggle: {
     width: 50,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#cbd5e1',
+    backgroundColor: COLORS.background.tertiary,
     padding: 2,
     justifyContent: 'center',
   },
   switchToggleActive: {
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.gradient.pink,
   },
   switchThumb: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
@@ -1203,12 +1212,12 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.background.tertiary,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border.primary,
   },
   usernameIcon: {
     marginRight: 12,
@@ -1216,14 +1225,14 @@ const styles = StyleSheet.create({
   usernameInput: {
     flex: 1,
     fontSize: 16,
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   addButton: {
     width: 50,
     height: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FAC63820',
+    backgroundColor: COLORS.gradient.pink + '20',
     borderRadius: 12,
   },
   // Friend Picker Styles
@@ -1234,7 +1243,7 @@ const styles = StyleSheet.create({
   friendPickerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 12,
   },
   friendPickerScrollContent: {
@@ -1251,12 +1260,12 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     marginBottom: 8,
     borderWidth: 3,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border.primary,
     overflow: 'hidden',
     position: 'relative',
   },
   friendPickerAvatarSelected: {
-    borderColor: '#FAC638',
+    borderColor: COLORS.gradient.pink,
     borderWidth: 3,
   },
   friendPickerAvatarImage: {
@@ -1266,7 +1275,7 @@ const styles = StyleSheet.create({
   friendPickerAvatarPlaceholder: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#e2e8f0',
+    backgroundColor: COLORS.background.tertiary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1274,7 +1283,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -2,
     right: -2,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderRadius: 12,
   },
   searchingIndicator: {
@@ -1282,7 +1291,7 @@ const styles = StyleSheet.create({
   },
   searchResultsContainer: {
     marginTop: 12,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.background.tertiary,
     borderRadius: 12,
     padding: 12,
     maxHeight: 300,
@@ -1290,7 +1299,7 @@ const styles = StyleSheet.create({
   searchResultsTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginBottom: 8,
   },
   searchResultItem: {
@@ -1299,7 +1308,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: COLORS.border.primary,
   },
   searchResultAvatar: {
     width: 40,
@@ -1308,7 +1317,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   searchResultAvatarPlaceholder: {
-    backgroundColor: '#e2e8f0',
+    backgroundColor: COLORS.background.tertiary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1318,11 +1327,11 @@ const styles = StyleSheet.create({
   searchResultName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   searchResultUsername: {
     fontSize: 13,
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginTop: 2,
   },
   selectedUsersContainer: {
@@ -1331,7 +1340,7 @@ const styles = StyleSheet.create({
   selectedUsersTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 8,
   },
   selectedUsersChips: {
@@ -1342,12 +1351,12 @@ const styles = StyleSheet.create({
   userChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: COLORS.background.tertiary,
     borderRadius: 20,
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border.primary,
   },
   chipAvatar: {
     width: 24,
@@ -1356,14 +1365,14 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   chipAvatarPlaceholder: {
-    backgroundColor: '#cbd5e1',
+    backgroundColor: COLORS.background.tertiary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   chipUsername: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#475569',
+    color: COLORS.text.secondary,
     maxWidth: 100,
   },
   chipRemoveButton: {
@@ -1372,7 +1381,7 @@ const styles = StyleSheet.create({
   friendPickerName: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#64748b',
+    color: COLORS.text.secondary,
     textAlign: 'center',
   },
   authorizedUsersList: {
@@ -1382,13 +1391,13 @@ const styles = StyleSheet.create({
   authorizedUsersTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 8,
   },
   userItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.background.tertiary,
     padding: 12,
     borderRadius: 12,
     gap: 12,
@@ -1397,7 +1406,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: COLORS.background.tertiary,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -1412,12 +1421,12 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 2,
   },
   userUsername: {
     fontSize: 13,
-    color: '#64748b',
+    color: COLORS.text.secondary,
   },
   removeButton: {
     padding: 4,
@@ -1425,15 +1434,15 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     padding: 32,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.background.tertiary,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border.primary,
     borderStyle: 'dashed',
   },
   emptyStateText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
     textAlign: 'center',
     marginTop: 12,
     lineHeight: 20,
@@ -1445,7 +1454,7 @@ const styles = StyleSheet.create({
   presetsTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginBottom: 12,
   },
   presetGrid: {
@@ -1454,17 +1463,17 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   presetButton: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border.primary,
   },
   presetText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#475569',
+    color: COLORS.text.secondary,
   },
   mediaPreview: {
     marginBottom: 16,
@@ -1482,29 +1491,29 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -8,
     right: -8,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderRadius: 12,
   },
   mediaGrid: {
     gap: 16,
   },
   mediaButton: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderRadius: 12,
     padding: 24,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border.primary,
     borderStyle: 'dashed',
   },
   mediaButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#475569',
+    color: COLORS.text.secondary,
     marginTop: 8,
   },
   reviewContainer: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderRadius: 12,
     padding: 20,
   },
@@ -1512,32 +1521,33 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     marginBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: COLORS.border.primary,
   },
   reviewLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginBottom: 4,
   },
   reviewValue: {
     fontSize: 16,
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   footer: {
     padding: 20,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
+    borderTopColor: COLORS.border.primary,
   },
   nextButton: {
-    backgroundColor: '#FAC638',
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    overflow: 'hidden',
+    ...SHADOWS.pink,
   },
   nextButtonText: {
     fontSize: 18,
@@ -1549,7 +1559,7 @@ const styles = StyleSheet.create({
   },
   mapModalContainer: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
   },
   mapHeader: {
     flexDirection: 'row',
@@ -1558,9 +1568,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 60,
     paddingBottom: 16,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: COLORS.border.primary,
   },
   mapCloseButton: {
     padding: 8,
@@ -1568,7 +1578,7 @@ const styles = StyleSheet.create({
   mapTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   mapConfirmButton: {
     padding: 8,
@@ -1586,7 +1596,7 @@ const styles = StyleSheet.create({
   mapInfoText: {
     flex: 1,
     fontSize: 14,
-    color: '#64748b',
+    color: COLORS.text.secondary,
   },
 });
 

@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAuthStore } from '../../store/authStore';
-import { COLORS, GRADIENTS, SHADOWS } from '../../constants/colors';
 
 interface LoginScreenProps {
   onNavigate: (screen: 'Welcome' | 'Login' | 'Signup') => void;
@@ -122,18 +120,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigate, onLogin, onGoBack
             disabled={loading}
             activeOpacity={0.8}
           >
-            <LinearGradient
-              colors={['#ED62EF', '#6A56FF']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.buttonGradient}
-            >
-              {loading ? (
-                <Text style={styles.buttonText}>Signing In...</Text>
-              ) : (
-                <Text style={styles.buttonText}>Sign In</Text>
-              )}
-            </LinearGradient>
+            {loading ? (
+              <Text style={styles.buttonText}>Signing In...</Text>
+            ) : (
+              <Text style={styles.buttonText}>Sign In</Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.forgotPassword}>
@@ -255,23 +246,19 @@ const styles = StyleSheet.create({
   button: {
     width: '100%',
     height: 56,
+    backgroundColor: '#ED62EF',
     borderRadius: 16,
-    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 16,
     shadowColor: '#ED62EF',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
+    shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 8,
   },
   buttonDisabled: {
     opacity: 0.6,
-  },
-  buttonGradient: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   buttonText: {
     color: COLORS.text.primary,

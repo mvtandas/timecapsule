@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ImageBackground, StyleSheet, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { COLORS, GRADIENTS, SHADOWS } from '../../constants/colors';
 
 const { height } = Dimensions.get('window');
 
@@ -27,7 +28,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onNavigate }) => {
         imageStyle={styles.imageStyle}
       >
         <LinearGradient
-          colors={['transparent', 'rgba(35, 30, 15, 0.7)', 'rgba(35, 30, 15, 0.95)']}
+          colors={['transparent', 'rgba(11, 11, 11, 0.7)', 'rgba(11, 11, 11, 0.95)']}
           style={styles.gradient}
         >
           <View style={styles.headerContent}>
@@ -46,7 +47,14 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onNavigate }) => {
           onPress={handleGetStarted}
           activeOpacity={0.8}
         >
-          <Text style={styles.primaryButtonText}>Get Started</Text>
+          <LinearGradient
+            colors={['#ED62EF', '#6A56FF']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.primaryButtonGradient}
+          >
+            <Text style={styles.primaryButtonText}>Get Started</Text>
+          </LinearGradient>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -64,7 +72,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onNavigate }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.background.primary,
   },
   headerImage: {
     flex: 1,
@@ -84,14 +92,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: COLORS.text.primary,
     textAlign: 'center',
     marginBottom: 16,
     lineHeight: 40,
   },
   subtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: COLORS.text.secondary,
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -100,23 +108,27 @@ const styles = StyleSheet.create({
     paddingTop: 32,
     paddingBottom: 50,
     gap: 16,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.background.primary,
   },
   primaryButton: {
     width: '100%',
     height: 56,
-    backgroundColor: '#FAC638',
     borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#ED62EF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  primaryButtonGradient: {
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#FAC638',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
   primaryButtonText: {
-    color: '#ffffff',
+    color: COLORS.text.primary,
     fontSize: 18,
     fontWeight: 'bold',
     letterSpacing: 0.5,
@@ -124,13 +136,15 @@ const styles = StyleSheet.create({
   secondaryButton: {
     width: '100%',
     height: 56,
-    backgroundColor: 'rgba(250, 198, 56, 0.2)',
+    backgroundColor: 'rgba(237, 98, 239, 0.15)',
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(237, 98, 239, 0.4)',
   },
   secondaryButtonText: {
-    color: '#FAC638',
+    color: COLORS.gradient.pink,
     fontSize: 18,
     fontWeight: 'bold',
     letterSpacing: 0.5,

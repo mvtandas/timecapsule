@@ -9,6 +9,8 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { COLORS, SHADOWS } from '../constants/colors';
 
 const { width } = Dimensions.get('window');
 
@@ -72,7 +74,7 @@ const DatePickerModal: React.FC<DatePickerModalProps> = ({
           <View style={styles.header}>
             <Text style={styles.title}>Select Open Date</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="#64748b" />
+              <Ionicons name="close" size={24} color={COLORS.text.secondary} />
             </TouchableOpacity>
           </View>
 
@@ -85,8 +87,9 @@ const DatePickerModal: React.FC<DatePickerModalProps> = ({
                   key={preset.label}
                   style={styles.presetCard}
                   onPress={() => handlePreset(preset.days)}
+                  activeOpacity={0.7}
                 >
-                  <Ionicons name={preset.icon as any} size={24} color="#FAC638" />
+                  <Ionicons name={preset.icon as any} size={24} color={COLORS.gradient.pink} />
                   <Text style={styles.presetLabel}>{preset.label}</Text>
                 </TouchableOpacity>
               ))}
@@ -178,15 +181,22 @@ const DatePickerModal: React.FC<DatePickerModalProps> = ({
 
           {/* Selected Date Display */}
           <View style={styles.selectedDateContainer}>
-            <Ionicons name="calendar" size={20} color="#FAC638" />
+            <Ionicons name="calendar" size={20} color={COLORS.gradient.pink} />
             <Text style={styles.selectedDateText}>
               {months[selectedMonth]} {selectedDay}, {selectedYear}
             </Text>
           </View>
 
           {/* Confirm Button */}
-          <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm}>
-            <Text style={styles.confirmButtonText}>Confirm Date</Text>
+          <TouchableOpacity onPress={handleConfirm} activeOpacity={0.8}>
+            <LinearGradient
+              colors={['#ED62EF', '#6A56FF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.confirmButton}
+            >
+              <Text style={styles.confirmButtonText}>Confirm Date</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </View>
@@ -201,7 +211,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 20,
@@ -218,7 +228,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   closeButton: {
     padding: 4,
@@ -229,7 +239,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginBottom: 12,
     paddingHorizontal: 24,
   },
@@ -237,25 +247,25 @@ const styles = StyleSheet.create({
     paddingLeft: 24,
   },
   presetCard: {
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.background.tertiary,
     borderRadius: 12,
     padding: 16,
     marginRight: 12,
     alignItems: 'center',
     minWidth: 80,
     borderWidth: 2,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border.primary,
   },
   presetLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#475569',
+    color: COLORS.text.secondary,
     marginTop: 8,
     textAlign: 'center',
   },
   orText: {
     textAlign: 'center',
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
     fontSize: 14,
     marginVertical: 16,
   },
@@ -271,13 +281,13 @@ const styles = StyleSheet.create({
   columnLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginBottom: 8,
     textAlign: 'center',
   },
   picker: {
     height: 180,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.background.tertiary,
     borderRadius: 12,
   },
   pickerItem: {
@@ -286,14 +296,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pickerItemSelected: {
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.gradient.pink,
     marginVertical: 2,
     marginHorizontal: 4,
     borderRadius: 8,
   },
   pickerText: {
     fontSize: 16,
-    color: '#475569',
+    color: COLORS.text.secondary,
   },
   pickerTextSelected: {
     color: 'white',
@@ -303,7 +313,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.background.tertiary,
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 12,
@@ -314,14 +324,15 @@ const styles = StyleSheet.create({
   selectedDateText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   confirmButton: {
-    backgroundColor: '#FAC638',
     paddingVertical: 16,
     marginHorizontal: 24,
     borderRadius: 12,
     alignItems: 'center',
+    overflow: 'hidden',
+    ...SHADOWS.pink,
   },
   confirmButtonText: {
     color: 'white',

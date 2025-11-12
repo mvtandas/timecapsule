@@ -1,12 +1,13 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { COLORS } from '../../constants/colors';
 
 const CapsulePreviewScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <MaterialIcons name="visibility" size={64} color="#FAC638" />
+        <MaterialIcons name="visibility" size={64} color={COLORS.gradient.pink} />
         <Text style={styles.title}>Capsule Preview</Text>
         <Text style={styles.text}>Preview view coming soon</Text>
       </View>
@@ -17,7 +18,7 @@ const CapsulePreviewScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.background.primary,
   },
   content: {
     flex: 1,
@@ -28,12 +29,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#111827',
+    color: COLORS.text.primary,
     marginTop: 16,
   },
   text: {
     fontSize: 16,
-    color: '#6b7280',
+    color: COLORS.text.secondary,
     marginTop: 8,
   },
 });

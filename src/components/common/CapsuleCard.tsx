@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { CapsuleCardProps } from '../../types';
+import { COLORS, GRADIENTS, OPACITY } from '../../constants/colors';
 
 export const CapsuleCard: React.FC<CapsuleCardProps> = ({
   capsule,
@@ -10,10 +12,6 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
 }) => {
   const getIconForCapsule = () => {
     return 'folder';
-  };
-
-  const getIconColor = () => {
-    return '#FAC638';
   };
 
   const isOpen = () => {
@@ -42,14 +40,22 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
     <TouchableOpacity
       onPress={() => onPress(capsule)}
       style={styles.container}
+      activeOpacity={0.8}
     >
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <MaterialIcons 
-            name={getIconForCapsule() as any} 
-            size={24} 
-            color={getIconColor()} 
-          />
+          <LinearGradient
+            colors={[COLORS.gradient.pink, COLORS.gradient.purple]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.iconGradient}
+          >
+            <MaterialIcons 
+              name={getIconForCapsule() as any} 
+              size={24} 
+              color={COLORS.text.primary} 
+            />
+          </LinearGradient>
         </View>
         <View style={styles.textContainer}>
           <Text style={styles.title}>
@@ -66,7 +72,7 @@ export const CapsuleCard: React.FC<CapsuleCardProps> = ({
           <MaterialIcons 
             name={isOpen() ? "lock-open" : "lock"} 
             size={20} 
-            color="#6B7280" 
+            color={isOpen() ? COLORS.status.success : COLORS.text.tertiary} 
           />
         </View>
       )}
@@ -80,14 +86,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderRadius: 12,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowColor: COLORS.gradient.pink,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: COLORS.border.primary,
   },
   content: {
     flexDirection: 'row',
@@ -98,8 +106,12 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: 56,
     height: 56,
-    backgroundColor: 'rgba(250, 198, 56, 0.1)',
     borderRadius: 28,
+    overflow: 'hidden',
+  },
+  iconGradient: {
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -108,12 +120,12 @@ const styles = StyleSheet.create({
   },
   title: {
     fontWeight: 'bold',
-    color: '#111827',
+    color: COLORS.text.primary,
     fontSize: 16,
   },
   subtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    color: COLORS.text.secondary,
     marginTop: 2,
   },
   lockContainer: {

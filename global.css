@@ -10,8 +10,8 @@ body {
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
   body {
-    background-color: #231e0f;
-    color: #F9FAFB;
+    background-color: #0B0B0B;
+    color: #FFFFFF;
   }
 }
 
@@ -25,8 +25,71 @@ body {
   }
 }
 
+@keyframes gradientGlow {
+  0% {
+    box-shadow: 0 4px 20px rgba(237, 98, 239, 0.5);
+  }
+  25% {
+    box-shadow: 0 4px 20px rgba(106, 86, 255, 0.5);
+  }
+  50% {
+    box-shadow: 0 4px 20px rgba(0, 201, 255, 0.5);
+  }
+  75% {
+    box-shadow: 0 4px 20px rgba(106, 86, 255, 0.5);
+  }
+  100% {
+    box-shadow: 0 4px 20px rgba(237, 98, 239, 0.5);
+  }
+}
+
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 4px 20px rgba(237, 98, 239, 0.4);
+  }
+  50% {
+    opacity: 0.9;
+    box-shadow: 0 8px 40px rgba(237, 98, 239, 0.7);
+  }
+}
+
 .animate-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-gradient-glow {
+  animation: gradientGlow 3s ease-in-out infinite;
+}
+
+.animate-gradient-shift {
+  background-size: 200% 200%;
+  animation: gradientShift 5s ease infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
 }
 
 /* Safe area handling */

@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Image, Platform, StatusBar, Modal, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { supabase } from '../../lib/supabase';
 import { ProfileVisitService, RecentVisitProfile } from '../../services/profileVisitService';
 import { FriendService, FriendRequest } from '../../services/friendService';
+import { COLORS } from '../../constants/colors';
 
 interface FriendsScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -421,7 +423,14 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
           onPress={openRequestsModal}
           activeOpacity={0.7}
         >
-          <Ionicons name="person-add" size={24} color="#1e293b" />
+          <LinearGradient
+            colors={['#ED62EF', '#6A56FF']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.notificationGradient}
+          >
+            <Ionicons name="person-add" size={24} color="white" />
+          </LinearGradient>
           {pendingRequests.length > 0 && (
             <View style={styles.notificationBadge}>
               <Text style={styles.notificationBadgeText}>
@@ -439,18 +448,18 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
           
           <View style={styles.userSearchContainer}>
             <View style={styles.userSearchInputWrapper}>
-              <Ionicons name="search" size={20} color="#94a3b8" style={styles.userSearchIcon} />
+              <Ionicons name="search" size={20} color={COLORS.text.tertiary} style={styles.userSearchIcon} />
               <TextInput
                 style={styles.userSearchInput}
                 placeholder="Search by username"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={COLORS.text.tertiary}
                 value={userSearchQuery}
                 onChangeText={handleUserSearch}
                 autoCapitalize="none"
                 autoCorrect={false}
               />
               {isSearching && (
-                <ActivityIndicator size="small" color="#FAC638" style={styles.searchLoader} />
+                <ActivityIndicator size="small" color={COLORS.gradient.pink} style={styles.searchLoader} />
               )}
             </View>
 
@@ -474,7 +483,7 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
                           <Image source={{ uri: user.avatar_url }} style={styles.searchResultAvatar} />
                         ) : (
                           <View style={[styles.searchResultAvatar, styles.searchResultAvatarPlaceholder]}>
-                            <Ionicons name="person" size={20} color="#94a3b8" />
+                            <Ionicons name="person" size={20} color={COLORS.text.tertiary} />
                           </View>
                         )}
                         <View style={styles.searchResultInfo}>
@@ -483,13 +492,13 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
                             <Text style={styles.searchResultName}>{user.display_name}</Text>
                           )}
                         </View>
-                        <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
+                        <Ionicons name="chevron-forward" size={20} color={COLORS.text.tertiary} />
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
                 ) : (
                   <View style={styles.searchEmptyState}>
-                    <Ionicons name="search-outline" size={32} color="#cbd5e1" />
+                    <Ionicons name="search-outline" size={32} color={COLORS.text.tertiary} />
                     <Text style={styles.searchEmptyText}>No users found</Text>
                   </View>
                 )}
@@ -517,7 +526,7 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
                     <Image source={{ uri: visit.avatar_url }} style={styles.friendAvatar} />
                   ) : (
                     <View style={[styles.friendAvatar, styles.friendAvatarPlaceholder]}>
-                      <Ionicons name="person" size={32} color="#94a3b8" />
+                      <Ionicons name="person" size={32} color={COLORS.text.tertiary} />
                     </View>
                   )}
                   <Text style={styles.friendName} numberOfLines={1}>
@@ -528,7 +537,7 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={48} color="#cbd5e1" />
+              <Ionicons name="people-outline" size={48} color={COLORS.text.tertiary} />
               <Text style={styles.emptyStateText}>No recent visits</Text>
               <Text style={styles.emptyStateSubtext}>
                 Search for users above and visit their profiles to see them here
@@ -545,7 +554,7 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
           
           {loadingFriends ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#FAC638" />
+              <ActivityIndicator size="large" color={COLORS.gradient.pink} />
               <Text style={styles.loadingText}>Loading friends...</Text>
             </View>
           ) : friends.length > 0 ? (
@@ -565,7 +574,7 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
                     <Image source={{ uri: friend.avatar_url }} style={styles.friendListAvatar} />
                   ) : (
                     <View style={[styles.friendListAvatar, styles.friendListAvatarPlaceholder]}>
-                      <Ionicons name="person" size={24} color="#94a3b8" />
+                      <Ionicons name="person" size={24} color={COLORS.text.tertiary} />
                     </View>
                   )}
 
@@ -606,13 +615,13 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
                   </View>
 
                   {/* Chevron */}
-                  <Ionicons name="chevron-forward" size={20} color="#cbd5e1" style={styles.friendListChevron} />
+                  <Ionicons name="chevron-forward" size={20} color={COLORS.text.tertiary} style={styles.friendListChevron} />
                 </TouchableOpacity>
               ))}
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={48} color="#cbd5e1" />
+              <Ionicons name="people-outline" size={48} color={COLORS.text.tertiary} />
               <Text style={styles.emptyStateText}>No friends yet</Text>
               <Text style={styles.emptyStateSubtext}>
                 Start by creating and sharing capsules with others
@@ -674,12 +683,12 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
             >
               {loadingRequests ? (
                 <View style={styles.modalLoadingState}>
-                  <ActivityIndicator size="large" color="#FAC638" />
+                  <ActivityIndicator size="large" color={COLORS.gradient.pink} />
                   <Text style={styles.modalLoadingText}>Loading requests...</Text>
                 </View>
               ) : pendingRequests.length === 0 ? (
                 <View style={styles.modalEmptyState}>
-                  <Ionicons name="people-outline" size={64} color="#cbd5e1" />
+                  <Ionicons name="people-outline" size={64} color={COLORS.text.tertiary} />
                   <Text style={styles.modalEmptyText}>No new friend requests</Text>
                   <Text style={styles.modalEmptySubtext}>
                     When someone sends you a friend request, it will appear here
@@ -762,7 +771,7 @@ const FriendRequestItem: React.FC<FriendRequestItemProps> = ({
   if (!senderProfile) {
     return (
       <View style={styles.requestItem}>
-        <ActivityIndicator size="small" color="#94a3b8" />
+        <ActivityIndicator size="small" color={COLORS.text.tertiary} />
       </View>
     );
   }
@@ -774,7 +783,7 @@ const FriendRequestItem: React.FC<FriendRequestItemProps> = ({
         <Image source={{ uri: senderProfile.avatar_url }} style={styles.requestAvatar} />
       ) : (
         <View style={[styles.requestAvatar, styles.requestAvatarPlaceholder]}>
-          <Ionicons name="person" size={24} color="#94a3b8" />
+          <Ionicons name="person" size={24} color={COLORS.text.tertiary} />
         </View>
       )}
 
@@ -822,37 +831,45 @@ const FriendRequestItem: React.FC<FriendRequestItemProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.background.primary,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight ? StatusBar.currentHeight + 16 : 16,
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: COLORS.border.primary,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     flex: 1,
   },
   notificationButton: {
+    position: 'relative',
+  },
+  notificationGradient: {
     width: 44,
     height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
+    shadowColor: COLORS.gradient.purple,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 8,
   },
   notificationBadge: {
     position: 'absolute',
     top: 4,
     right: 4,
-    backgroundColor: '#ef4444',
+    backgroundColor: COLORS.status.error,
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -861,7 +878,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
   },
   notificationBadgeText: {
-    color: 'white',
+    color: COLORS.text.primary,
     fontSize: 11,
     fontWeight: '700',
   },
@@ -869,14 +886,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   searchSection: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     padding: 20,
     marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 16,
   },
   userSearchContainer: {
@@ -886,10 +903,10 @@ const styles = StyleSheet.create({
   userSearchInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.background.tertiary,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border.primary,
     paddingHorizontal: 12,
     height: 48,
   },
@@ -899,7 +916,7 @@ const styles = StyleSheet.create({
   userSearchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   searchLoader: {
     marginLeft: 8,
@@ -909,13 +926,13 @@ const styles = StyleSheet.create({
     top: 52,
     left: 0,
     right: 0,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.tertiary,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
+    borderColor: COLORS.border.primary,
+    shadowColor: COLORS.gradient.pink,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
     maxHeight: 300,
@@ -929,7 +946,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: COLORS.border.primary,
   },
   searchResultAvatar: {
     width: 40,
@@ -938,7 +955,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   searchResultAvatarPlaceholder: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: COLORS.background.tertiary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -948,11 +965,11 @@ const styles = StyleSheet.create({
   searchResultUsername: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   searchResultName: {
     fontSize: 13,
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginTop: 2,
   },
   searchEmptyState: {
@@ -962,11 +979,11 @@ const styles = StyleSheet.create({
   },
   searchEmptyText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
     marginTop: 8,
   },
   friendsListSection: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     padding: 20,
     marginBottom: 20,
   },
@@ -985,16 +1002,30 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 32,
     marginBottom: 8,
+    borderWidth: 2,
+    borderColor: COLORS.gradient.purple,
+    shadowColor: COLORS.gradient.purple,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 5,
   },
   friendAvatarPlaceholder: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: COLORS.background.tertiary,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.gradient.purple,
+    shadowColor: COLORS.gradient.purple,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 5,
   },
   friendName: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     textAlign: 'center',
   },
   emptyState: {
@@ -1006,19 +1037,19 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginTop: 16,
     marginBottom: 8,
   },
   emptyStateSubtext: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
     textAlign: 'center',
     lineHeight: 20,
   },
   // All Friends Section - List View
   allFriendsSection: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     padding: 20,
     marginBottom: 20,
   },
@@ -1029,7 +1060,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginTop: 12,
   },
   friendsList: {
@@ -1042,7 +1073,7 @@ const styles = StyleSheet.create({
   },
   friendListItemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: COLORS.border.primary,
   },
   friendListAvatar: {
     width: 56,
@@ -1051,7 +1082,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   friendListAvatarPlaceholder: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: COLORS.background.tertiary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1063,12 +1094,12 @@ const styles = StyleSheet.create({
   friendListName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 2,
   },
   friendListUsername: {
     fontSize: 14,
-    color: '#64748b',
+    color: COLORS.text.secondary,
   },
   friendListActivity: {
     alignItems: 'flex-end',
@@ -1082,13 +1113,13 @@ const styles = StyleSheet.create({
   },
   activityText: {
     fontSize: 12,
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginLeft: 4,
     maxWidth: 120,
   },
   activityTextMuted: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
     fontStyle: 'italic',
   },
   friendListChevron: {
@@ -1103,14 +1134,14 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   modalContent: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '80%',
-    shadowColor: '#000',
+    shadowColor: COLORS.gradient.pink,
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
     elevation: 10,
   },
   modalHeader: {
@@ -1120,12 +1151,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: COLORS.border.primary,
   },
   modalTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   modalCloseButton: {
     width: 36,
@@ -1146,7 +1177,7 @@ const styles = StyleSheet.create({
   },
   modalLoadingText: {
     fontSize: 14,
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginTop: 12,
   },
   modalEmptyState: {
@@ -1158,13 +1189,13 @@ const styles = StyleSheet.create({
   modalEmptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginTop: 16,
     marginBottom: 8,
   },
   modalEmptySubtext: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -1174,7 +1205,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: COLORS.border.primary,
   },
   requestAvatar: {
     width: 56,
@@ -1183,7 +1214,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   requestAvatarPlaceholder: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: COLORS.background.tertiary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1194,17 +1225,17 @@ const styles = StyleSheet.create({
   requestName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 2,
   },
   requestUsername: {
     fontSize: 14,
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginBottom: 4,
   },
   requestTime: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
   },
   requestActions: {
     flexDirection: 'row',
@@ -1214,14 +1245,21 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
   acceptButton: {
-    backgroundColor: '#10b981',
+    backgroundColor: COLORS.status.success,
   },
   declineButton: {
-    backgroundColor: '#ef4444',
+    backgroundColor: COLORS.status.error,
+  },
+  acceptButtonGradient: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, TextInput, Modal, Image, Dimensions, Animated, PanResponder } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../../store/authStore';
 import { CapsuleService } from '../../services/capsuleService';
 import { MediaService } from '../../services/mediaService';
+import { COLORS, GRADIENTS, SHADOWS } from '../../constants/colors';
 
 const { height } = Dimensions.get('window');
 
@@ -16,11 +18,6 @@ interface ProfileScreenProps {
 
 const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
   const { user, updateProfile } = useAuthStore();
-  const [stats, setStats] = useState([
-    { id: 'created', label: 'Capsules Created', value: '0', icon: 'archive', tappable: true },
-    { id: 'memories', label: 'Memories Saved', value: '0', icon: 'images', tappable: false },
-    { id: 'days', label: 'Days Active', value: '0', icon: 'calendar', tappable: false },
-  ]);
   const [capsulesCreated, setCapsulesCreated] = useState(0);
   const [capsulesReceived, setCapsulesReceived] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -60,27 +57,10 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
       
       if (!error && data) {
         const capsulesCount = data.length;
-        const memoriesCount = data.reduce((acc, capsule) => {
-          return acc + (capsule.content_refs?.length || 0);
-        }, 0);
-        
-        // Calculate days active (from oldest capsule)
-        let daysActive = 0;
-        if (data.length > 0) {
-          const oldestDate = new Date(data[data.length - 1].created_at);
-          const now = new Date();
-          daysActive = Math.floor((now.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24));
-        }
 
         // Set capsules counts
         setCapsulesCreated(capsulesCount);
         setCapsulesReceived(!sharedError && sharedData ? sharedData.length : 0);
-
-        setStats([
-          { id: 'created', label: 'Capsules Created', value: capsulesCount.toString(), icon: 'archive', tappable: true },
-          { id: 'memories', label: 'Memories Saved', value: memoriesCount.toString(), icon: 'images', tappable: false },
-          { id: 'days', label: 'Days Active', value: daysActive.toString(), icon: 'calendar', tappable: false },
-        ]);
       }
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -115,11 +95,11 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
   };
 
   const menuItems = [
-    { id: 'account', label: 'Account Settings', icon: 'person-outline', color: '#FAC638' },
-    { id: 'notifications', label: 'Notifications', icon: 'notifications-outline', color: '#06D6A0' },
-    { id: 'privacy', label: 'Privacy & Security', icon: 'lock-closed-outline', color: '#FF6B6B' },
-    { id: 'help', label: 'Help & Support', icon: 'help-circle-outline', color: '#FFD166' },
-    { id: 'about', label: 'About', icon: 'information-circle-outline', color: '#94a3b8' },
+    { id: 'account', label: 'Account Settings', icon: 'person-outline', color: COLORS.gradient.pink },
+    { id: 'notifications', label: 'Notifications', icon: 'notifications-outline', color: COLORS.gradient.purple },
+    { id: 'privacy', label: 'Privacy & Security', icon: 'lock-closed-outline', color: COLORS.gradient.blue },
+    { id: 'help', label: 'Help & Support', icon: 'help-circle-outline', color: COLORS.gradient.pink },
+    { id: 'about', label: 'About', icon: 'information-circle-outline', color: COLORS.gradient.purple },
   ];
 
   const handleMenuPress = (id: string) => {
@@ -345,7 +325,7 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
           style={styles.backButton}
           onPress={() => onNavigate('Dashboard')}
         >
-          <Ionicons name="arrow-back" size={24} color="#1e293b" />
+          <Ionicons name="arrow-back" size={24} color={COLORS.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Profile</Text>
         <View style={styles.headerSpacer} />
@@ -358,7 +338,7 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
         decelerationRate="normal"
         bounces={true}
         overScrollMode="auto"
-        showsVerticalScrollIndicator={true}
+        showsVerticalScrollIndicator={false}
       >
         {/* Profile Info */}
         <View style={styles.profileCard}>
@@ -377,7 +357,7 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
             )}
             {uploadingPhoto ? (
               <View style={styles.avatarUploadingOverlay}>
-                <ActivityIndicator size="large" color="#FAC638" />
+                <ActivityIndicator size="large" color={COLORS.gradient.pink} />
               </View>
             ) : (
               <View style={styles.avatarEditBadge}>
@@ -399,7 +379,7 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
               </Text>
             </View>
             <View style={styles.chevronContainer}>
-              <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
+              <Ionicons name="chevron-forward" size={16} color={COLORS.text.tertiary} />
             </View>
           </TouchableOpacity>
         </View>
@@ -425,13 +405,13 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
         >
           <View style={styles.capsulesPreviewHeader}>
             <Text style={styles.capsulesPreviewTitle}>My Capsules</Text>
-            <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+            <Ionicons name="chevron-forward" size={20} color={COLORS.text.tertiary} />
           </View>
           
           <View style={styles.capsulesPreviewContent}>
             <View style={styles.capsulePreviewItem}>
               <View style={styles.capsulePreviewIconContainer}>
-                <Ionicons name="create-outline" size={28} color="#FAC638" />
+                <Ionicons name="create-outline" size={28} color={COLORS.gradient.pink} />
               </View>
               <Text style={styles.capsulePreviewValue}>{capsulesCreated}</Text>
               <Text style={styles.capsulePreviewLabel}>Created</Text>
@@ -441,7 +421,7 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
             
             <View style={styles.capsulePreviewItem}>
               <View style={styles.capsulePreviewIconContainer}>
-                <Ionicons name="gift-outline" size={28} color="#10b981" />
+                <Ionicons name="gift-outline" size={28} color={COLORS.gradient.purple} />
               </View>
               <Text style={styles.capsulePreviewValue}>{capsulesReceived}</Text>
               <Text style={styles.capsulePreviewLabel}>Received</Text>
@@ -455,29 +435,6 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
           )}
         </TouchableOpacity>
 
-        {/* Stats */}
-        <View style={styles.statsContainer}>
-          {stats.map((stat) => {
-            const StatContainer = stat.tappable ? TouchableOpacity : View;
-            return (
-              <StatContainer
-                key={stat.label}
-                style={styles.statItem}
-                onPress={stat.tappable ? () => handleStatPress(stat.id) : undefined}
-                activeOpacity={stat.tappable ? 0.7 : 1}
-              >
-                <Ionicons name={stat.icon as any} size={24} color="#FAC638" />
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
-                {stat.tappable && (
-                  <View style={styles.statTapIndicator}>
-                    <Ionicons name="chevron-forward" size={14} color="#94a3b8" />
-                  </View>
-                )}
-              </StatContainer>
-            );
-          })}
-        </View>
 
         {/* Menu Items */}
         <View style={styles.menuContainer}>
@@ -491,14 +448,14 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
                 <Ionicons name={item.icon as any} size={24} color={item.color} />
               </View>
               <Text style={styles.menuLabel}>{item.label}</Text>
-              <Ionicons name="chevron-forward" size={24} color="#94a3b8" />
+              <Ionicons name="chevron-forward" size={24} color={COLORS.text.tertiary} />
             </TouchableOpacity>
           ))}
         </View>
 
         {/* Logout Button */}
         <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
+          <Ionicons name="log-out-outline" size={24} color={COLORS.gradient.purple} />
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
 
@@ -528,10 +485,10 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
               activeOpacity={0.7}
             >
               <View style={styles.photoPickerIcon}>
-                <Ionicons name="camera" size={24} color="#FAC638" />
+                <Ionicons name="camera" size={24} color={COLORS.gradient.pink} />
               </View>
               <Text style={styles.photoPickerOptionText}>Take Photo</Text>
-              <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+              <Ionicons name="chevron-forward" size={20} color={COLORS.text.tertiary} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -540,10 +497,10 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
               activeOpacity={0.7}
             >
               <View style={styles.photoPickerIcon}>
-                <Ionicons name="images" size={24} color="#06D6A0" />
+                <Ionicons name="images" size={24} color={COLORS.status.success} />
               </View>
               <Text style={styles.photoPickerOptionText}>Choose from Gallery</Text>
-              <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+              <Ionicons name="chevron-forward" size={20} color={COLORS.text.tertiary} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -640,7 +597,7 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
               onPress={closeInviteModal}
               activeOpacity={0.7}
             >
-              <Ionicons name="close" size={18} color="#64748b" />
+              <Ionicons name="close" size={18} color={COLORS.text.secondary} />
             </TouchableOpacity>
 
             {/* Scrollable Content */}
@@ -651,7 +608,7 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
             >
               {/* Image/Banner Area */}
               <View style={styles.inviteModalImagePlaceholder}>
-                <Ionicons name="gift" size={64} color="#FAC638" />
+                <Ionicons name="gift" size={64} color={COLORS.gradient.pink} />
               </View>
 
               {/* Main Heading */}
@@ -668,11 +625,11 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
               <View style={styles.inviteModalForm}>
                 <Text style={styles.inviteModalFormLabel}>Friend's Username or Email</Text>
                 <View style={styles.inviteModalInputContainer}>
-                  <Ionicons name="person-add-outline" size={20} color="#94a3b8" style={styles.inviteModalInputIcon} />
+                  <Ionicons name="person-add-outline" size={20} color={COLORS.text.tertiary} style={styles.inviteModalInputIcon} />
                   <TextInput
                     style={styles.inviteModalInput}
                     placeholder="Enter friend's username or email"
-                    placeholderTextColor="#94a3b8"
+                    placeholderTextColor={COLORS.text.tertiary}
                     value={inviteIdentifier}
                     onChangeText={setInviteIdentifier}
                     keyboardType="default"
@@ -688,7 +645,7 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
                 <View style={styles.inviteModalBenefits}>
                   <View style={styles.inviteModalBenefitItem}>
                     <View style={styles.inviteModalBenefitIcon}>
-                      <Ionicons name="checkmark-circle" size={24} color="#06D6A0" />
+                      <Ionicons name="checkmark-circle" size={24} color={COLORS.status.success} />
                     </View>
                     <Text style={styles.inviteModalBenefitText}>
                       Get 5 Premium Capsules instantly
@@ -696,7 +653,7 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
                   </View>
                   <View style={styles.inviteModalBenefitItem}>
                     <View style={styles.inviteModalBenefitIcon}>
-                      <Ionicons name="checkmark-circle" size={24} color="#06D6A0" />
+                      <Ionicons name="checkmark-circle" size={24} color={COLORS.status.success} />
                     </View>
                     <Text style={styles.inviteModalBenefitText}>
                       Help your friend save memories
@@ -704,7 +661,7 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
                   </View>
                   <View style={styles.inviteModalBenefitItem}>
                     <View style={styles.inviteModalBenefitIcon}>
-                      <Ionicons name="checkmark-circle" size={24} color="#06D6A0" />
+                      <Ionicons name="checkmark-circle" size={24} color={COLORS.status.success} />
                     </View>
                     <Text style={styles.inviteModalBenefitText}>
                       Build your TimeCapsule community
@@ -734,7 +691,7 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.background.primary,
   },
   header: {
     flexDirection: 'row',
@@ -743,7 +700,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 60,
     paddingBottom: 16,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.background.primary,
   },
   backButton: {
     padding: 4,
@@ -756,7 +713,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#FAC638',
+    color: COLORS.gradient.pink,
     flex: 1,
     textAlign: 'center',
   },
@@ -768,16 +725,12 @@ const styles = StyleSheet.create({
     paddingBottom: 120, // Extra space for bottom tab bar + logout button
   },
   profileCard: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderRadius: 16,
     padding: 32,
     alignItems: 'center',
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...SHADOWS.soft,
   },
   avatarContainer: {
     position: 'relative',
@@ -787,7 +740,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.gradient.pink,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -803,16 +756,12 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.gradient.pink,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
-    borderColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    borderColor: COLORS.background.primary,
+    ...SHADOWS.pink,
   },
   avatarUploadingOverlay: {
     position: 'absolute',
@@ -830,7 +779,7 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 12,
     textAlign: 'center',
   },
@@ -842,10 +791,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.background.tertiary,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border.primary,
     minHeight: 50,
     gap: 8,
   },
@@ -861,12 +810,12 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
   },
   infoValue: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   infoDivider: {
     fontSize: 13,
@@ -878,7 +827,7 @@ const styles = StyleSheet.create({
   },
   // My Capsules Preview Styles
   capsulesPreviewCard: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -897,7 +846,7 @@ const styles = StyleSheet.create({
   capsulesPreviewTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   capsulesPreviewContent: {
     flexDirection: 'row',
@@ -912,7 +861,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.background.tertiary,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
@@ -920,13 +869,13 @@ const styles = StyleSheet.create({
   capsulePreviewValue: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 4,
   },
   capsulePreviewLabel: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#64748b',
+    color: COLORS.text.secondary,
   },
   capsulePreviewDivider: {
     width: 1,
@@ -941,52 +890,11 @@ const styles = StyleSheet.create({
   },
   capsulesEmptyText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
     fontStyle: 'italic',
   },
-  statsContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    justifyContent: 'space-around',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  statItem: {
-    alignItems: 'center',
-    gap: 4,
-    position: 'relative',
-    flex: 1,
-    paddingVertical: 4,
-  },
-  statTapIndicator: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
   menuContainer: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderRadius: 16,
     padding: 8,
     marginBottom: 16,
@@ -1014,23 +922,23 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderRadius: 16,
     padding: 16,
     gap: 8,
     borderWidth: 2,
-    borderColor: '#FF6B6B',
+    borderColor: COLORS.gradient.purple,
   },
   logoutText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FF6B6B',
+    color: COLORS.gradient.purple,
   },
   bottomSpacer: {
     height: 100, // Extra space for bottom tab bar
@@ -1042,7 +950,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   photoPickerSheet: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 8,
@@ -1060,7 +968,7 @@ const styles = StyleSheet.create({
   photoPickerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 20,
     textAlign: 'center',
   },
@@ -1069,7 +977,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 16,
     paddingHorizontal: 16,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.background.tertiary,
     borderRadius: 12,
     marginBottom: 12,
   },
@@ -1077,7 +985,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -1086,7 +994,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   photoPickerCancel: {
     alignItems: 'center',
@@ -1096,7 +1004,7 @@ const styles = StyleSheet.create({
   photoPickerCancelText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
   },
   modalOverlay: {
     flex: 1,
@@ -1105,7 +1013,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderRadius: 16,
     padding: 24,
     width: '85%',
@@ -1114,7 +1022,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 20,
   },
   modalInputContainer: {
@@ -1123,17 +1031,17 @@ const styles = StyleSheet.create({
   modalLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginBottom: 8,
   },
   modalInput: {
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.background.primary,
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: '#1e293b',
+    color: COLORS.text.primary,
     borderWidth: 2,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border.primary,
   },
   modalButtons: {
     flexDirection: 'row',
@@ -1146,10 +1054,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalButtonCancel: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: COLORS.background.tertiary,
   },
   modalButtonSave: {
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.gradient.pink,
+    ...SHADOWS.pink,
   },
   modalButtonText: {
     fontSize: 16,
@@ -1159,11 +1068,11 @@ const styles = StyleSheet.create({
   modalButtonTextCancel: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#64748b',
+    color: COLORS.text.secondary,
   },
   // Invite Friends Button
   inviteFriendsButton: {
-    backgroundColor: '#06D6A0',
+    backgroundColor: COLORS.gradient.purple,
     marginHorizontal: 16,
     marginVertical: 12,
     padding: 18,
@@ -1172,7 +1081,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
-    shadowColor: '#06D6A0',
+    ...SHADOWS.purple,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -1202,7 +1111,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   inviteModalSheet: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: 'hidden',
@@ -1224,7 +1133,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: COLORS.background.tertiary,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
@@ -1238,7 +1147,7 @@ const styles = StyleSheet.create({
   },
   inviteModalImagePlaceholder: {
     height: 200,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.background.tertiary,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1247,14 +1156,14 @@ const styles = StyleSheet.create({
   inviteModalTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     textAlign: 'center',
     lineHeight: 32,
     marginBottom: 12,
   },
   inviteModalSubtext: {
     fontSize: 15,
-    color: '#64748b',
+    color: COLORS.text.secondary,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 32,
@@ -1271,11 +1180,11 @@ const styles = StyleSheet.create({
   inviteModalInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.background.tertiary,
     borderRadius: 12,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border.primary,
   },
   inviteModalInputIcon: {
     marginRight: 12,
@@ -1284,11 +1193,11 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 16,
     fontSize: 16,
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   inviteModalInputHint: {
     fontSize: 13,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
     marginTop: -8,
   },
   inviteModalBenefits: {
@@ -1315,16 +1224,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.gradient.pink,
     paddingVertical: 18,
     borderRadius: 16,
     marginTop: 32,
     gap: 8,
-    shadowColor: '#FAC638',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    ...SHADOWS.pink,
   },
   inviteModalActionButtonIcon: {
     marginRight: 4,

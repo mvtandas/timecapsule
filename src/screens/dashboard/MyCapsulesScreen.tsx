@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, RefreshControl, Modal, Animated, Dimensions, PanResponder, Platform, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import MapView, { Marker } from 'react-native-maps';
 import { CapsuleService } from '../../services/capsuleService';
 import { NotificationService } from '../../services/notificationService';
+import { COLORS, GRADIENTS, SHADOWS } from '../../constants/colors';
 import { supabase } from '../../lib/supabase';
 
 const { width, height } = Dimensions.get('window');
@@ -145,7 +147,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
   };
 
   const getRandomColor = () => {
-    const colors = ['#FFD166', '#06D6A0', '#FF6B6B', '#4ECDC4', '#95E1D3'];
+    const colors = [COLORS.gradient.pink, COLORS.gradient.purple, COLORS.gradient.blue, COLORS.gradient.pink, COLORS.gradient.purple];
     return colors[Math.floor(Math.random() * colors.length)];
   };
 
@@ -301,11 +303,11 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => onGoBack && onGoBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#1e293b" />
+          <Ionicons name="arrow-back" size={24} color={COLORS.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Capsules</Text>
         <TouchableOpacity onPress={() => onNavigate('Create')} style={styles.addButton}>
-          <Ionicons name="add-circle" size={32} color="#FAC638" />
+          <Ionicons name="add-circle" size={32} color={COLORS.gradient.pink} />
         </TouchableOpacity>
       </View>
 
@@ -336,7 +338,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
         style={styles.content} 
         contentContainerStyle={styles.contentContainer}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#FAC638']} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.gradient.pink]} />
         }
         scrollEventThrottle={16}
         decelerationRate="normal"
@@ -346,12 +348,12 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
       >
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FAC638" />
+            <ActivityIndicator size="large" color={COLORS.gradient.pink} />
             <Text style={styles.loadingText}>Loading capsules...</Text>
           </View>
         ) : capsules.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Ionicons name="file-tray-outline" size={80} color="#cbd5e1" />
+            <Ionicons name="file-tray-outline" size={80} color={COLORS.text.tertiary} />
             <Text style={styles.emptyTitle}>
               {activeTab === 'created' ? 'No Capsules Yet' : 'No Shared Capsules'}
             </Text>
@@ -387,7 +389,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
                 <Ionicons
                   name={isLocked(capsule.open_at) ? 'lock-closed' : 'lock-open'}
                   size={24}
-                  color={isLocked(capsule.open_at) ? '#FF6B6B' : '#06D6A0'}
+                  color={isLocked(capsule.open_at) ? COLORS.status.error : COLORS.status.success}
                   style={styles.lockIcon}
                 />
                 {activeTab === 'created' && (
@@ -398,7 +400,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
                     }}
                     style={styles.deleteButton}
                   >
-                    <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
+                    <Ionicons name="trash-outline" size={20} color={COLORS.status.error} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -453,7 +455,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
               onPress={closeDetailModal}
               activeOpacity={0.7}
             >
-              <Ionicons name="close" size={24} color="#64748b" />
+              <Ionicons name="close" size={24} color={COLORS.text.secondary} />
         </TouchableOpacity>
 
             {/* Content */}
@@ -481,7 +483,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
                   if (!finalMediaUrl) {
                     return (
                       <View style={styles.detailModalMediaPlaceholder}>
-                        <Ionicons name="image-outline" size={48} color="#cbd5e1" />
+                        <Ionicons name="image-outline" size={48} color={COLORS.text.tertiary} />
                         <Text style={styles.detailModalMediaPlaceholderText}>No media attached</Text>
                       </View>
                     );
@@ -498,7 +500,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
                     <View style={styles.detailModalMediaContainer}>
                       {isVideo ? (
                         <View style={styles.detailModalMediaVideoContainer}>
-                          <Ionicons name="play-circle" size={64} color="#ffffff" style={styles.detailModalVideoIcon} />
+                          <Ionicons name="play-circle" size={64} color={COLORS.text.primary} style={styles.detailModalVideoIcon} />
                           <Image 
                             source={{ uri: finalMediaUrl }}
                             style={styles.detailModalMediaImage}
@@ -516,7 +518,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
                       {isCapsuleLocked(selectedCapsule) && (
                         <BlurView intensity={80} style={styles.detailModalMediaBlur}>
                           <View style={styles.detailModalMediaLockedBadge}>
-                            <Ionicons name="lock-closed" size={32} color="#ffffff" />
+                            <Ionicons name="lock-closed" size={32} color={COLORS.text.primary} />
                             <Text style={styles.detailModalMediaLockedText}>Locked</Text>
                             <Text style={styles.detailModalMediaLockedSubtext}>
                               Unlocks on {new Date(selectedCapsule.open_at || '').toLocaleDateString()}
@@ -576,7 +578,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
                   <View style={styles.detailModalSharedContainer}>
                     {selectedCapsule?.is_public ? (
                       <View style={styles.detailModalPublicBadge}>
-                        <Ionicons name="globe-outline" size={20} color="#64748b" />
+                        <Ionicons name="globe-outline" size={20} color={COLORS.text.secondary} />
                         <Text style={styles.detailModalPublicText}>This capsule is public</Text>
                       </View>
                     ) : (
@@ -595,7 +597,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
                                 />
                               ) : (
                                 <View style={styles.detailModalSharedAvatar}>
-                                  <Ionicons name="person" size={20} color="#94a3b8" />
+                                  <Ionicons name="person" size={20} color={COLORS.text.tertiary} />
                                 </View>
                               )}
                               <Text style={styles.detailModalSharedName}>
@@ -606,7 +608,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
                         ) : (
                           <View style={styles.detailModalSharedUser}>
                             <View style={styles.detailModalSharedAvatar}>
-                              <Ionicons name="people-outline" size={20} color="#94a3b8" />
+                              <Ionicons name="people-outline" size={20} color={COLORS.text.tertiary} />
                             </View>
                             <Text style={styles.detailModalSharedName}>Loading...</Text>
                           </View>
@@ -621,7 +623,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
                   <Text style={styles.detailModalSectionTitle}>Details</Text>
                   <View style={styles.detailModalMetaContainer}>
                     <View style={styles.detailModalMetaRow}>
-                      <Ionicons name="calendar-outline" size={20} color="#64748b" />
+                      <Ionicons name="calendar-outline" size={20} color={COLORS.text.secondary} />
                       <View style={styles.detailModalMetaTextContainer}>
                         <Text style={styles.detailModalMetaLabel}>Shared On</Text>
                         <Text style={styles.detailModalMetaValue}>
@@ -640,7 +642,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
                     
                     {selectedCapsule?.open_at && (
                       <View style={styles.detailModalMetaRow}>
-                        <Ionicons name="time-outline" size={20} color="#64748b" />
+                        <Ionicons name="time-outline" size={20} color={COLORS.text.secondary} />
                         <View style={styles.detailModalMetaTextContainer}>
                           <Text style={styles.detailModalMetaLabel}>Opens On</Text>
                           <Text style={styles.detailModalMetaValue}>
@@ -658,7 +660,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
 
                     {(selectedCapsule?.lat && selectedCapsule?.lng) && (
                       <View style={styles.detailModalMetaRow}>
-                        <Ionicons name="location-outline" size={20} color="#64748b" />
+                        <Ionicons name="location-outline" size={20} color={COLORS.text.secondary} />
                         <View style={styles.detailModalMetaTextContainer}>
                           <Text style={styles.detailModalMetaLabel}>Shared Location</Text>
                           <Text style={styles.detailModalMetaValue}>
@@ -695,7 +697,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
                           }}
                         >
                           <View style={styles.detailModalMapMarker}>
-                            <Ionicons name="location" size={32} color="#FAC638" />
+                            <Ionicons name="location" size={32} color={COLORS.gradient.pink} />
                           </View>
                         </Marker>
                       </MapView>
@@ -708,12 +710,18 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
             {/* Share Button - Fixed at bottom */}
             <View style={styles.detailModalFooter}>
               <TouchableOpacity
-                style={styles.detailModalShareButton}
                 onPress={() => Alert.alert('Share', 'Share functionality coming soon!')}
                 activeOpacity={0.8}
               >
-                <Ionicons name="share-social" size={20} color="#1e293b" style={styles.detailModalShareIcon} />
-                <Text style={styles.detailModalShareText}>Share Capsule</Text>
+                <LinearGradient
+                  colors={['#ED62EF', '#6A56FF']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.detailModalShareButton}
+                >
+                  <Ionicons name="share-social" size={20} color={COLORS.text.primary} style={styles.detailModalShareIcon} />
+                  <Text style={styles.detailModalShareText}>Share Capsule</Text>
+                </LinearGradient>
         </TouchableOpacity>
       </View>
           </Animated.View>
@@ -727,7 +735,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack, initialTab }: MyCapsulesScreen
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.background.primary,
   },
   header: {
     flexDirection: 'row',
@@ -736,7 +744,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 60,
     paddingBottom: 16,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.background.primary,
   },
   backButton: {
     padding: 4,
@@ -744,7 +752,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     flex: 1,
     textAlign: 'center',
   },
@@ -753,8 +761,8 @@ const styles = StyleSheet.create({
   },
   tabsContainer: {
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    backgroundColor: '#f8f8f5',
+    borderBottomColor: COLORS.border.primary,
+    backgroundColor: COLORS.background.primary,
   },
   tabs: {
     flexDirection: 'row',
@@ -769,16 +777,16 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   activeTab: {
-    borderBottomColor: '#FAC638',
+    borderBottomColor: COLORS.gradient.pink,
   },
   tabText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
   },
   activeTabText: {
     fontWeight: '700',
-    color: '#FAC638',
+    color: COLORS.gradient.pink,
   },
   content: {
     flex: 1,
@@ -790,7 +798,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -822,16 +830,16 @@ const styles = StyleSheet.create({
   capsuleTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 4,
   },
   capsuleTime: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
   },
   capsuleDescription: {
     fontSize: 12,
-    color: '#cbd5e1',
+    color: COLORS.text.tertiary,
     marginTop: 2,
   },
   capsuleActions: {
@@ -854,7 +862,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
   },
   emptyContainer: {
     flex: 1,
@@ -866,13 +874,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginTop: 16,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -886,7 +894,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   detailModalSheet: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     shadowColor: '#000',
@@ -905,7 +913,7 @@ const styles = StyleSheet.create({
   detailModalDragIndicator: {
     width: 48,
     height: 5,
-    backgroundColor: '#cbd5e1',
+    backgroundColor: COLORS.background.tertiary,
     borderRadius: 3,
   },
   detailModalCloseButton: {
@@ -915,7 +923,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: COLORS.background.tertiary,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
@@ -933,7 +941,7 @@ const styles = StyleSheet.create({
   detailModalMediaContainer: {
     width: '100%',
     height: 250,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: COLORS.background.tertiary,
     position: 'relative',
   },
   detailModalMediaImage: {
@@ -975,20 +983,20 @@ const styles = StyleSheet.create({
   },
   detailModalMediaLockedSubtext: {
     fontSize: 13,
-    color: '#e2e8f0',
+    color: COLORS.text.secondary,
     marginTop: 8,
     textAlign: 'center',
   },
   detailModalMediaPlaceholder: {
     width: '100%',
     height: 250,
-    backgroundColor: '#f8fafc',
+    backgroundColor: COLORS.background.tertiary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   detailModalMediaPlaceholderText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
     marginTop: 8,
   },
   detailModalTextContent: {
@@ -998,17 +1006,17 @@ const styles = StyleSheet.create({
   detailModalTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 12,
   },
   detailModalDescription: {
     fontSize: 16,
-    color: '#64748b',
+    color: COLORS.text.secondary,
     lineHeight: 24,
     marginBottom: 24,
   },
   detailModalCountdownContainer: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: COLORS.background.tertiary,
     borderRadius: 16,
     padding: 20,
     marginBottom: 24,
@@ -1016,7 +1024,7 @@ const styles = StyleSheet.create({
   detailModalCountdownLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginBottom: 12,
     textAlign: 'center',
   },
@@ -1030,12 +1038,12 @@ const styles = StyleSheet.create({
   detailModalCountdownValue: {
     fontSize: 32,
     fontWeight: '700',
-    color: '#FAC638',
+    color: COLORS.gradient.pink,
     marginBottom: 4,
   },
   detailModalCountdownUnit: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
     fontWeight: '500',
   },
   detailModalConditionRow: {
@@ -1047,11 +1055,11 @@ const styles = StyleSheet.create({
   detailModalConditionText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#06D6A0',
+    color: COLORS.status.success,
   },
   detailModalConditionValue: {
     fontSize: 14,
-    color: '#64748b',
+    color: COLORS.text.secondary,
   },
   detailModalSection: {
     marginBottom: 24,
@@ -1059,11 +1067,11 @@ const styles = StyleSheet.create({
   detailModalSectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 12,
   },
   detailModalSharedContainer: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: COLORS.background.tertiary,
     borderRadius: 12,
     padding: 16,
   },
@@ -1074,7 +1082,7 @@ const styles = StyleSheet.create({
   },
   detailModalPublicText: {
     fontSize: 14,
-    color: '#64748b',
+    color: COLORS.text.secondary,
   },
   detailModalSharedList: {
     gap: 16,
@@ -1087,7 +1095,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: COLORS.background.tertiary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1098,11 +1106,11 @@ const styles = StyleSheet.create({
   },
   detailModalSharedName: {
     fontSize: 12,
-    color: '#64748b',
+    color: COLORS.text.secondary,
     fontWeight: '500',
   },
   detailModalMetaContainer: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: COLORS.background.tertiary,
     borderRadius: 12,
     padding: 16,
     gap: 16,
@@ -1118,14 +1126,14 @@ const styles = StyleSheet.create({
   detailModalMetaLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
     marginBottom: 4,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   detailModalMetaValue: {
     fontSize: 14,
-    color: '#1e293b',
+    color: COLORS.text.primary,
     fontWeight: '500',
   },
   detailModalMapContainer: {
@@ -1133,7 +1141,7 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: COLORS.background.tertiary,
   },
   detailModalMiniMap: {
     flex: 1,
@@ -1147,23 +1155,23 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     paddingHorizontal: 24,
     paddingVertical: 16,
     paddingBottom: Platform.OS === 'ios' ? 32 : 16,
     borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
+    borderTopColor: COLORS.border.primary,
     zIndex: 1001,
   },
   detailModalShareButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FAC638',
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 12,
     gap: 8,
+    overflow: 'hidden',
   },
   detailModalShareIcon: {
     marginRight: 4,
@@ -1171,7 +1179,7 @@ const styles = StyleSheet.create({
   detailModalShareText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
 });
 

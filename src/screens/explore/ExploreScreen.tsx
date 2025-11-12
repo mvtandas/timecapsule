@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import MapView, { Marker, Circle, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { CapsuleService } from '../../services/capsuleService';
+import { COLORS, GRADIENTS, SHADOWS } from '../../constants/colors';
 
 const { width, height } = Dimensions.get('window');
 
@@ -271,7 +273,7 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.background.primary,
   },
   header: {
     flexDirection: 'row',
@@ -280,7 +282,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 60,
     paddingBottom: 16,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
     zIndex: 10,
@@ -288,7 +290,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   headerButtons: {
     flexDirection: 'row',
@@ -309,7 +311,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
   },
   errorContainer: {
     flex: 1,
@@ -320,13 +322,13 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginTop: 16,
     marginBottom: 8,
   },
   errorText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
     textAlign: 'center',
     marginBottom: 24,
   },
@@ -351,24 +353,24 @@ const styles = StyleSheet.create({
   calloutTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 4,
   },
   calloutDistance: {
     fontSize: 14,
-    color: '#64748b',
+    color: COLORS.text.secondary,
     marginBottom: 4,
   },
   calloutStatus: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
   },
   infoCard: {
     position: 'absolute',
     top: 140,
     left: 16,
     right: 16,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderRadius: 12,
     padding: 16,
     shadowColor: '#000',
@@ -390,12 +392,12 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 12,
-    color: '#64748b',
+    color: COLORS.text.secondary,
   },
   capsuleCount: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,

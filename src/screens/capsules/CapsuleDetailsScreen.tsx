@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet, Alert, Dimensions, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { CapsuleService, Capsule } from '../../services/capsuleService';
 import { MediaService } from '../../services/mediaService';
+import { COLORS, GRADIENTS, SHADOWS } from '../../constants/colors';
 import { supabase } from '../../lib/supabase';
 import { 
   getDistanceStatus, 
@@ -442,7 +444,7 @@ const CapsuleDetailsScreen = ({ onBack, capsuleId }: CapsuleDetailsScreenProps) 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.background.primary,
   },
   header: {
     flexDirection: 'row',
@@ -451,7 +453,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 60,
     paddingBottom: 16,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
@@ -461,7 +463,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
   },
   editButton: {
     padding: 8,
@@ -532,12 +534,12 @@ const styles = StyleSheet.create({
   // Content Section Styles
   contentSection: {
     padding: 20,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
   },
   capsuleTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 12,
   },
   capsuleDescription: {
@@ -547,14 +549,14 @@ const styles = StyleSheet.create({
   },
   // Shared With Section
   section: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     padding: 20,
     marginTop: 1,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text.primary,
     marginBottom: 16,
   },
   sharedWithContainer: {
@@ -622,7 +624,7 @@ const styles = StyleSheet.create({
   },
   metaLabel: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
     marginBottom: 4,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -630,7 +632,7 @@ const styles = StyleSheet.create({
   },
   metaValue: {
     fontSize: 16,
-    color: '#1e293b',
+    color: COLORS.text.primary,
     fontWeight: '500',
   },
   // Map Styles
@@ -667,7 +669,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'white',
+    backgroundColor: COLORS.background.secondary,
     borderRadius: 12,
     padding: 16,
     gap: 8,
@@ -694,7 +696,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#64748b',
+    color: COLORS.text.secondary,
   },
   errorContainer: {
     flex: 1,
@@ -705,7 +707,7 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#64748b',
+    color: COLORS.text.secondary,
     textAlign: 'center',
   },
   errorButton: {
@@ -752,7 +754,7 @@ const styles = StyleSheet.create({
   },
   viewCountText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: COLORS.text.tertiary,
   },
   lockedStatus: {
     color: '#FAC638',
@@ -772,7 +774,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border.primary,
   },
   sharedUserAvatar: {
     width: 20,

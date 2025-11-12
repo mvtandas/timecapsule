@@ -234,7 +234,7 @@ export default function App() {
   if (loading && !user && currentScreen === 'Welcome') {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FAC638" />
+        <ActivityIndicator size="large" color="#ED62EF" />
       </View>
     );
   }
@@ -290,14 +290,14 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: '#0B0B0B',
   },
   screenContainer: {
     flex: 1,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: '#0B0B0B',
     alignItems: 'center',
     justifyContent: 'center',
   },

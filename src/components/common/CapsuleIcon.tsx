@@ -1,14 +1,17 @@
 import React from 'react';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
+import { COLORS } from '../../constants/colors';
 
 interface CapsuleIconProps {
   size?: number;
   color?: string;
+  useGradient?: boolean;
 }
 
 export const CapsuleIcon: React.FC<CapsuleIconProps> = ({ 
   size = 24, 
-  color = '#94a3b8' 
+  color,
+  useGradient = true,
 }) => {
   // Calculate dimensions for a vertical capsule/pill shape
   // Capsule: two semicircles (top and bottom) connected by a rectangle
@@ -31,11 +34,22 @@ export const CapsuleIcon: React.FC<CapsuleIconProps> = ({
     Z
   `;
 
+  const fillColor = color || COLORS.text.tertiary;
+
   return (
     <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      {useGradient && !color && (
+        <Defs>
+          <LinearGradient id="capsuleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor={COLORS.gradient.pink} />
+            <Stop offset="50%" stopColor={COLORS.gradient.purple} />
+            <Stop offset="100%" stopColor={COLORS.gradient.blue} />
+          </LinearGradient>
+        </Defs>
+      )}
       <Path
         d={path}
-        fill={color}
+        fill={useGradient && !color ? "url(#capsuleGradient)" : fillColor}
       />
     </Svg>
   );
