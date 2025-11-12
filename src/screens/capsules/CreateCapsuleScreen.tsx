@@ -23,6 +23,7 @@ import * as Location from 'expo-location';
 import DatePickerModal from '../../components/DatePickerModal';
 import { CapsuleService } from '../../services/capsuleService';
 import { MediaService } from '../../services/mediaService';
+import { NotificationService } from '../../services/notificationService';
 import { Friend } from '../../types';
 import { supabase } from '../../lib/supabase';
 
@@ -197,6 +198,17 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
     try {
       setSaving(true);
 
+      // Validate private capsule has users selected
+      if (!capsuleData.isPublic && capsuleData.sharedWith.length === 0) {
+        Alert.alert(
+          'Selection Required',
+          'Please select at least one user to share this private capsule with.',
+          [{ text: 'OK' }]
+        );
+        setSaving(false);
+        return;
+      }
+
       // Check if capsule location is within 5km of current location
       if (currentLocation && capsuleData.location) {
         const distance = calculateDistance(
@@ -284,6 +296,61 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
           if (path) await MediaService.deleteMedia(path);
         }
       } else {
+        // Send notifications if capsule is private and shared with users
+        if (!capsuleData.isPublic && sharedWithUsers.length > 0 && data) {
+          try {
+            const senderUsername = user.user_metadata?.username || user.email?.split('@')[0] || 'Someone';
+            
+            console.log('📬 Preparing to send notifications...');
+            console.log('   → Sender ID:', user.id);
+            console.log('   → Sender username:', senderUsername);
+            console.log('   → Receiver IDs:', sharedWithUsers);
+            console.log('   → Capsule ID:', data.id);
+            
+            const { success, error: notifError } = await NotificationService.notifyPrivateCapsuleShared(
+              user.id,
+              sharedWithUsers,
+              data.id,
+              senderUsername
+            );
+            
+            if (success) {
+              console.log(`✅ Successfully sent ${sharedWithUsers.length} notification(s)`);
+              console.log('   → Notifications inserted into database');
+            } else {
+              // Check if it's a table not found error
+              if (notifError?.code === 'PGRST204' || notifError?.message?.includes('notifications')) {
+                console.warn('⚠️ Notifications table not found!');
+                console.warn('   → Please run migration: db/migrations/012_add_notifications.sql');
+                console.warn('   → Capsule created successfully, but notifications were not sent.');
+                
+                // Show alert to user
+                Alert.alert(
+                  'Capsule Created',
+                  'Your capsule was created, but notifications could not be sent. Please contact support.',
+                  [{ text: 'OK' }]
+                );
+              } else {
+                console.error('⚠️ Failed to send notifications!');
+                console.error('   → Error code:', notifError?.code);
+                console.error('   → Error message:', notifError?.message);
+                console.error('   → Full error:', notifError);
+              }
+              // Don't fail the whole operation if notifications fail
+            }
+          } catch (notifError: any) {
+            console.error('⚠️ Notification error (non-critical)!');
+            console.error('   → Error:', notifError?.message || notifError);
+            // Continue with capsule creation even if notifications fail
+          }
+        } else {
+          if (capsuleData.isPublic) {
+            console.log('📢 Capsule is public - no notifications needed');
+          } else if (sharedWithUsers.length === 0) {
+            console.log('⚠️  Private capsule but no users selected - no notifications sent');
+          }
+        }
+        
         Alert.alert('Success!', 'Your time capsule has been created!', [
           { text: 'OK', onPress: () => onNavigate('Dashboard') },
         ]);

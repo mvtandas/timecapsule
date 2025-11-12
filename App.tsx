@@ -259,7 +259,14 @@ export default function App() {
           {currentScreen === 'Signup' && <SignupScreen onNavigate={navigate} onSignup={handleLogin} onGoBack={goBack} />}
           {currentScreen === 'Dashboard' && <DashboardScreen onNavigate={navigate} onLogout={handleLogout} onGoBack={goBack} />}
           {currentScreen === 'Friends' && <FriendsScreen onNavigate={navigate} onGoBack={goBack} />}
-          {currentScreen === 'MyCapsules' && <MyCapsulesScreen onNavigate={navigate} onLogout={handleLogout} onGoBack={goBack} />}
+          {currentScreen === 'MyCapsules' && (
+            <MyCapsulesScreen 
+              onNavigate={navigate} 
+              onLogout={handleLogout} 
+              onGoBack={goBack} 
+              initialTab={navigationData?.initialTab}
+            />
+          )}
           {currentScreen === 'Create' && <CreateCapsuleScreen onNavigate={navigate} onGoBack={goBack} />}
           {currentScreen === 'Explore' && <ExploreScreen onNavigate={navigate} onGoBack={goBack} />}
           {currentScreen === 'Profile' && <ProfileScreen onNavigate={navigate} onLogout={handleLogout} onGoBack={goBack} />}
