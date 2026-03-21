@@ -16,9 +16,12 @@ export class NotificationService {
   // Initialize notifications
   static async initialize(): Promise<void> {
     try {
-      // Request permissions
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') {
+      // Check existing permission status - don't auto-request on app launch
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      if (existingStatus !== 'granted') {
+        // Don't auto-request on app launch - wait for user action
+        // Permission will be requested contextually when the user creates
+        // a capsule with a future date (see CreateCapsuleScreen)
         return;
       }
 
@@ -46,7 +49,7 @@ export class NotificationService {
         handleSuccess: (notificationId) => {
         },
         handleError: (error) => {
-          console.error('Notification error:', error);
+          if (__DEV__) console.error('Notification error:', error);
         },
       });
 
@@ -56,7 +59,7 @@ export class NotificationService {
       });
 
     } catch (error) {
-      console.error('Error initializing notifications:', error);
+      if (__DEV__) console.error('Error initializing notifications:', error);
     }
   }
 
@@ -78,7 +81,7 @@ export class NotificationService {
 
       return notificationId;
     } catch (error) {
-      console.error('Error scheduling notification:', error);
+      if (__DEV__) console.error('Error scheduling notification:', error);
       return null;
     }
   }
@@ -107,6 +110,61 @@ export class NotificationService {
     };
 
     return this.scheduleNotification(notificationData, trigger);
+  }
+
+  // Schedule streak reminder at 9pm daily
+  static async scheduleStreakReminder(): Promise<string | null> {
+    const now = new Date();
+    const trigger = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 21, 0, 0);
+    // If 9pm has already passed today, schedule for tomorrow
+    if (trigger <= now) {
+      trigger.setDate(trigger.getDate() + 1);
+    }
+
+    const notificationData: NotificationData = {
+      title: 'Streak Reminder',
+      body: 'Your streaks reset at midnight! Create a capsule to keep them going \uD83D\uDD25',
+      data: {
+        type: 'streak_reminder',
+      },
+      sound: 'default',
+    };
+
+    const triggerInput: Notifications.DateTriggerInput = {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: trigger,
+    };
+
+    return this.scheduleNotification(notificationData, triggerInput);
+  }
+
+  // Schedule "opening soon" notification 1 hour before capsule opens
+  static async scheduleCapsulesOpeningSoon(
+    capsuleTitle: string,
+    openDate: Date
+  ): Promise<string | null> {
+    const oneHourBefore = new Date(openDate.getTime() - 60 * 60 * 1000);
+
+    // Only schedule if the 1-hour-before time is still in the future
+    if (oneHourBefore <= new Date()) {
+      return null;
+    }
+
+    const notificationData: NotificationData = {
+      title: 'Opening Soon!',
+      body: `Your capsule '${capsuleTitle}' opens in 1 hour! \uD83C\uDF89`,
+      data: {
+        type: 'capsule_opening_soon',
+      },
+      sound: 'default',
+    };
+
+    const triggerInput: Notifications.DateTriggerInput = {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: oneHourBefore,
+    };
+
+    return this.scheduleNotification(notificationData, triggerInput);
   }
 
   // Schedule location-based notification
@@ -168,7 +226,7 @@ export class NotificationService {
     try {
       await Notifications.cancelScheduledNotificationAsync(notificationId);
     } catch (error) {
-      console.error('Error canceling notification:', error);
+      if (__DEV__) console.error('Error canceling notification:', error);
     }
   }
 
@@ -178,7 +236,7 @@ export class NotificationService {
       const notifications = await Notifications.getAllScheduledNotificationsAsync();
       return notifications;
     } catch (error) {
-      console.error('Error getting scheduled notifications:', error);
+      if (__DEV__) console.error('Error getting scheduled notifications:', error);
       return [];
     }
   }
@@ -188,7 +246,7 @@ export class NotificationService {
     try {
       await Notifications.dismissAllNotificationsAsync();
     } catch (error) {
-      console.error('Error clearing notifications:', error);
+      if (__DEV__) console.error('Error clearing notifications:', error);
     }
   }
 
@@ -198,7 +256,7 @@ export class NotificationService {
       const badgeCount = await Notifications.getBadgeCountAsync();
       return badgeCount;
     } catch (error) {
-      console.error('Error getting badge count:', error);
+      if (__DEV__) console.error('Error getting badge count:', error);
       return 0;
     }
   }
@@ -208,7 +266,7 @@ export class NotificationService {
     try {
       await Notifications.setBadgeCountAsync(count);
     } catch (error) {
-      console.error('Error setting badge count:', error);
+      if (__DEV__) console.error('Error setting badge count:', error);
     }
   }
 
@@ -218,7 +276,7 @@ export class NotificationService {
       const { status } = await Notifications.getPermissionsAsync();
       return status === 'granted';
     } catch (error) {
-      console.error('Error checking notification permissions:', error);
+      if (__DEV__) console.error('Error checking notification permissions:', error);
       return false;
     }
   }
@@ -238,7 +296,7 @@ export class NotificationService {
 
       return token.data;
     } catch (error) {
-      console.error('Error registering for push notifications:', error);
+      if (__DEV__) console.error('Error registering for push notifications:', error);
       return null;
     }
   }
@@ -247,7 +305,7 @@ export class NotificationService {
   static async unregisterFromPushNotifications(): Promise<void> {
     try {
     } catch (error) {
-      console.error('Error unregistering from push notifications:', error);
+      if (__DEV__) console.error('Error unregistering from push notifications:', error);
     }
   }
 }

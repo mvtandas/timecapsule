@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,19 +8,38 @@ import {
   Image,
   ActivityIndicator,
   RefreshControl,
+  Alert,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NotificationAppService, AppNotification } from '../../services/notificationService';
+import { timeAgo } from '../../utils/dateUtils';
 
 interface NotificationsScreenProps {
   onNavigate: (screen: string, data?: any) => void;
   onGoBack?: () => void;
 }
 
+type NotifFilter = 'All' | 'Likes' | 'Comments' | 'Friends';
+
+const NOTIF_FILTERS: NotifFilter[] = ['All', 'Likes', 'Comments', 'Friends'];
+
 const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<NotifFilter>('All');
+
+  const filteredNotifications = useMemo(() => {
+    if (activeFilter === 'All') return notifications;
+    if (activeFilter === 'Likes') return notifications.filter((n) => n.type === 'like');
+    if (activeFilter === 'Comments') return notifications.filter((n) => n.type === 'comment');
+    if (activeFilter === 'Friends')
+      return notifications.filter(
+        (n) => n.type === 'friend_request' || n.type === 'friend_accepted'
+      );
+    return notifications;
+  }, [notifications, activeFilter]);
 
   useEffect(() => {
     loadNotifications();
@@ -43,6 +62,33 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
     await NotificationAppService.markAllAsRead();
   };
 
+  const handleDeleteNotification = async (id: string) => {
+    const { error } = await NotificationAppService.deleteNotification(id);
+    if (!error) {
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    }
+  };
+
+  const handleClearAll = () => {
+    Alert.alert(
+      'Clear All Notifications',
+      'Are you sure you want to delete all notifications?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear All',
+          style: 'destructive',
+          onPress: async () => {
+            const { error } = await NotificationAppService.clearAllNotifications();
+            if (!error) {
+              setNotifications([]);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const getIcon = (type: string): { name: string; color: string } => {
     switch (type) {
       case 'like': return { name: 'heart', color: '#FF375F' };
@@ -52,18 +98,6 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
       case 'capsule_opened': return { name: 'lock-open', color: '#4ECDC4' };
       default: return { name: 'notifications', color: '#94a3b8' };
     }
-  };
-
-  const timeAgo = (d: string): string => {
-    const diff = Date.now() - new Date(d).getTime();
-    const m = Math.floor(diff / 60000);
-    if (m < 1) return 'now';
-    if (m < 60) return `${m}m`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h`;
-    const days = Math.floor(h / 24);
-    if (days < 7) return `${days}d`;
-    return `${Math.floor(days / 7)}w`;
   };
 
   const handleNotificationPress = (notif: AppNotification) => {
@@ -87,8 +121,34 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
           <Ionicons name="arrow-back" size={24} color="#1e293b" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
-        <View style={styles.backBtn} />
+        {notifications.length > 0 ? (
+          <TouchableOpacity onPress={handleClearAll} style={styles.clearAllBtn}>
+            <Text style={styles.clearAllText}>Clear All</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.backBtn} />
+        )}
       </View>
+
+      {/* Filter Chips */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterChipsContainer}
+        contentContainerStyle={styles.filterChipsContent}
+      >
+        {NOTIF_FILTERS.map((filter) => (
+          <TouchableOpacity
+            key={filter}
+            style={[styles.filterChip, activeFilter === filter && styles.filterChipActive]}
+            onPress={() => setActiveFilter(filter)}
+          >
+            <Text style={[styles.filterChipText, activeFilter === filter && styles.filterChipTextActive]}>
+              {filter}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -96,9 +156,9 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
         </View>
       ) : (
         <FlatList
-          data={notifications}
+          data={filteredNotifications}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={notifications.length === 0 ? styles.emptyContainer : undefined}
+          contentContainerStyle={filteredNotifications.length === 0 ? styles.emptyContainer : undefined}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FAC638" />
           }
@@ -139,10 +199,14 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
                   <Text style={styles.notifTime}>{timeAgo(item.created_at)}</Text>
                 </View>
 
-                {/* Type icon */}
-                <View style={[styles.notifTypeIcon, { backgroundColor: icon.color + '15' }]}>
-                  <Ionicons name={icon.name as any} size={16} color={icon.color} />
-                </View>
+                {/* Delete button */}
+                <TouchableOpacity
+                  style={styles.deleteBtn}
+                  onPress={() => handleDeleteNotification(item.id)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="trash-outline" size={18} color="#FF6B6B" />
+                </TouchableOpacity>
               </TouchableOpacity>
             );
           }}
@@ -172,10 +236,51 @@ const styles = StyleSheet.create({
     width: 40,
     alignItems: 'center',
   },
+  clearAllBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  clearAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FF6B6B',
+  },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#1e293b',
+  },
+  filterChipsContainer: {
+    maxHeight: 48,
+    backgroundColor: '#f8f8f5',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#e2e8f0',
+  },
+  filterChipsContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+    flexDirection: 'row',
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  filterChipActive: {
+    backgroundColor: '#FAC638',
+    borderColor: '#FAC638',
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  filterChipTextActive: {
+    color: '#ffffff',
   },
   loadingContainer: {
     flex: 1,
@@ -241,10 +346,11 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     marginTop: 3,
   },
-  notifTypeIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  deleteBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFF0F0',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -30,6 +30,7 @@ export interface CreateCapsuleData {
   media_url?: string | null;
   media_type?: 'image' | 'video' | 'none';
   is_locked?: boolean;
+  category?: string;
 }
 
 export class CapsuleService {
@@ -78,7 +79,7 @@ export class CapsuleService {
           } as any);
 
         if (insertError) {
-          console.error('Failed to create profile:', insertError);
+          if (__DEV__) console.error('Failed to create profile:', insertError);
           throw new Error('Failed to initialize user profile. Please try logging out and back in.');
         }
       }

@@ -299,6 +299,111 @@ export interface Database {
         }
         Relationships: []
       }
+      streaks: {
+        Row: {
+          id: string
+          user_id: string
+          friend_id: string
+          current_streak: number
+          longest_streak: number
+          last_capsule_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          friend_id: string
+          current_streak?: number
+          longest_streak?: number
+          last_capsule_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          friend_id?: string
+          current_streak?: number
+          longest_streak?: number
+          last_capsule_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      capsule_collaborators: {
+        Row: {
+          id: string
+          capsule_id: string
+          user_id: string
+          added_at: string
+        }
+        Insert: {
+          id?: string
+          capsule_id: string
+          user_id: string
+          added_at?: string
+        }
+        Update: {
+          id?: string
+          capsule_id?: string
+          user_id?: string
+          added_at?: string
+        }
+        Relationships: []
+      }
+      reports: {
+        Row: {
+          id: string
+          reporter_id: string
+          reported_user_id: string | null
+          capsule_id: string | null
+          comment_id: string | null
+          reason: string
+          details: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          reporter_id: string
+          reported_user_id?: string | null
+          capsule_id?: string | null
+          comment_id?: string | null
+          reason: string
+          details?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          reporter_id?: string
+          reported_user_id?: string | null
+          capsule_id?: string | null
+          comment_id?: string | null
+          reason?: string
+          details?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      blocked_users: {
+        Row: {
+          id: string
+          blocker_id: string
+          blocked_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          blocker_id: string
+          blocked_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          blocker_id?: string
+          blocked_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

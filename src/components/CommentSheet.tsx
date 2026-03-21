@@ -16,8 +16,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CommentService, CommentWithProfile } from '../services/commentService';
+import { ReportService, REPORT_REASONS } from '../services/reportService';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabase';
+import { timeAgo } from '../utils/dateUtils';
 
 const { height } = Dimensions.get('window');
 const SHEET_HEIGHT = height * 0.55;
@@ -104,24 +106,61 @@ const CommentSheet: React.FC<CommentSheetProps> = ({ capsuleId, visible, onClose
     ]);
   };
 
+  const handleReportComment = (comment: CommentWithProfile) => {
+    Alert.alert(
+      'Report Comment',
+      'Select a reason:',
+      [
+        ...REPORT_REASONS.map((reason) => ({
+          text: reason,
+          onPress: async () => {
+            const { error } = await ReportService.reportContent('comment', comment.id, reason);
+            if (error) {
+              Alert.alert('Error', 'Failed to submit report. Please try again.');
+            } else {
+              Alert.alert('Reported', 'Thank you for your report. We will review it shortly.');
+            }
+          },
+        })),
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
   const handleLongPress = (comment: CommentWithProfile) => {
     const isOwn = user?.id === comment.user_id;
-    if (!isOwn) return;
 
-    Alert.alert('Comment', undefined, [
-      {
-        text: 'Copy',
-        onPress: () => {
-          // Could use Clipboard.setStringAsync but keeping simple
+    if (isOwn) {
+      Alert.alert('Comment', undefined, [
+        {
+          text: 'Copy',
+          onPress: () => {
+            // Could use Clipboard.setStringAsync but keeping simple
+          },
         },
-      },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => handleDelete(comment),
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => handleDelete(comment),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    } else {
+      Alert.alert('Comment', undefined, [
+        {
+          text: 'Copy',
+          onPress: () => {
+            // Could use Clipboard.setStringAsync but keeping simple
+          },
+        },
+        {
+          text: 'Report Comment',
+          style: 'destructive',
+          onPress: () => handleReportComment(comment),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    }
   };
 
   const renderCommentContent = (content: string) => {
@@ -163,16 +202,6 @@ const CommentSheet: React.FC<CommentSheetProps> = ({ capsuleId, visible, onClose
     setText(newText);
     setMentionQuery(null);
     setMentionResults([]);
-  };
-
-  const timeAgo = (d: string): string => {
-    const diff = Date.now() - new Date(d).getTime();
-    const m = Math.floor(diff / 60000);
-    if (m < 1) return 'now';
-    if (m < 60) return `${m}m`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h`;
-    return `${Math.floor(h / 24)}d`;
   };
 
   if (!visible) return null;

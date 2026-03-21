@@ -1,12 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, Circle, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { CapsuleService } from '../../services/capsuleService';
 import CapsuleDetailModal from '../../components/CapsuleDetailModal';
+import { calculateDistance, formatDistance } from '../../utils/geoUtils';
+import { isLocked } from '../../utils/mediaUtils';
 
 const { width, height } = Dimensions.get('window');
+
+type ExploreFilter = 'All' | 'Unlocked' | 'Locked' | 'Travel' | 'Family' | 'Friends' | 'Events' | 'Personal';
+
+const EXPLORE_FILTERS: ExploreFilter[] = ['All', 'Unlocked', 'Locked', 'Travel', 'Family', 'Friends', 'Events', 'Personal'];
 
 interface ExploreScreenProps {
   onNavigate: (screen: string) => void;
@@ -22,6 +28,21 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
   const [selectedCapsule, setSelectedCapsule] = useState<any>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [mapView, setMapView] = useState<'standard' | 'satellite'>('standard');
+  const [activeFilter, setActiveFilter] = useState<ExploreFilter>('All');
+  const [locationDenied, setLocationDenied] = useState(false);
+
+  const filteredNearbyCapsules = useMemo(() => {
+    if (activeFilter === 'All') return nearbyCapsules;
+    if (activeFilter === 'Unlocked') return nearbyCapsules.filter((c) => !isLocked(c.open_at));
+    if (activeFilter === 'Locked') return nearbyCapsules.filter((c) => isLocked(c.open_at));
+    // Category filters - match against capsule category field or title
+    const category = activeFilter.toLowerCase();
+    return nearbyCapsules.filter(
+      (c) =>
+        (c.category && c.category.toLowerCase() === category) ||
+        (c.title && c.title.toLowerCase().includes(category))
+    );
+  }, [nearbyCapsules, activeFilter]);
 
   useEffect(() => {
     loadLocation();
@@ -34,10 +55,7 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       
       if (status !== 'granted') {
-        Alert.alert(
-          'Permission Denied',
-          'Location permission is required to show nearby capsules.'
-        );
+        setLocationDenied(true);
         setLoading(false);
         return;
       }
@@ -66,31 +84,26 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
         setNearbyCapsules(capsulesWithDistance);
       }
     } catch (error) {
-      console.error('Error loading location:', error);
+      if (__DEV__) console.error('Error loading location:', error);
       Alert.alert('Error', 'Failed to load location');
     } finally {
       setLoading(false);
     }
   };
 
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371;
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
-
-  const toRad = (deg: number) => deg * (Math.PI / 180);
-
-  const formatDistance = (km: number) => {
-    if (km < 1) {
-      return `${Math.round(km * 1000)} m`;
+  const loadPublicCapsules = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await CapsuleService.getAllAccessibleCapsules();
+      if (!error && data) {
+        const publicCapsules = data.filter((c: any) => c.is_public && c.lat && c.lng);
+        setNearbyCapsules(publicCapsules);
+      }
+    } catch (error) {
+      if (__DEV__) console.error('Error loading public capsules:', error);
+    } finally {
+      setLoading(false);
     }
-    return `${km.toFixed(1)} km`;
   };
 
   const getRandomIcon = () => {
@@ -160,17 +173,73 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
         </View>
       ) : !location ? (
         <View style={styles.errorContainer}>
-          <Ionicons name="location-outline" size={80} color="#cbd5e1" />
-          <Text style={styles.errorTitle}>Location Not Available</Text>
+          <Ionicons name="location-outline" size={80} color="#FAC638" />
+          <Text style={styles.errorTitle}>
+            {locationDenied ? 'Location Access Denied' : 'Location Not Available'}
+          </Text>
           <Text style={styles.errorText}>
-            Please enable location permissions to explore nearby capsules
+            {locationDenied
+              ? 'Location access helps you discover nearby capsules. You can still browse public capsules.'
+              : 'Please enable location permissions to explore nearby capsules'}
           </Text>
           <TouchableOpacity onPress={loadLocation} style={styles.retryButton}>
             <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
+          {locationDenied && (
+            <TouchableOpacity onPress={loadPublicCapsules} style={styles.browsePublicButton}>
+              <Ionicons name="globe-outline" size={20} color="#FAC638" />
+              <Text style={styles.browsePublicButtonText}>Browse All Public Capsules</Text>
+            </TouchableOpacity>
+          )}
+          {locationDenied && nearbyCapsules.length > 0 && (
+            <ScrollView style={styles.publicCapsulesList}>
+              <Text style={styles.publicCapsulesTitle}>
+                Public Capsules ({nearbyCapsules.length})
+              </Text>
+              {nearbyCapsules.map((capsule) => (
+                <TouchableOpacity
+                  key={capsule.id}
+                  style={styles.publicCapsuleItem}
+                  onPress={() => {
+                    setSelectedCapsule(capsule);
+                    setShowDetailModal(true);
+                  }}
+                >
+                  <Ionicons name="time-outline" size={24} color="#FAC638" />
+                  <View style={styles.publicCapsuleInfo}>
+                    <Text style={styles.publicCapsuleName} numberOfLines={1}>{capsule.title}</Text>
+                    <Text style={styles.publicCapsuleStatus}>
+                      {isLocked(capsule.open_at) ? 'Locked' : 'Unlocked'}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
         </View>
       ) : (
         <>
+          {/* Filter Chips */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.filterChipsContainer}
+            contentContainerStyle={styles.filterChipsContent}
+          >
+            {EXPLORE_FILTERS.map((filter) => (
+              <TouchableOpacity
+                key={filter}
+                style={[styles.filterChip, activeFilter === filter && styles.filterChipActive]}
+                onPress={() => setActiveFilter(filter)}
+              >
+                <Text style={[styles.filterChipText, activeFilter === filter && styles.filterChipTextActive]}>
+                  {filter}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
           {/* Map View */}
           <MapView
             style={styles.map}
@@ -209,7 +278,7 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
             />
 
             {/* Capsule Markers */}
-            {nearbyCapsules.map((capsule) => {
+            {filteredNearbyCapsules.map((capsule) => {
               const distance = calculateDistance(
                 location.coords.latitude,
                 location.coords.longitude,
@@ -217,7 +286,7 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
                 capsule.lng
               );
               const canInteract = distance <= 5;
-              const isLocked = capsule.open_at && new Date(capsule.open_at) > new Date();
+              const locked = isLocked(capsule.open_at);
 
               return (
                 <Marker
@@ -226,7 +295,7 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
                     latitude: capsule.lat,
                     longitude: capsule.lng,
                   }}
-                  pinColor={canInteract ? (isLocked ? '#FF6B6B' : '#06D6A0') : '#94a3b8'}
+                  pinColor={canInteract ? (locked ? '#FF6B6B' : '#06D6A0') : '#94a3b8'}
                   onPress={() => handleCapsuleTap(capsule)}
                 >
                   <Callout>
@@ -236,7 +305,7 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
                       <Text style={styles.calloutStatus}>
                         {!canInteract
                           ? '🚫 Too far to open'
-                          : isLocked
+                          : locked
                           ? '🔒 Locked'
                           : '🔓 Can open'}
                       </Text>
@@ -262,8 +331,18 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
               <Text style={styles.legendText}>Too far (outside 5km)</Text>
             </View>
             <Text style={styles.capsuleCount}>
-              Found {nearbyCapsules.length} capsule{nearbyCapsules.length !== 1 ? 's' : ''} within {RADIUS_KM}km
+              Found {filteredNearbyCapsules.length} capsule{filteredNearbyCapsules.length !== 1 ? 's' : ''} within {RADIUS_KM}km
+              {activeFilter !== 'All' ? ` (${activeFilter})` : ''}
             </Text>
+            {filteredNearbyCapsules.length === 0 && (
+              <TouchableOpacity
+                style={styles.exploreCtaButton}
+                onPress={() => onNavigate('Create')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.exploreCtaButtonText}>Create a Capsule Here</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </>
       )}
@@ -352,6 +431,95 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  browsePublicButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#FAC638',
+    gap: 8,
+  },
+  browsePublicButtonText: {
+    color: '#FAC638',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  publicCapsulesList: {
+    width: '100%',
+    marginTop: 24,
+    maxHeight: 300,
+  },
+  publicCapsulesTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 12,
+    paddingHorizontal: 16,
+  },
+  publicCapsuleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 8,
+    marginHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  publicCapsuleInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  publicCapsuleName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+  publicCapsuleStatus: {
+    fontSize: 13,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+  filterChipsContainer: {
+    maxHeight: 48,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  filterChipsContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+    flexDirection: 'row',
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  filterChipActive: {
+    backgroundColor: '#FAC638',
+    borderColor: '#FAC638',
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  filterChipTextActive: {
+    color: '#ffffff',
+  },
   map: {
     flex: 1,
   },
@@ -411,6 +579,19 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
+  },
+  exploreCtaButton: {
+    backgroundColor: '#FAC638',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  exploreCtaButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#ffffff',
   },
 });
 

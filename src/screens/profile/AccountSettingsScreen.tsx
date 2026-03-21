@@ -20,6 +20,12 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
   const [editPhoneNumber, setEditPhoneNumber] = useState(user?.phone_number || '');
   const [savingInfo, setSavingInfo] = useState(false);
 
+  // Password change fields
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+
   // Track original values to detect changes
   const [originalValues, setOriginalValues] = useState({
     displayName: user?.display_name || '',
@@ -142,13 +148,47 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
 
       Alert.alert('Success', 'Profile updated successfully!');
     } catch (error: any) {
-      console.error('Error updating account info:', error);
+      if (__DEV__) console.error('Error updating account info:', error);
       Alert.alert(
         'Update Failed',
         error.message || 'Failed to update account information. Please try again.'
       );
     } finally {
       setSavingInfo(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword.length < 6) {
+      Alert.alert('Invalid Password', 'Password must be at least 6 characters long.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Passwords Do Not Match', 'Please make sure both passwords match.');
+      return;
+    }
+
+    try {
+      setSavingPassword(true);
+      const { error } = await AuthService.changePassword(newPassword);
+
+      if (error) {
+        throw new Error((error as any).message || 'Failed to change password');
+      }
+
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowPasswordChange(false);
+      Alert.alert('Success', 'Your password has been changed successfully.');
+    } catch (error: any) {
+      if (__DEV__) console.error('Error changing password:', error);
+      Alert.alert(
+        'Password Change Failed',
+        error.message || 'Failed to change password. Please try again.'
+      );
+    } finally {
+      setSavingPassword(false);
     }
   };
 
@@ -314,6 +354,82 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
                 <Text style={styles.saveButtonText}>Save Changes</Text>
               )}
             </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Change Password Section */}
+        <Text style={styles.sectionHeader}>CHANGE PASSWORD</Text>
+        <View style={styles.card}>
+          {!showPasswordChange ? (
+            <TouchableOpacity
+              style={[styles.menuItem, styles.menuItemLast]}
+              onPress={() => setShowPasswordChange(true)}
+              activeOpacity={0.6}
+            >
+              <View style={styles.menuItemLeft}>
+                <Ionicons name="lock-closed-outline" size={20} color="#1e293b" />
+                <Text style={styles.menuItemLabel}>Change Password</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#c7c7cc" />
+            </TouchableOpacity>
+          ) : (
+            <View>
+              <View style={styles.editField}>
+                <Text style={styles.editFieldLabel}>New Password</Text>
+                <TextInput
+                  style={styles.editFieldInput}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  placeholder="Enter new password"
+                  placeholderTextColor="#c7c7cc"
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+              <View style={styles.editFieldSeparator} />
+
+              <View style={styles.editFieldLast}>
+                <Text style={styles.editFieldLabel}>Confirm Password</Text>
+                <TextInput
+                  style={styles.editFieldInput}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="Confirm new password"
+                  placeholderTextColor="#c7c7cc"
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+
+              <View style={styles.passwordActions}>
+                <TouchableOpacity
+                  style={styles.passwordCancelBtn}
+                  onPress={() => {
+                    setShowPasswordChange(false);
+                    setNewPassword('');
+                    setConfirmPassword('');
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.passwordCancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.saveButton, { flex: 1, marginHorizontal: 0, marginLeft: 8 }]}
+                  onPress={handleChangePassword}
+                  activeOpacity={0.7}
+                  disabled={savingPassword}
+                >
+                  {savingPassword ? (
+                    <ActivityIndicator size="small" color="#1e293b" />
+                  ) : (
+                    <Text style={styles.saveButtonText}>Update Password</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
           )}
         </View>
 
@@ -509,6 +625,27 @@ const styles = StyleSheet.create({
   },
   menuItemLabelDestructive: {
     color: '#FF3B30',
+  },
+  // Password Actions
+  passwordActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  passwordCancelBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: '#f2f2f7',
+    borderWidth: 1,
+    borderColor: '#c6c6c8',
+  },
+  passwordCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#8e8e93',
   },
   // Version
   versionText: {

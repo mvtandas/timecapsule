@@ -8,13 +8,17 @@ import {
   Image,
   Dimensions,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { FriendService, FriendshipStatus } from '../../services/friendService';
+import { ReportService, REPORT_REASONS } from '../../services/reportService';
 import CapsuleDetailModal from '../../components/CapsuleDetailModal';
+import { getMediaUrl } from '../../utils/mediaUtils';
+import { timeAgo } from '../../utils/dateUtils';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48 - 12) / 2;
@@ -78,29 +82,6 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
   const avatarUrl = useMemo(() => {
     return profile?.avatar_url || friend?.avatar_url || null;
   }, [profile?.avatar_url, friend?.avatar_url]);
-
-  const getMediaUrl = (capsule: CapsuleSummary): string | null => {
-    if (capsule.media_url) return capsule.media_url;
-    const refs = capsule.content_refs;
-    if (!refs || refs.length === 0) return null;
-    const firstItem = refs[0];
-    if (typeof firstItem === 'string') return firstItem;
-    if (firstItem && typeof firstItem === 'object') {
-      return firstItem.url || firstItem.file_url || firstItem.media_url || null;
-    }
-    return null;
-  };
-
-  const timeAgo = (d: string): string => {
-    const diff = Date.now() - new Date(d).getTime();
-    const m = Math.floor(diff / 60000);
-    if (m < 60) return `${m}m ago`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h ago`;
-    const days = Math.floor(h / 24);
-    if (days < 30) return `${days}d ago`;
-    return `${Math.floor(days / 30)}mo ago`;
-  };
 
   const loadProfileData = async () => {
     if (!viewedProfileId) {
@@ -210,6 +191,68 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
     }
   };
 
+  const handleMoreOptions = () => {
+    if (!viewedProfileId || user?.id === viewedProfileId) return;
+
+    Alert.alert(
+      'Options',
+      undefined,
+      [
+        {
+          text: 'Report User',
+          onPress: () => {
+            Alert.alert(
+              'Report User',
+              'Select a reason:',
+              [
+                ...REPORT_REASONS.map((reason) => ({
+                  text: reason,
+                  onPress: async () => {
+                    const { error } = await ReportService.reportContent('user', viewedProfileId, reason);
+                    if (error) {
+                      Alert.alert('Error', 'Failed to submit report. Please try again.');
+                    } else {
+                      Alert.alert('Reported', 'Thank you for your report. We will review it shortly.');
+                    }
+                  },
+                })),
+                { text: 'Cancel', style: 'cancel' },
+              ]
+            );
+          },
+        },
+        {
+          text: 'Block User',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Block User',
+              `Are you sure you want to block ${displayName}? You will no longer see their content.`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Block',
+                  style: 'destructive',
+                  onPress: async () => {
+                    const { error } = await ReportService.blockUser(viewedProfileId);
+                    if (error) {
+                      Alert.alert('Error', 'Failed to block user. Please try again.');
+                    } else {
+                      Alert.alert('Blocked', 'User has been blocked.', [
+                        { text: 'OK', onPress: () => onGoBack?.() },
+                      ]);
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
   const renderActionButton = () => {
     if (user?.id === viewedProfileId) return null;
 
@@ -285,7 +328,13 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
           <Ionicons name="arrow-back" size={24} color="#1e293b" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>@{username}</Text>
-        <View style={styles.headerSpacer} />
+        {user?.id !== viewedProfileId ? (
+          <TouchableOpacity style={styles.backButton} onPress={handleMoreOptions}>
+            <Ionicons name="ellipsis-vertical" size={22} color="#1e293b" />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerSpacer} />
+        )}
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>

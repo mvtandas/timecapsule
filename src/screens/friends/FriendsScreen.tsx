@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Image, Platform, StatusBar, Modal, Animated } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Image, Platform, StatusBar, Modal, Animated, RefreshControl, Share } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { supabase } from '../../lib/supabase';
 import { getRecentVisits, addRecentVisit, RecentVisit } from '../../utils/recentVisits';
 import { FriendService, FriendRequest } from '../../services/friendService';
+import { timeAgo } from '../../utils/dateUtils';
+import { StreakService, Streak } from '../../services/streakService';
 
 interface FriendsScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -30,6 +32,10 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
   // Friends list state
   const [friends, setFriends] = useState<FriendWithActivity[]>([]);
   const [loadingFriends, setLoadingFriends] = useState(true);
+  const [streaks, setStreaks] = useState<Map<string, number>>(new Map());
+
+  // Refresh state
+  const [refreshing, setRefreshing] = useState(false);
 
   // User search state
   const [userSearchQuery, setUserSearchQuery] = useState('');
@@ -53,10 +59,24 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
     loadRecentVisits();
     loadFriends();
     loadPendingRequests();
+    loadStreaks();
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     };
   }, []);
+
+  const loadStreaks = async () => {
+    const data = await StreakService.getStreaks();
+    const map = new Map<string, number>();
+    data.forEach(s => map.set(s.friend_id, s.current_streak));
+    setStreaks(map);
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([loadFriends(), loadPendingRequests(), loadStreaks()]);
+    setRefreshing(false);
+  };
 
   const loadRecentVisits = async () => {
     const visits = await getRecentVisits();
@@ -68,12 +88,12 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
     try {
       const { data, error } = await FriendService.getPendingRequests();
       if (error) {
-        console.error('Error loading pending requests:', error);
+        if (__DEV__) console.error('Error loading pending requests:', error);
         return;
       }
       setPendingRequests(data || []);
     } catch (error) {
-      console.error('Error loading pending requests:', error);
+      if (__DEV__) console.error('Error loading pending requests:', error);
     }
   };
 
@@ -107,7 +127,7 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
       const { error } = await FriendService.acceptFriendRequest(requestId);
 
       if (error) {
-        console.error('Error accepting request:', error);
+        if (__DEV__) console.error('Error accepting request:', error);
         return;
       }
 
@@ -119,7 +139,7 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
       // Remove from pending list
       setPendingRequests(prev => prev.filter(req => req.id !== requestId));
     } catch (error) {
-      console.error('Error accepting request:', error);
+      if (__DEV__) console.error('Error accepting request:', error);
     } finally {
       setProcessingRequestId(null);
     }
@@ -133,7 +153,7 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
       const { error } = await FriendService.rejectFriendRequest(requestId);
 
       if (error) {
-        console.error('Error declining request:', error);
+        if (__DEV__) console.error('Error declining request:', error);
         return;
       }
 
@@ -144,7 +164,7 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
       // Remove from pending list
       setPendingRequests(prev => prev.filter(req => req.id !== requestId));
     } catch (error) {
-      console.error('Error declining request:', error);
+      if (__DEV__) console.error('Error declining request:', error);
     } finally {
       setProcessingRequestId(null);
     }
@@ -256,14 +276,14 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
         .limit(10);
 
       if (error) {
-        console.error('Search error:', error);
+        if (__DEV__) console.error('Search error:', error);
         return;
       }
 
       setSearchResults(data || []);
       setShowSearchDropdown(true);
     } catch (error) {
-      console.error('Search failed:', error);
+      if (__DEV__) console.error('Search failed:', error);
     } finally {
       setIsSearching(false);
     }
@@ -333,23 +353,6 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
     await loadRecentVisits();
 
     onNavigate('FriendProfile', { friend });
-  };
-
-  // Format time ago
-  const formatTimeAgo = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
   };
 
   const cancelSearch = () => {
@@ -458,7 +461,13 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
         </View>
       )}
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FAC638" />
+        }
+      >
         {/* Stories Row */}
         <View style={styles.storiesSection}>
           <ScrollView
@@ -505,6 +514,46 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
           </ScrollView>
         </View>
 
+        {/* Streaks Section */}
+        {Array.from(streaks.entries()).filter(([_, count]) => count > 0).length > 0 && (
+          <View style={styles.streaksSection}>
+            <Text style={styles.streaksSectionTitle}>Streaks</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.streaksContent}
+            >
+              {Array.from(streaks.entries())
+                .filter(([_, count]) => count > 0)
+                .sort((a, b) => b[1] - a[1])
+                .map(([friendId, count]) => {
+                  const friend = friends.find(f => f.id === friendId);
+                  if (!friend) return null;
+                  return (
+                    <TouchableOpacity
+                      key={friendId}
+                      style={styles.streakCard}
+                      onPress={() => handleFriendPress(friend)}
+                      activeOpacity={0.7}
+                    >
+                      {friend.avatar_url ? (
+                        <Image source={{ uri: friend.avatar_url }} style={styles.streakAvatar} />
+                      ) : (
+                        <View style={[styles.streakAvatar, styles.avatarPlaceholder]}>
+                          <Ionicons name="person" size={18} color="#94a3b8" />
+                        </View>
+                      )}
+                      <Text style={styles.streakName} numberOfLines={1}>
+                        {friend.display_name || friend.username}
+                      </Text>
+                      <Text style={styles.streakCount}>{'\uD83D\uDD25'} {count} days</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Pending Requests Banner */}
         {pendingRequests.length > 0 && (
           <TouchableOpacity
@@ -544,30 +593,21 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
                   </View>
                 )}
 
-                {/* Name + Username */}
+                {/* Name + Username + Activity */}
                 <View style={styles.friendInfo}>
-                  <Text style={styles.friendName} numberOfLines={1}>
-                    {friend.display_name || friend.username}
+                  <View style={styles.friendNameRow}>
+                    <Text style={styles.friendName} numberOfLines={1}>
+                      {friend.display_name || friend.username}
+                    </Text>
+                    {(streaks.get(friend.id) || 0) > 0 && (
+                      <Text style={styles.friendStreakBadge}>{'\uD83D\uDD25'}{streaks.get(friend.id)}</Text>
+                    )}
+                  </View>
+                  <Text style={styles.friendActivity} numberOfLines={1}>
+                    {friend.lastCapsule
+                      ? `Created '${friend.lastCapsule.title}' \u2022 ${timeAgo(friend.lastCapsule.created_at)}`
+                      : 'No recent activity'}
                   </Text>
-                  <Text style={styles.friendUsername} numberOfLines={1}>
-                    @{friend.username}
-                  </Text>
-                </View>
-
-                {/* Right side: last capsule info or time */}
-                <View style={styles.friendMeta}>
-                  {friend.lastCapsule ? (
-                    <>
-                      <Text style={styles.friendMetaText} numberOfLines={1}>
-                        {friend.lastCapsule.title}
-                      </Text>
-                      <Text style={styles.friendMetaTime}>
-                        {formatTimeAgo(friend.lastCapsule.created_at)}
-                      </Text>
-                    </>
-                  ) : (
-                    <Text style={styles.friendMetaMuted}>No capsules</Text>
-                  )}
                 </View>
 
                 {/* Separator */}
@@ -582,6 +622,14 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
             <Text style={styles.emptySubtitle}>
               Search for people by username or share your profile
             </Text>
+            <TouchableOpacity
+              style={styles.inviteFriendsButton}
+              onPress={() => Share.share({ message: "I'm using TimeCapsule to preserve memories! Join me and create your own time capsules \uD83D\uDCE6\u2728" })}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="person-add-outline" size={18} color="#FAC638" />
+              <Text style={styles.inviteFriendsButtonText}>Invite Friends</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -698,30 +746,14 @@ const FriendRequestItem: React.FC<FriendRequestItemProps> = ({
         .maybeSingle();
 
       if (error) {
-        console.error('Error loading sender profile:', error);
+        if (__DEV__) console.error('Error loading sender profile:', error);
         return;
       }
 
       setSenderProfile(data);
     } catch (error) {
-      console.error('Error loading sender profile:', error);
+      if (__DEV__) console.error('Error loading sender profile:', error);
     }
-  };
-
-  const formatTimeAgo = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
   };
 
   if (!senderProfile) {
@@ -753,7 +785,7 @@ const FriendRequestItem: React.FC<FriendRequestItemProps> = ({
             @{senderProfile.username}
           </Text>
         )}
-        <Text style={styles.requestTime}>{formatTimeAgo(request.created_at)}</Text>
+        <Text style={styles.requestTime}>{timeAgo(request.created_at)}</Text>
       </View>
 
       {/* Actions */}
@@ -977,6 +1009,68 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
+  // Streaks Section
+  streaksSection: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 14,
+    marginBottom: 4,
+  },
+  streaksSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1e293b',
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  streaksContent: {
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  streakCard: {
+    alignItems: 'center',
+    backgroundColor: '#FFF8E1',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    minWidth: 90,
+  },
+  streakAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginBottom: 6,
+  },
+  streakName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 4,
+    maxWidth: 80,
+    textAlign: 'center',
+  },
+  streakCount: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#D97706',
+  },
+
+  // Friend Name Row + Streak Badge
+  friendNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  friendStreakBadge: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#D97706',
+  },
+  friendActivity: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+
   // Pending Requests Banner
   requestsBanner: {
     flexDirection: 'row',
@@ -1086,6 +1180,24 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  inviteFriendsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: '#FAC638',
+    backgroundColor: 'transparent',
+  },
+  inviteFriendsButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FAC638',
   },
 
   // Loading

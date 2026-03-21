@@ -62,4 +62,23 @@ export class NotificationAppService {
       .eq('user_id', user.id)
       .eq('is_read', false);
   }
+
+  static async deleteNotification(id: string): Promise<{ error: any }> {
+    const { error } = await supabase
+      .from('notifications')
+      .delete()
+      .eq('id', id);
+    return { error };
+  }
+
+  static async clearAllNotifications(): Promise<{ error: any }> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: { message: 'Not authenticated' } };
+
+    const { error } = await supabase
+      .from('notifications')
+      .delete()
+      .eq('user_id', user.id);
+    return { error };
+  }
 }

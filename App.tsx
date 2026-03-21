@@ -3,7 +3,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet, Animated, Dimensions } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from './src/store/authStore';
+import OnboardingScreen from './src/screens/auth/OnboardingScreen';
 import WelcomeScreen from './src/screens/auth/WelcomeScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import SignupScreen from './src/screens/auth/SignupScreen';
@@ -16,6 +18,7 @@ import FriendProfileScreen from './src/screens/friends/FriendProfileScreen';
 import FriendsScreen from './src/screens/friends/FriendsScreen';
 import AccountSettingsScreen from './src/screens/profile/AccountSettingsScreen';
 import NotificationsScreen from './src/screens/notifications/NotificationsScreen';
+import MemoriesScreen from './src/screens/memories/MemoriesScreen';
 import BottomTabBar from './src/components/common/BottomTabBar';
 import { Friend } from './src/types';
 
@@ -28,8 +31,9 @@ export default function App() {
   const [previousScreen, setPreviousScreen] = useState<string>('Welcome');
   const [navigationData, setNavigationData] = useState<any>(null);
   const [navigationHistory, setNavigationHistory] = useState<Array<{screen: string, data?: any}>>([{screen: 'Welcome'}]);
+  const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
   const { user, loading, refreshSession, signOut } = useAuthStore();
-  
+
   // Animation values
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -38,6 +42,27 @@ export default function App() {
     // Check for existing session on app load
     refreshSession();
   }, []);
+
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      try {
+        const value = await AsyncStorage.getItem('@timecapsule_onboarded');
+        setShowOnboarding(value === null);
+      } catch {
+        setShowOnboarding(false);
+      }
+    };
+    checkOnboarding();
+  }, []);
+
+  const handleOnboardingComplete = async () => {
+    try {
+      await AsyncStorage.setItem('@timecapsule_onboarded', 'true');
+    } catch {
+      // ignore storage error
+    }
+    setShowOnboarding(false);
+  };
 
   const navigate = (screen: string, data?: any, replace: boolean = false) => {
     if (screen === currentScreen && !replace) return;
@@ -231,12 +256,22 @@ export default function App() {
     setNavigationHistory([{screen: 'Welcome'}]);
   };
 
-  // Show loading screen while checking auth
-  if (loading && !user && currentScreen === 'Welcome') {
+  // Show loading screen while checking auth or onboarding state
+  if ((loading && !user && currentScreen === 'Welcome') || showOnboarding === null) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#FAC638" />
       </View>
+    );
+  }
+
+  // Show onboarding on first launch
+  if (showOnboarding) {
+    return (
+      <SafeAreaProvider>
+        <OnboardingScreen onComplete={handleOnboardingComplete} />
+        <StatusBar style="light" />
+      </SafeAreaProvider>
     );
   }
 
@@ -269,6 +304,7 @@ export default function App() {
           )}
           {currentScreen === 'AccountSettings' && <AccountSettingsScreen onNavigate={navigate} onGoBack={goBack} onLogout={handleLogout} />}
           {currentScreen === 'Notifications' && <NotificationsScreen onNavigate={navigate} onGoBack={goBack} />}
+          {currentScreen === 'Memories' && <MemoriesScreen onNavigate={navigate} onGoBack={goBack} />}
         </Animated.View>
         
         {/* Bottom Tab Bar - Fixed at bottom, outside scroll context */}

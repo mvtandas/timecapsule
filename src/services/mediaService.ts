@@ -73,7 +73,7 @@ export class MediaService {
         });
 
       if (error) {
-        console.error('Upload error:', error);
+        if (__DEV__) console.error('Upload error:', error);
         throw error;
       }
 
@@ -93,7 +93,7 @@ export class MediaService {
         type: mediaType,
       };
     } catch (error: any) {
-      console.error('❌ Error uploading media:', error?.message || error);
+      if (__DEV__) console.error('❌ Error uploading media:', error?.message || error);
       // Return null to allow capsule creation without media
       return null;
     }
@@ -177,7 +177,7 @@ export class MediaService {
         });
 
       if (error) {
-        console.error('❌ Supabase upload error:', error);
+        if (__DEV__) console.error('❌ Supabase upload error:', error);
         throw error;
       }
 
@@ -194,7 +194,7 @@ export class MediaService {
 
       return { url: urlData.publicUrl, error: null };
     } catch (error: any) {
-      console.error('❌ Error uploading avatar:', error?.message || error);
+      if (__DEV__) console.error('❌ Error uploading avatar:', error?.message || error);
       return { url: null, error };
     }
   }
@@ -210,13 +210,13 @@ export class MediaService {
         .remove([filePath]);
 
       if (error) {
-        console.error('Delete error:', error);
+        if (__DEV__) console.error('Delete error:', error);
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error('Error deleting media:', error);
+      if (__DEV__) console.error('Error deleting media:', error);
       return false;
     }
   }
@@ -251,7 +251,7 @@ export class MediaService {
       
       return null;
     } catch (error) {
-      console.error('Error extracting path from URL:', error);
+      if (__DEV__) console.error('Error extracting path from URL:', error);
       return null;
     }
   }

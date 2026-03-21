@@ -47,7 +47,7 @@ export class CommentService {
 
       return { data: result, error: null };
     } catch (err) {
-      console.error('getComments error:', err);
+      if (__DEV__) console.error('getComments error:', err);
       return { data: [], error: err };
     }
   }
@@ -65,7 +65,7 @@ export class CommentService {
         .single();
 
       if (error) {
-        console.error('Comment insert error:', error);
+        if (__DEV__) console.error('Comment insert error:', error);
         return { data: null, error };
       }
 
@@ -136,11 +136,11 @@ export class CommentService {
             }
           }
         }
-      } catch {}
+      } catch (e) { if (__DEV__) console.error(e); }
 
       return { data: commentWithProfile, error: null };
     } catch (err) {
-      console.error('addComment error:', err);
+      if (__DEV__) console.error('addComment error:', err);
       return { data: null, error: err };
     }
   }

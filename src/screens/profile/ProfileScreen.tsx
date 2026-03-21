@@ -10,6 +10,8 @@ import {
   Modal,
   Image,
   Dimensions,
+  RefreshControl,
+  Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,6 +21,8 @@ import { CapsuleService } from '../../services/capsuleService';
 import { MediaService } from '../../services/mediaService';
 import { supabase } from '../../lib/supabase';
 import CapsuleDetailModal from '../../components/CapsuleDetailModal';
+import { timeAgo } from '../../utils/dateUtils';
+import { getMediaUrl } from '../../utils/mediaUtils';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48 - 12) / 2; // 2 columns
@@ -36,6 +40,7 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
   const [daysActive, setDaysActive] = useState(0);
   const [capsulesList, setCapsulesList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [photoPickerVisible, setPhotoPickerVisible] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(user?.avatar_url || null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -76,6 +81,12 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
     }
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadStats();
+    setRefreshing(false);
+  };
+
   const handleAvatarPress = () => setPhotoPickerVisible(true);
 
   const handleTakePhoto = async () => {
@@ -110,28 +121,6 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
     }
   };
 
-  const timeAgo = (d: string): string => {
-    const diff = Date.now() - new Date(d).getTime();
-    const m = Math.floor(diff / 60000);
-    if (m < 60) return `${m}m ago`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h ago`;
-    const days = Math.floor(h / 24);
-    if (days < 30) return `${days}d ago`;
-    return `${Math.floor(days / 30)}mo ago`;
-  };
-
-  const getMediaUrl = (capsule: any): string | null => {
-    if (capsule.media_url && capsule.media_type !== 'none') return capsule.media_url;
-    if (capsule.content_refs && Array.isArray(capsule.content_refs)) {
-      for (const item of capsule.content_refs) {
-        if (typeof item === 'string' && item.startsWith('http')) return item;
-        if (item?.url && item.url.startsWith('http')) return item.url;
-      }
-    }
-    return null;
-  };
-
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -142,7 +131,13 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FAC638" />
+        }
+      >
         {/* Profile Hero */}
         <View style={styles.heroSection}>
           {/* Avatar - centered, large */}
@@ -197,6 +192,27 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
             </View>
           </View>
         </View>
+
+        {/* Invite Friends Button */}
+        <TouchableOpacity
+          style={styles.inviteButton}
+          onPress={() => Share.share({ message: "I'm using TimeCapsule to preserve memories! Join me and create your own time capsules \uD83D\uDCE6\u2728" })}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="person-add-outline" size={18} color="#FAC638" />
+          <Text style={styles.inviteButtonText}>Invite Friends</Text>
+        </TouchableOpacity>
+
+        {/* Memories Button */}
+        <TouchableOpacity
+          style={styles.memoriesButton}
+          onPress={() => onNavigate('Memories')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="sparkles" size={20} color="#FAC638" />
+          <Text style={styles.memoriesButtonText}>Memories - On This Day</Text>
+          <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+        </TouchableOpacity>
 
         {/* Section Header */}
         <View style={styles.sectionHeader}>
@@ -433,7 +449,43 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
+  // Invite Friends
+  inviteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 20,
+    marginBottom: 12,
+    paddingVertical: 12,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: '#FAC638',
+    backgroundColor: 'transparent',
+  },
+  inviteButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FAC638',
+  },
+
   // Section
+  memoriesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 20,
+    marginBottom: 16,
+    backgroundColor: '#FFF8E1',
+    padding: 14,
+    borderRadius: 14,
+  },
+  memoriesButtonText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',

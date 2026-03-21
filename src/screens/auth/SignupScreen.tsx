@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Linking } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/authStore';
 
@@ -279,8 +279,8 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
 
           <Text style={styles.termsText}>
             By signing up, you agree to our{'\n'}
-            <Text style={styles.termsLink} onPress={() => Linking.openURL('https://timecapsule.app/terms')}>Terms of Service</Text> and{' '}
-            <Text style={styles.termsLink} onPress={() => Linking.openURL('https://timecapsule.app/privacy')}>Privacy Policy</Text>
+            <Text style={styles.termsLink} onPress={() => Alert.alert('Terms of Service', 'By using TimeCapsule, you agree to use the app responsibly. You must be at least 13 years old. Do not post harmful, illegal, or inappropriate content. We may remove content or suspend accounts that violate these terms. Your data is stored securely on our servers. We reserve the right to update these terms at any time.')}>Terms of Service</Text> and{' '}
+            <Text style={styles.termsLink} onPress={() => Alert.alert('Privacy Policy', 'TimeCapsule collects your email, username, profile photo, and location data to provide the app service. Your capsule content (photos, videos, messages) is stored on secure servers. We do not sell your data to third parties. You can delete your account and all associated data at any time from Settings. We use location data only to place and discover capsules on the map. For questions, contact support@timecapsule.app')}>Privacy Policy</Text>
           </Text>
         </View>
 

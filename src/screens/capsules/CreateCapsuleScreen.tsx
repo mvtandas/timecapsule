@@ -23,8 +23,11 @@ import * as Location from 'expo-location';
 import DatePickerModal from '../../components/DatePickerModal';
 import { CapsuleService } from '../../services/capsuleService';
 import { MediaService } from '../../services/mediaService';
+import { NotificationService } from '../../lib/notifications';
+import * as Notifications from 'expo-notifications';
 import { Friend } from '../../types';
 import { supabase } from '../../lib/supabase';
+import { calculateDistance } from '../../utils/geoUtils';
 
 const { width, height } = Dimensions.get('window');
 
@@ -49,8 +52,23 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
     media: [] as any[],
     isPublic: true,
     allowedUsers: [] as string[],
+    category: 'general' as string,
   });
 
+  const CATEGORIES = [
+    { id: 'general', label: 'General', icon: '📦' },
+    { id: 'travel', label: 'Travel', icon: '✈️' },
+    { id: 'family', label: 'Family', icon: '👨‍👩‍👧‍👦' },
+    { id: 'friends', label: 'Friends', icon: '👫' },
+    { id: 'school', label: 'School', icon: '🎓' },
+    { id: 'work', label: 'Work', icon: '💼' },
+    { id: 'celebration', label: 'Celebration', icon: '🎉' },
+    { id: 'nature', label: 'Nature', icon: '🌴' },
+    { id: 'food', label: 'Food', icon: '🍕' },
+    { id: 'music', label: 'Music', icon: '🎸' },
+  ];
+
+  const [showMessageInput, setShowMessageInput] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
 
@@ -104,7 +122,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
         );
       }
     } catch (error) {
-      console.error('Error loading friends:', error);
+      if (__DEV__) console.error('Error loading friends:', error);
     } finally {
       setLoadingFriends(false);
     }
@@ -137,7 +155,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
         });
       }
     } catch (error) {
-      console.error('Error getting location:', error);
+      if (__DEV__) console.error('Error getting location:', error);
     }
   };
 
@@ -146,7 +164,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
       Alert.alert('Error', 'Please enter a title');
       return;
     }
-    if (step < 5) {
+    if (step < 3) {
       Keyboard.dismiss();
       setStep(step + 1);
     } else {
@@ -228,10 +246,11 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
         media_url: mediaUrl,
         media_type: mediaType,
         is_locked: isLocked,
-      });
+        category: capsuleData.category,
+      } as any);
 
       if (error) {
-        console.error('Error creating capsule:', error);
+        if (__DEV__) console.error('Error creating capsule:', error);
         Alert.alert('Error', 'Failed to create capsule. Please try again.');
         
         // Clean up uploaded media if capsule creation failed
@@ -240,30 +259,95 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
           if (path) await MediaService.deleteMedia(path);
         }
       } else {
+        // Schedule notification for capsule opening if open_at date is set
+        if (capsuleData.openDate && data?.id) {
+          const openDate = new Date(capsuleData.openDate);
+          if (openDate > new Date()) {
+            // Check if notification permission is already granted
+            const hasPermission = await NotificationService.checkPermissions();
+            if (hasPermission) {
+              NotificationService.scheduleCapsuleOpeningNotification(
+                data.id,
+                capsuleData.title,
+                openDate
+              ).catch((e) => {
+                if (__DEV__) console.error('Failed to schedule notification:', e);
+              });
+              NotificationService.scheduleCapsulesOpeningSoon(
+                capsuleData.title,
+                openDate
+              ).catch((e) => {
+                if (__DEV__) console.error('Failed to schedule opening soon notification:', e);
+              });
+              Alert.alert('Success!', 'Your time capsule has been created!', [
+                { text: 'OK', onPress: () => onNavigate('Dashboard') },
+              ]);
+            } else {
+              // Ask user if they want notifications before requesting permission
+              const formattedDate = openDate.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              });
+              Alert.alert(
+                'Get Notified?',
+                `Would you like to be notified when this capsule opens? We'll send you a reminder on ${formattedDate}.`,
+                [
+                  {
+                    text: 'No Thanks',
+                    style: 'cancel',
+                    onPress: () => {
+                      Alert.alert('Success!', 'Your time capsule has been created!', [
+                        { text: 'OK', onPress: () => onNavigate('Dashboard') },
+                      ]);
+                    },
+                  },
+                  {
+                    text: 'Yes',
+                    onPress: async () => {
+                      try {
+                        const { status } = await Notifications.requestPermissionsAsync();
+                        if (status === 'granted') {
+                          NotificationService.scheduleCapsuleOpeningNotification(
+                            data.id,
+                            capsuleData.title,
+                            openDate
+                          ).catch((e) => {
+                            if (__DEV__) console.error('Failed to schedule notification:', e);
+                          });
+                          NotificationService.scheduleCapsulesOpeningSoon(
+                            capsuleData.title,
+                            openDate
+                          ).catch((e) => {
+                            if (__DEV__) console.error('Failed to schedule opening soon notification:', e);
+                          });
+                        }
+                      } catch (e) {
+                        if (__DEV__) console.error('Notification permission error:', e);
+                      }
+                      Alert.alert('Success!', 'Your time capsule has been created!', [
+                        { text: 'OK', onPress: () => onNavigate('Dashboard') },
+                      ]);
+                    },
+                  },
+                ]
+              );
+            }
+            return; // Don't show the default success alert below
+          }
+        }
+
         Alert.alert('Success!', 'Your time capsule has been created!', [
           { text: 'OK', onPress: () => onNavigate('Dashboard') },
         ]);
       }
     } catch (error) {
-      console.error('Error:', error);
+      if (__DEV__) console.error('Error:', error);
       Alert.alert('Error', 'Something went wrong. Please try again.');
     } finally {
       setSaving(false);
     }
   };
-
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371;
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
-
-  const toRad = (deg: number) => deg * (Math.PI / 180);
 
   const handleBack = () => {
     Keyboard.dismiss();
@@ -295,7 +379,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
         });
       }
     } catch (error) {
-      console.error('Error picking image:', error);
+      if (__DEV__) console.error('Error picking image:', error);
     }
   };
 
@@ -308,8 +392,9 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
         quality: 0.7,
+        videoMaxDuration: 60,
       });
 
       if (!result.canceled) {
@@ -319,7 +404,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
         });
       }
     } catch (error) {
-      console.error('Error taking photo:', error);
+      if (__DEV__) console.error('Error taking photo:', error);
     }
   };
 
@@ -369,13 +454,13 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
   const renderStep = () => {
     switch (step) {
       case 1:
-  return (
+        return (
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Give your capsule a name</Text>
+              <Text style={styles.stepTitle}>Title & Media</Text>
               <Text style={styles.stepSubtitle}>
-                Choose something meaningful that captures the moment
-        </Text>
+                Name your capsule and add photos or videos
+              </Text>
               <TextInput
                 style={styles.input}
                 value={capsuleData.title}
@@ -385,53 +470,74 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
                 returnKeyType="done"
                 onSubmitEditing={() => Keyboard.dismiss()}
               />
-      </View>
+
+              {/* Media Section */}
+              <Text style={[styles.stepSubtitle, { marginTop: 24, marginBottom: 12 }]}>Add Media</Text>
+
+              {capsuleData.media.length > 0 && (
+                <ScrollView horizontal style={styles.mediaPreview} showsHorizontalScrollIndicator={false}>
+                  {capsuleData.media.map((item, index) => (
+                    <View key={index} style={styles.mediaPreviewItem}>
+                      <Image source={{ uri: item.uri }} style={styles.mediaPreviewImage} />
+                      {(item.type === 'video' || item.uri?.includes('.mov') || item.uri?.includes('.mp4')) && (
+                        <View style={styles.videoOverlay}>
+                          <Ionicons name="play-circle" size={28} color="#fff" />
+                          {item.duration && (
+                            <Text style={styles.videoDuration}>{Math.round(item.duration / 1000)}s</Text>
+                          )}
+                        </View>
+                      )}
+                      <TouchableOpacity
+                        style={styles.mediaRemoveButton}
+                        onPress={() => {
+                          const newMedia = [...capsuleData.media];
+                          newMedia.splice(index, 1);
+                          setCapsuleData({ ...capsuleData, media: newMedia });
+                        }}
+                      >
+                        <Ionicons name="close-circle" size={24} color="#FF6B6B" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+
+              <View style={styles.mediaGrid}>
+                <TouchableOpacity style={styles.mediaButton} onPress={handleTakePhoto}>
+                  <Ionicons name="camera" size={28} color="#FAC638" />
+                  <Text style={styles.mediaButtonText}>Camera</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.mediaButton} onPress={handlePickImage}>
+                  <Ionicons name="images" size={28} color="#FAC638" />
+                  <Text style={styles.mediaButtonText}>Gallery</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </TouchableWithoutFeedback>
         );
 
       case 2:
         return (
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Add your message</Text>
-              <Text style={styles.stepSubtitle}>
-                Write a message to your future self or loved ones
-          </Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={capsuleData.message}
-                onChangeText={(text) => setCapsuleData({ ...capsuleData, message: text })}
-                placeholder="Dear future me..."
-                placeholderTextColor="#94a3b8"
-                multiline
-                numberOfLines={8}
-                textAlignVertical="top"
-                returnKeyType="done"
-                blurOnSubmit={true}
-              />
-                </View>
-          </TouchableWithoutFeedback>
-        );
-
-      case 3:
-        return (
           <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>When should it open?</Text>
-            <Text style={styles.stepSubtitle}>Choose a date in the future</Text>
-            
-            <TouchableOpacity 
+            <Text style={styles.stepTitle}>When & Where</Text>
+            <Text style={styles.stepSubtitle}>Choose a date and location</Text>
+
+            <TouchableOpacity
               style={styles.dateButton}
               onPress={() => setShowDatePicker(true)}
             >
               <Ionicons name="calendar-outline" size={24} color="#FAC638" />
               <Text style={styles.dateButtonText}>
-                {capsuleData.openDate 
-                  ? capsuleData.openDate.toLocaleDateString('en-US', {
+                {capsuleData.openDate
+                  ? `${capsuleData.openDate.toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric',
-                    })
-                  : 'Select Date'}
+                    })} at ${capsuleData.openDate.toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}`
+                  : 'Select Date & Time'}
               </Text>
               <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
             </TouchableOpacity>
@@ -450,8 +556,8 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
             <Text style={styles.stepSubtitle}>
               Choose the location where this capsule should be accessible
             </Text>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.locationButton}
               onPress={handleSelectLocation}
             >
@@ -466,270 +572,255 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
               </View>
               <Ionicons name="map-outline" size={20} color="#94a3b8" />
             </TouchableOpacity>
-
-            {/* Access Control Section */}
-            <View style={styles.accessControlSection}>
-              <Text style={styles.subsectionTitle}>
-                Who can open this capsule?
-              </Text>
-
-              {/* Public/Private Toggle */}
-              <TouchableOpacity 
-                style={styles.toggleContainer}
-                onPress={() => setCapsuleData({ ...capsuleData, isPublic: !capsuleData.isPublic })}
-                activeOpacity={0.7}
-              >
-                <View style={styles.toggleInfo}>
-                  <Ionicons 
-                    name={capsuleData.isPublic ? "globe-outline" : "lock-closed-outline"} 
-                    size={24} 
-                    color="#FAC638" 
-                  />
-                  <View style={styles.toggleTextContainer}>
-                    <Text style={styles.toggleTitle}>
-                      {capsuleData.isPublic ? 'Public Capsule' : 'Private Capsule'}
-                    </Text>
-                    <Text style={styles.toggleSubtext}>
-                      {capsuleData.isPublic 
-                        ? 'Anyone can open after unlock time' 
-                        : 'Only selected people can open'}
-                    </Text>
-                  </View>
-                </View>
-                <View style={[styles.switchToggle, capsuleData.isPublic && styles.switchToggleActive]}>
-                  <View style={[styles.switchThumb, capsuleData.isPublic && styles.switchThumbActive]} />
-                </View>
-              </TouchableOpacity>
-
-              {/* Authorized Users List - Only show when private */}
-              {!capsuleData.isPublic && (
-                <>
-                  {/* Username Input */}
-                  <View style={styles.addContactContainer}>
-                    <View style={styles.usernameInputContainer}>
-                      <Ionicons name="at-outline" size={20} color="#94a3b8" style={styles.usernameIcon} />
-                      <TextInput
-                        style={styles.usernameInput}
-                        value={newUsername}
-                        onChangeText={setNewUsername}
-                        placeholder="Enter username"
-                        placeholderTextColor="#94a3b8"
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                      />
-                    </View>
-                    <TouchableOpacity
-                      style={styles.addButton}
-                      onPress={() => {
-                        if (newUsername.trim()) {
-                          const username = newUsername.trim().toLowerCase();
-                          if (!capsuleData.allowedUsers.includes(username)) {
-                            setCapsuleData({
-                              ...capsuleData,
-                              allowedUsers: [...capsuleData.allowedUsers, username],
-                            });
-                          }
-                          setNewUsername('');
-                        }
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="add-circle" size={24} color="#FAC638" />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Friend Picker - Horizontal Scrollable */}
-                  <View style={styles.friendPickerSection}>
-                    <Text style={styles.friendPickerTitle}>Quick Select Friends</Text>
-                    <ScrollView 
-                      horizontal 
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.friendPickerScrollContent}
-                    >
-                      {friends.map((friend) => {
-                        const isSelected = selectedFriends.includes(friend.username);
-                        return (
-                          <TouchableOpacity
-                            key={friend.id}
-                            style={styles.friendPickerItem}
-                            onPress={() => {
-                              let newSelectedFriends: string[];
-                              let newAllowedUsers: string[];
-                              
-                              if (isSelected) {
-                                // Deselect friend
-                                newSelectedFriends = selectedFriends.filter(u => u !== friend.username);
-                                newAllowedUsers = capsuleData.allowedUsers.filter(u => u !== friend.username);
-                              } else {
-                                // Select friend
-                                newSelectedFriends = [...selectedFriends, friend.username];
-                                newAllowedUsers = capsuleData.allowedUsers.includes(friend.username)
-                                  ? capsuleData.allowedUsers
-                                  : [...capsuleData.allowedUsers, friend.username];
-                              }
-                              
-                              setSelectedFriends(newSelectedFriends);
-                              setCapsuleData({
-                                ...capsuleData,
-                                allowedUsers: newAllowedUsers,
-                              });
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            <View style={[
-                              styles.friendPickerAvatar,
-                              isSelected && styles.friendPickerAvatarSelected
-                            ]}>
-                              {friend.avatar_url ? (
-                                <Image source={{ uri: friend.avatar_url }} style={styles.friendPickerAvatarImage} />
-                              ) : (
-                                <View style={styles.friendPickerAvatarPlaceholder}>
-                                  <Ionicons name="person" size={32} color="#94a3b8" />
-                                </View>
-                              )}
-                              {isSelected && (
-                                <View style={styles.selectionCheckmark}>
-                                  <Ionicons name="checkmark-circle" size={24} color="#FAC638" />
-                                </View>
-                              )}
-                            </View>
-                            <Text style={styles.friendPickerName} numberOfLines={1}>
-                              {friend.name.split(' ')[0]}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </ScrollView>
-                  </View>
-
-                  {/* List of Authorized Users */}
-                  {capsuleData.allowedUsers.length > 0 && (
-                    <View style={styles.authorizedUsersList}>
-                      <Text style={styles.authorizedUsersTitle}>
-                        Selected Users ({capsuleData.allowedUsers.length})
-                      </Text>
-                      {capsuleData.allowedUsers.map((username, index) => {
-                        const friend = friends.find(f => f.username === username);
-                        return (
-                          <View key={index} style={styles.userItem}>
-                            <View style={styles.userAvatar}>
-                              {friend?.avatar_url ? (
-                                <Image source={{ uri: friend.avatar_url }} style={styles.userAvatarImage} />
-                              ) : (
-                                <Ionicons name="person" size={20} color="#64748b" />
-                              )}
-                            </View>
-                            <View style={styles.userInfo}>
-                              <Text style={styles.userName}>
-                                {friend?.name || username}
-                              </Text>
-                              <Text style={styles.userUsername}>@{username}</Text>
-                            </View>
-                            <TouchableOpacity
-                              onPress={() => {
-                                const newUsers = capsuleData.allowedUsers.filter(u => u !== username);
-                                const newSelectedFriends = selectedFriends.filter(u => u !== username);
-                                setSelectedFriends(newSelectedFriends);
-                                setCapsuleData({ ...capsuleData, allowedUsers: newUsers });
-                              }}
-                              style={styles.removeButton}
-                            >
-                              <Ionicons name="close-circle" size={20} color="#FF6B6B" />
-                            </TouchableOpacity>
-                          </View>
-                        );
-                      })}
-                    </View>
-                  )}
-
-                  {capsuleData.allowedUsers.length === 0 && (
-                    <View style={styles.emptyState}>
-                      <Ionicons name="people-outline" size={32} color="#cbd5e1" />
-                      <Text style={styles.emptyStateText}>
-                        No users selected yet. Select friends or enter a username to share with specific people.
-                      </Text>
-                    </View>
-                  )}
-                </>
-              )}
-            </View>
           </View>
         );
 
-      case 4:
-        return (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Add photos & videos</Text>
-            <Text style={styles.stepSubtitle}>Capture the moment visually</Text>
-            
-            {capsuleData.media.length > 0 && (
-              <ScrollView horizontal style={styles.mediaPreview} showsHorizontalScrollIndicator={false}>
-                {capsuleData.media.map((item, index) => (
-                  <View key={index} style={styles.mediaPreviewItem}>
-                    <Image source={{ uri: item.uri }} style={styles.mediaPreviewImage} />
-                    <TouchableOpacity
-                      style={styles.mediaRemoveButton}
-                      onPress={() => {
-                        const newMedia = [...capsuleData.media];
-                        newMedia.splice(index, 1);
-                        setCapsuleData({ ...capsuleData, media: newMedia });
-                      }}
-                    >
-                      <Ionicons name="close-circle" size={24} color="#FF6B6B" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </ScrollView>
-            )}
-
-            <View style={styles.mediaGrid}>
-              <TouchableOpacity style={styles.mediaButton} onPress={handleTakePhoto}>
-                <Ionicons name="camera" size={32} color="#FAC638" />
-                <Text style={styles.mediaButtonText}>Take Photo</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.mediaButton} onPress={handlePickImage}>
-                <Ionicons name="images" size={32} color="#FAC638" />
-                <Text style={styles.mediaButtonText}>Choose from Library</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        );
-
-      case 5:
+      case 3:
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Review & Create</Text>
-            <Text style={styles.stepSubtitle}>Make sure everything looks good</Text>
-            <ScrollView style={styles.reviewContainer}>
+            <Text style={styles.stepSubtitle}>Check your capsule and add optional details</Text>
+            <View style={styles.reviewContainer}>
               <View style={styles.reviewItem}>
                 <Text style={styles.reviewLabel}>Title:</Text>
                 <Text style={styles.reviewValue}>{capsuleData.title || 'Not set'}</Text>
               </View>
               <View style={styles.reviewItem}>
-                <Text style={styles.reviewLabel}>Message:</Text>
-                <Text style={styles.reviewValue} numberOfLines={3}>
-                  {capsuleData.message || 'No message'}
-                </Text>
+                <Text style={styles.reviewLabel}>Media:</Text>
+                <Text style={styles.reviewValue}>{capsuleData.media.length} items</Text>
               </View>
               <View style={styles.reviewItem}>
                 <Text style={styles.reviewLabel}>Open Date:</Text>
                 <Text style={styles.reviewValue}>
-                  {capsuleData.openDate 
-                    ? capsuleData.openDate.toLocaleDateString()
+                  {capsuleData.openDate
+                    ? `${capsuleData.openDate.toLocaleDateString()} ${capsuleData.openDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
                     : 'Not set'}
                 </Text>
               </View>
-              <View style={styles.reviewItem}>
+              <View style={[styles.reviewItem, { borderBottomWidth: 0, marginBottom: 0, paddingBottom: 0 }]}>
                 <Text style={styles.reviewLabel}>Location:</Text>
                 <Text style={styles.reviewValue}>
                   {capsuleData.location?.address || 'Current location'}
                 </Text>
               </View>
-              <View style={styles.reviewItem}>
-                <Text style={styles.reviewLabel}>Media:</Text>
-                <Text style={styles.reviewValue}>{capsuleData.media.length} items</Text>
+            </View>
+
+            {/* Optional: Category */}
+            <Text style={[styles.subsectionTitle, { marginTop: 24 }]}>Category</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {CATEGORIES.map(cat => (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={[
+                      styles.categoryChip,
+                      capsuleData.category === cat.id && styles.categoryChipActive,
+                    ]}
+                    onPress={() => setCapsuleData({ ...capsuleData, category: cat.id })}
+                  >
+                    <Text style={styles.categoryEmoji}>{cat.icon}</Text>
+                    <Text style={[
+                      styles.categoryLabel,
+                      capsuleData.category === cat.id && styles.categoryLabelActive,
+                    ]}>{cat.label}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </ScrollView>
+
+            {/* Optional: Public/Private Toggle */}
+            <TouchableOpacity
+              style={styles.toggleContainer}
+              onPress={() => setCapsuleData({ ...capsuleData, isPublic: !capsuleData.isPublic })}
+              activeOpacity={0.7}
+            >
+              <View style={styles.toggleInfo}>
+                <Ionicons
+                  name={capsuleData.isPublic ? "globe-outline" : "lock-closed-outline"}
+                  size={24}
+                  color="#FAC638"
+                />
+                <View style={styles.toggleTextContainer}>
+                  <Text style={styles.toggleTitle}>
+                    {capsuleData.isPublic ? 'Public Capsule' : 'Private Capsule'}
+                  </Text>
+                  <Text style={styles.toggleSubtext}>
+                    {capsuleData.isPublic
+                      ? 'Anyone can open after unlock time'
+                      : 'Only selected people can open'}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.switchToggle, capsuleData.isPublic && styles.switchToggleActive]}>
+                <View style={[styles.switchThumb, capsuleData.isPublic && styles.switchThumbActive]} />
+              </View>
+            </TouchableOpacity>
+
+            {/* Authorized Users List - Only show when private */}
+            {!capsuleData.isPublic && (
+              <>
+                {/* Username Input */}
+                <View style={styles.addContactContainer}>
+                  <View style={styles.usernameInputContainer}>
+                    <Ionicons name="at-outline" size={20} color="#94a3b8" style={styles.usernameIcon} />
+                    <TextInput
+                      style={styles.usernameInput}
+                      value={newUsername}
+                      onChangeText={setNewUsername}
+                      placeholder="Enter username"
+                      placeholderTextColor="#94a3b8"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+                  <TouchableOpacity
+                    style={styles.addButton}
+                    onPress={() => {
+                      if (newUsername.trim()) {
+                        const username = newUsername.trim().toLowerCase();
+                        if (!capsuleData.allowedUsers.includes(username)) {
+                          setCapsuleData({
+                            ...capsuleData,
+                            allowedUsers: [...capsuleData.allowedUsers, username],
+                          });
+                        }
+                        setNewUsername('');
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="add-circle" size={24} color="#FAC638" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Friend Picker - Horizontal Scrollable */}
+                <View style={styles.friendPickerSection}>
+                  <Text style={styles.friendPickerTitle}>Quick Select Friends</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.friendPickerScrollContent}
+                  >
+                    {friends.map((friend) => {
+                      const isSelected = selectedFriends.includes(friend.username);
+                      return (
+                        <TouchableOpacity
+                          key={friend.id}
+                          style={styles.friendPickerItem}
+                          onPress={() => {
+                            let newSelectedFriends: string[];
+                            let newAllowedUsers: string[];
+
+                            if (isSelected) {
+                              newSelectedFriends = selectedFriends.filter(u => u !== friend.username);
+                              newAllowedUsers = capsuleData.allowedUsers.filter(u => u !== friend.username);
+                            } else {
+                              newSelectedFriends = [...selectedFriends, friend.username];
+                              newAllowedUsers = capsuleData.allowedUsers.includes(friend.username)
+                                ? capsuleData.allowedUsers
+                                : [...capsuleData.allowedUsers, friend.username];
+                            }
+
+                            setSelectedFriends(newSelectedFriends);
+                            setCapsuleData({
+                              ...capsuleData,
+                              allowedUsers: newAllowedUsers,
+                            });
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={[
+                            styles.friendPickerAvatar,
+                            isSelected && styles.friendPickerAvatarSelected
+                          ]}>
+                            {friend.avatar_url ? (
+                              <Image source={{ uri: friend.avatar_url }} style={styles.friendPickerAvatarImage} />
+                            ) : (
+                              <View style={styles.friendPickerAvatarPlaceholder}>
+                                <Ionicons name="person" size={32} color="#94a3b8" />
+                              </View>
+                            )}
+                            {isSelected && (
+                              <View style={styles.selectionCheckmark}>
+                                <Ionicons name="checkmark-circle" size={24} color="#FAC638" />
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.friendPickerName} numberOfLines={1}>
+                            {friend.name.split(' ')[0]}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
+                {/* List of Authorized Users */}
+                {capsuleData.allowedUsers.length > 0 && (
+                  <View style={styles.authorizedUsersList}>
+                    <Text style={styles.authorizedUsersTitle}>
+                      Selected Users ({capsuleData.allowedUsers.length})
+                    </Text>
+                    {capsuleData.allowedUsers.map((username, index) => {
+                      const friend = friends.find(f => f.username === username);
+                      return (
+                        <View key={index} style={styles.userItem}>
+                          <View style={styles.userAvatar}>
+                            {friend?.avatar_url ? (
+                              <Image source={{ uri: friend.avatar_url }} style={styles.userAvatarImage} />
+                            ) : (
+                              <Ionicons name="person" size={20} color="#64748b" />
+                            )}
+                          </View>
+                          <View style={styles.userInfo}>
+                            <Text style={styles.userName}>
+                              {friend?.name || username}
+                            </Text>
+                            <Text style={styles.userUsername}>@{username}</Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => {
+                              const newUsers = capsuleData.allowedUsers.filter(u => u !== username);
+                              const newSelectedFriends = selectedFriends.filter(u => u !== username);
+                              setSelectedFriends(newSelectedFriends);
+                              setCapsuleData({ ...capsuleData, allowedUsers: newUsers });
+                            }}
+                            style={styles.removeButton}
+                          >
+                            <Ionicons name="close-circle" size={20} color="#FF6B6B" />
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+              </>
+            )}
+
+            {/* Optional: Message (expandable) */}
+            <TouchableOpacity
+              style={styles.expandableHeader}
+              onPress={() => setShowMessageInput(!showMessageInput)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="chatbubble-outline" size={20} color="#FAC638" />
+              <Text style={styles.expandableHeaderText}>
+                {capsuleData.message ? 'Edit Message' : 'Add a Message (Optional)'}
+              </Text>
+              <Ionicons name={showMessageInput ? 'chevron-up' : 'chevron-down'} size={20} color="#94a3b8" />
+            </TouchableOpacity>
+            {showMessageInput && (
+              <TextInput
+                style={[styles.input, styles.textArea, { marginTop: 8 }]}
+                value={capsuleData.message}
+                onChangeText={(text) => setCapsuleData({ ...capsuleData, message: text })}
+                placeholder="Dear future me..."
+                placeholderTextColor="#94a3b8"
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+            )}
           </View>
         );
 
@@ -756,7 +847,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
       {/* Progress Indicator */}
       <View style={styles.progressContainer}>
         <View style={styles.progressBar}>
-          {[1, 2, 3, 4, 5].map((i) => (
+          {[1, 2, 3].map((i) => (
             <View
               key={i}
               style={[
@@ -767,7 +858,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
             />
           ))}
         </View>
-        <Text style={styles.progressText}>Step {step} of 5</Text>
+        <Text style={styles.progressText}>Step {step} of 3</Text>
       </View>
 
       {/* Content */}
@@ -799,7 +890,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
           ) : (
             <>
               <Text style={styles.nextButtonText}>
-                {step === 5 ? 'Create Capsule' : 'Continue'}
+                {step === 3 ? 'Create Capsule' : 'Continue'}
               </Text>
               <Ionicons name="arrow-forward" size={20} color="white" />
             </>
@@ -1398,6 +1489,75 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#64748b',
+  },
+  videoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+  },
+  videoDuration: {
+    fontSize: 11,
+    color: '#fff',
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  voiceHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFF8E1',
+    padding: 12,
+    borderRadius: 12,
+    marginTop: 12,
+  },
+  voiceHintText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#92400e',
+    lineHeight: 18,
+  },
+  expandableHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+    gap: 10,
+  },
+  expandableHeaderText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+  },
+  categoryChipActive: {
+    backgroundColor: '#FFF8E1',
+    borderColor: '#FAC638',
+  },
+  categoryEmoji: {
+    fontSize: 16,
+  },
+  categoryLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  categoryLabelActive: {
+    color: '#1e293b',
   },
 });
 

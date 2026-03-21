@@ -10,13 +10,20 @@ import {
   StatusBar,
   FlatList,
   Animated,
+  Share,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { supabase } from '../lib/supabase';
-import { LikeService } from '../services/likeService';
 import CommentSheet from './CommentSheet';
+import EditCapsuleSheet from './EditCapsuleSheet';
+import ReactionBar from './ReactionBar';
+import { getMediaUrl, isLocked } from '../utils/mediaUtils';
+import { formatDate, timeAgo } from '../utils/dateUtils';
+import { ChainService } from '../services/chainService';
+import { ReportService, REPORT_REASONS } from '../services/reportService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -26,36 +33,113 @@ interface CapsuleDetailModalProps {
   capsules?: any[];
   onClose: () => void;
   onOwnerPress?: (owner: any) => void;
+  onExplore?: () => void;
 }
 
 // Single capsule story page
 const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onClose: () => void; onOwnerPress?: (owner: any) => void; onPause?: (paused: boolean) => void }) => {
   const [owner, setOwner] = useState<any>(null);
   const [address, setAddress] = useState<string | null>(null);
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
   const [commentCount, setCommentCount] = useState(0);
+  const [chainCount, setChainCount] = useState(0);
   const [showComments, setShowComments] = useState(false);
+  const [showEditSheet, setShowEditSheet] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  const [displayTitle, setDisplayTitle] = useState(item?.title || '');
+  const [displayDescription, setDisplayDescription] = useState(item?.description || '');
+  const [displayCategory, setDisplayCategory] = useState(item?.category || '');
 
   useEffect(() => {
     setOwner(null);
     setAddress(null);
-    setLiked(false);
-    setLikeCount(0);
+    setDisplayTitle(item?.title || '');
+    setDisplayDescription(item?.description || '');
+    setDisplayCategory(item?.category || '');
     if (item?.owner_id) loadOwner(item.owner_id);
     if (item?.lat && item?.lng) loadAddress(item.lat, item.lng);
-    if (item?.id) loadLikeStatus();
     if (item?.id) loadCommentCount();
+    if (item?.id) loadChainCount();
+    checkOwnership();
   }, [item?.id]);
 
-  useEffect(() => {
-    onPause?.(showComments);
-  }, [showComments]);
+  const checkOwnership = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && item?.owner_id) {
+        setIsOwner(user.id === item.owner_id);
+      }
+    } catch (e) {
+      // silently fail
+    }
+  };
 
-  const loadLikeStatus = async () => {
-    const { liked: l, count } = await LikeService.getLikeStatus(item.id);
-    setLiked(l);
-    setLikeCount(count);
+  const handleMoreOptions = () => {
+    Alert.alert(
+      'Options',
+      undefined,
+      [
+        {
+          text: 'Report Capsule',
+          onPress: () => {
+            Alert.alert(
+              'Report Capsule',
+              'Select a reason:',
+              [
+                ...REPORT_REASONS.map((reason) => ({
+                  text: reason,
+                  onPress: async () => {
+                    const { error } = await ReportService.reportContent('capsule', item.id, reason);
+                    if (error) {
+                      Alert.alert('Error', 'Failed to submit report. Please try again.');
+                    } else {
+                      Alert.alert('Reported', 'Thank you for your report. We will review it shortly.');
+                    }
+                  },
+                })),
+                { text: 'Cancel', style: 'cancel' },
+              ]
+            );
+          },
+        },
+        {
+          text: 'Block User',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Block User',
+              `Are you sure you want to block ${owner?.display_name || owner?.username || 'this user'}? You will no longer see their content.`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Block',
+                  style: 'destructive',
+                  onPress: async () => {
+                    if (!item?.owner_id) return;
+                    const { error } = await ReportService.blockUser(item.owner_id);
+                    if (error) {
+                      Alert.alert('Error', 'Failed to block user. Please try again.');
+                    } else {
+                      Alert.alert('Blocked', 'User has been blocked.');
+                      onClose();
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  useEffect(() => {
+    onPause?.(showComments || showEditSheet);
+  }, [showComments, showEditSheet]);
+
+  const loadChainCount = async () => {
+    const count = await ChainService.getChainCount(item.id);
+    setChainCount(count);
   };
 
   const loadCommentCount = async () => {
@@ -64,17 +148,6 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
     setCommentCount(count);
   };
 
-  const handleLike = async () => {
-    // Optimistic update
-    setLiked(!liked);
-    setLikeCount(prev => liked ? prev - 1 : prev + 1);
-    const { liked: newLiked, error } = await LikeService.toggleLike(item.id);
-    if (error) {
-      // Revert
-      setLiked(liked);
-      setLikeCount(prev => liked ? prev + 1 : prev - 1);
-    }
-  };
 
   const loadOwner = async (ownerId: string) => {
     try {
@@ -84,7 +157,7 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
         .eq('id', ownerId)
         .maybeSingle();
       setOwner(data);
-    } catch {}
+    } catch (e) { if (__DEV__) console.error(e); }
   };
 
   const loadAddress = async (lat: number, lng: number) => {
@@ -94,46 +167,11 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
         const a = results[0];
         setAddress([a.city, a.region].filter(Boolean).join(', '));
       }
-    } catch {}
+    } catch (e) { if (__DEV__) console.error(e); }
   };
 
-  const getMediaUrl = (): string | null => {
-    if (!item) return null;
-    if (item.media_url && item.media_type !== 'none') return item.media_url;
-    if (item.content_refs && Array.isArray(item.content_refs)) {
-      for (const ref of item.content_refs) {
-        if (typeof ref === 'string' && ref.startsWith('http')) return ref;
-        if (ref?.url && ref.url.startsWith('http')) return ref.url;
-      }
-    }
-    return null;
-  };
-
-  const isLocked = (): boolean => {
-    if (!item?.open_at) return false;
-    return new Date(item.open_at).getTime() > Date.now();
-  };
-
-  const formatDate = (d: string | null): string => {
-    if (!d) return '';
-    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-
-  const timeAgo = (d: string | null): string => {
-    if (!d) return '';
-    const diff = Date.now() - new Date(d).getTime();
-    const m = Math.floor(diff / 60000);
-    if (m < 1) return 'now';
-    if (m < 60) return `${m}m`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h`;
-    const days = Math.floor(h / 24);
-    if (days < 7) return `${days}d`;
-    return `${Math.floor(days / 7)}w`;
-  };
-
-  const mediaUrl = getMediaUrl();
-  const locked = isLocked();
+  const mediaUrl = getMediaUrl(item);
+  const locked = isLocked(item?.open_at);
 
   return (
     <View style={styles.page}>
@@ -170,9 +208,16 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
           </Text>
           <Text style={styles.timeText}>{timeAgo(item.created_at)}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-          <Ionicons name="close" size={26} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.topBarRight}>
+          {!isOwner && (
+            <TouchableOpacity onPress={handleMoreOptions} style={styles.moreBtn}>
+              <Ionicons name="ellipsis-vertical" size={22} color="#fff" />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <Ionicons name="close" size={26} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Center locked */}
@@ -195,29 +240,55 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
 
       {/* Bottom content */}
       <View style={styles.bottomContent}>
-        <Text style={styles.title}>{item.title}</Text>
-        {item.description ? (
-          <Text style={styles.description} numberOfLines={3}>{item.description}</Text>
+        <Text style={styles.title}>{displayTitle}</Text>
+        {displayDescription ? (
+          <Text style={styles.description} numberOfLines={3}>{displayDescription}</Text>
         ) : null}
+
+        {/* Reactions */}
+        <ReactionBar capsuleId={item.id} />
 
         {/* Action buttons */}
         <View style={styles.actionRow}>
-          <TouchableOpacity onPress={handleLike} style={styles.actionBtn} activeOpacity={0.7}>
-            <Ionicons name={liked ? 'heart' : 'heart-outline'} size={26} color={liked ? '#FF375F' : '#fff'} />
-            {likeCount > 0 && <Text style={styles.actionCount}>{likeCount}</Text>}
-          </TouchableOpacity>
-
           <TouchableOpacity onPress={() => setShowComments(true)} style={styles.actionBtn} activeOpacity={0.7}>
-            <Ionicons name="chatbubble-outline" size={24} color="#fff" />
+            <Ionicons name="chatbubble-outline" size={22} color="#fff" />
             {commentCount > 0 && <Text style={styles.actionCount}>{commentCount}</Text>}
           </TouchableOpacity>
 
+          <TouchableOpacity
+            onPress={() => Share.share({ message: `Check out "${displayTitle}" on TimeCapsule!` })}
+            style={styles.actionBtn}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="share-outline" size={22} color="#fff" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => onClose()}
+            style={styles.actionBtn}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="git-branch-outline" size={22} color="#fff" />
+            {chainCount > 0 && <Text style={styles.actionCount}>{chainCount}</Text>}
+          </TouchableOpacity>
+
+          {isOwner && (
+            <TouchableOpacity
+              onPress={() => setShowEditSheet(true)}
+              style={styles.actionBtn}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="pencil-outline" size={22} color="#fff" />
+            </TouchableOpacity>
+          )}
+
           <View style={styles.actionSpacer} />
 
-          <View style={styles.pill}>
-            <Ionicons name={item.is_public ? 'globe-outline' : 'lock-closed-outline'} size={13} color="#fff" />
-            <Text style={styles.pillText}>{item.is_public ? 'Public' : 'Private'}</Text>
-          </View>
+          {displayCategory && displayCategory !== 'general' && (
+            <View style={styles.pill}>
+              <Text style={styles.pillText}>{displayCategory}</Text>
+            </View>
+          )}
 
           {address && (
             <View style={styles.pill}>
@@ -235,6 +306,21 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
         onClose={() => setShowComments(false)}
         onCountChange={(count) => setCommentCount(count)}
       />
+
+      {/* Edit Capsule Sheet */}
+      <EditCapsuleSheet
+        capsuleId={item.id}
+        visible={showEditSheet}
+        onClose={() => setShowEditSheet(false)}
+        initialTitle={displayTitle}
+        initialDescription={displayDescription}
+        initialCategory={displayCategory}
+        onSaved={(updated) => {
+          setDisplayTitle(updated.title);
+          setDisplayDescription(updated.description);
+          setDisplayCategory(updated.category);
+        }}
+      />
     </View>
   );
 };
@@ -247,6 +333,7 @@ const CapsuleDetailModal: React.FC<CapsuleDetailModalProps> = ({
   capsules,
   onClose,
   onOwnerPress,
+  onExplore,
 }) => {
   const flatListRef = useRef<FlatList>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -323,7 +410,11 @@ const CapsuleDetailModal: React.FC<CapsuleDetailModalProps> = ({
     progressAnims.current[currentIndex]?.setValue(1);
     const next = currentIndex + 1;
     if (next >= list.length) {
-      onClose();
+      if (onExplore) {
+        onExplore();
+      } else {
+        onClose();
+      }
       return;
     }
     setActiveIndex(next);
@@ -530,6 +621,19 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.7)',
+  },
+  topBarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  moreBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   closeBtn: {
     width: 34,

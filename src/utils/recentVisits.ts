@@ -20,7 +20,7 @@ export const getRecentVisits = async (): Promise<RecentVisit[]> => {
     if (!data) return [];
     return JSON.parse(data);
   } catch (error) {
-    console.error('Error getting recent visits:', error);
+    if (__DEV__) console.error('Error getting recent visits:', error);
     return [];
   }
 };
@@ -51,7 +51,7 @@ export const addRecentVisit = async (user: {
     
     await AsyncStorage.setItem(RECENT_VISITS_KEY, JSON.stringify(updated));
   } catch (error) {
-    console.error('Error adding recent visit:', error);
+    if (__DEV__) console.error('Error adding recent visit:', error);
   }
 };
 
@@ -62,7 +62,7 @@ export const clearRecentVisits = async (): Promise<void> => {
   try {
     await AsyncStorage.removeItem(RECENT_VISITS_KEY);
   } catch (error) {
-    console.error('Error clearing recent visits:', error);
+    if (__DEV__) console.error('Error clearing recent visits:', error);
   }
 };
 
@@ -75,7 +75,7 @@ export const removeRecentVisit = async (userId: string): Promise<void> => {
     const filtered = visits.filter(v => v.id !== userId);
     await AsyncStorage.setItem(RECENT_VISITS_KEY, JSON.stringify(filtered));
   } catch (error) {
-    console.error('Error removing recent visit:', error);
+    if (__DEV__) console.error('Error removing recent visit:', error);
   }
 };
 

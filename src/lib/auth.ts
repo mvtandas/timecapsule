@@ -52,7 +52,7 @@ export class AuthService {
           } as any);
 
           if (profileError) {
-            console.error('Profile creation error:', profileError);
+            if (__DEV__) console.error('Profile creation error:', profileError);
             // Check if it's a username uniqueness error
             if (profileError.message?.toLowerCase().includes('username')) {
               throw new Error('Username is already taken');
@@ -255,6 +255,21 @@ export class AuthService {
         .single();
 
       return { data, error };
+    } catch (error) {
+      return { data: null, error };
+    }
+  }
+
+  // Change password (for authenticated users)
+  static async changePassword(newPassword: string) {
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) throw error;
+
+      return { data, error: null };
     } catch (error) {
       return { data: null, error };
     }

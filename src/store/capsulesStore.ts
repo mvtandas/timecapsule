@@ -131,7 +131,7 @@ export const useCapsulesStore = create<CapsulesStore>((set, get) => ({
       if (error) throw error;
       return data;
     } catch (error) {
-      console.error('Error fetching capsule:', error);
+      if (__DEV__) console.error('Error fetching capsule:', error);
       return null;
     }
   },

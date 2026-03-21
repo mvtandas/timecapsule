@@ -49,13 +49,13 @@ export class FriendService {
         .single();
 
       if (error) {
-        console.error('Error sending friend request:', error);
+        if (__DEV__) console.error('Error sending friend request:', error);
         return { data: null, error };
       }
 
       return { data, error: null };
     } catch (error: any) {
-      console.error('Error in sendFriendRequest:', error);
+      if (__DEV__) console.error('Error in sendFriendRequest:', error);
       return { data: null, error };
     }
   }
@@ -83,7 +83,7 @@ export class FriendService {
         .maybeSingle();
 
       if (error) {
-        console.error('Error checking friendship status:', error);
+        if (__DEV__) console.error('Error checking friendship status:', error);
         return { status: 'none' };
       }
 
@@ -110,7 +110,7 @@ export class FriendService {
 
       return { status: 'none' };
     } catch (error: any) {
-      console.error('Error in getFriendshipStatus:', error);
+      if (__DEV__) console.error('Error in getFriendshipStatus:', error);
       return { status: 'none' };
     }
   }
@@ -126,13 +126,13 @@ export class FriendService {
         .eq('id', requestId);
 
       if (error) {
-        console.error('Error accepting friend request:', error);
+        if (__DEV__) console.error('Error accepting friend request:', error);
         return { error };
       }
 
       return { error: null };
     } catch (error: any) {
-      console.error('Error in acceptFriendRequest:', error);
+      if (__DEV__) console.error('Error in acceptFriendRequest:', error);
       return { error };
     }
   }
@@ -148,13 +148,13 @@ export class FriendService {
         .eq('id', requestId);
 
       if (error) {
-        console.error('Error rejecting friend request:', error);
+        if (__DEV__) console.error('Error rejecting friend request:', error);
         return { error };
       }
 
       return { error: null };
     } catch (error: any) {
-      console.error('Error in rejectFriendRequest:', error);
+      if (__DEV__) console.error('Error in rejectFriendRequest:', error);
       return { error };
     }
   }
@@ -170,13 +170,13 @@ export class FriendService {
         .eq('id', requestId);
 
       if (error) {
-        console.error('Error canceling friend request:', error);
+        if (__DEV__) console.error('Error canceling friend request:', error);
         return { error };
       }
 
       return { error: null };
     } catch (error: any) {
-      console.error('Error in cancelFriendRequest:', error);
+      if (__DEV__) console.error('Error in cancelFriendRequest:', error);
       return { error };
     }
   }
@@ -200,13 +200,13 @@ export class FriendService {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching pending requests:', error);
+        if (__DEV__) console.error('Error fetching pending requests:', error);
         return { data: [], error };
       }
 
       return { data: data || [], error: null };
     } catch (error: any) {
-      console.error('Error in getPendingRequests:', error);
+      if (__DEV__) console.error('Error in getPendingRequests:', error);
       return { data: [], error };
     }
   }
@@ -229,7 +229,7 @@ export class FriendService {
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
 
       if (error) {
-        console.error('Error fetching friends:', error);
+        if (__DEV__) console.error('Error fetching friends:', error);
         return { data: [], error };
       }
 
@@ -240,7 +240,7 @@ export class FriendService {
 
       return { data: friendIds, error: null };
     } catch (error: any) {
-      console.error('Error in getFriends:', error);
+      if (__DEV__) console.error('Error in getFriends:', error);
       return { data: [], error };
     }
   }
