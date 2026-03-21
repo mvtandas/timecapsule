@@ -61,7 +61,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       if (session?.user) {
         // Get user with profile data
         const { user } = await AuthService.getCurrentUser();
-        set({ session, user, loading: false });
+        set({ session, user: user as User | null, loading: false });
       } else {
         set({ session: null, user: null, loading: false });
       }
@@ -78,7 +78,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         // Refresh user data to get updated email
         const { user } = await AuthService.getCurrentUser();
         if (user) {
-          set({ user });
+          set({ user: user as User });
         }
       }
       
@@ -119,7 +119,7 @@ AuthService.onAuthStateChange(async (event, session) => {
     const { user } = await AuthService.getCurrentUser();
     useAuthStore.setState({
       session,
-      user,
+      user: user as User | null,
       loading: false
     });
   } else {

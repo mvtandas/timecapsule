@@ -41,7 +41,7 @@ export class AuthService {
           .from('profiles')
           .select('id')
           .eq('id', data.user.id)
-          .single();
+          .maybeSingle();
 
         if (!existingProfile) {
           const { error: profileError } = await supabase.from('profiles').insert({
@@ -160,14 +160,14 @@ export class AuthService {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (profileError || !profile) {
         // Create profile if it doesn't exist
         const { error: insertError } = await supabase.from('profiles').insert({
           id: user.id,
           display_name: user.user_metadata?.display_name || user.email?.split('@')[0],
-        });
+        } as any);
 
         if (!insertError) {
           // Fetch the newly created profile
@@ -175,7 +175,7 @@ export class AuthService {
             .from('profiles')
             .select('*')
             .eq('id', user.id)
-            .single();
+            .maybeSingle();
           
           if (newProfile) {
             return { user: newProfile, error: null };
@@ -270,6 +270,34 @@ export class AuthService {
       return { data, error };
     } catch (error) {
       return { data: null, error };
+    }
+  }
+
+  // Delete user account and all data
+  static async deleteAccount(): Promise<{ error: any }> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Delete user's data in order (respecting foreign keys)
+      await supabase.from('comments').delete().eq('user_id', user.id);
+      await supabase.from('likes').delete().eq('user_id', user.id);
+      await supabase.from('notifications').delete().eq('user_id', user.id);
+      await supabase.from('notifications').delete().eq('from_user_id', user.id);
+      await supabase.from('friend_requests').delete().or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+      await supabase.from('shared_capsules').delete().eq('user_id', user.id);
+      await supabase.from('capsule_contents').delete().in('capsule_id',
+        (await supabase.from('capsules').select('id').eq('owner_id', user.id)).data?.map((c: any) => c.id) || []
+      );
+      await supabase.from('capsules').delete().eq('owner_id', user.id);
+      await supabase.from('profiles').delete().eq('id', user.id);
+
+      // Sign out
+      await supabase.auth.signOut();
+
+      return { error: null };
+    } catch (error) {
+      return { error };
     }
   }
 

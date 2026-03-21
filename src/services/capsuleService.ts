@@ -21,13 +21,13 @@ export interface Capsule {
 
 export interface CreateCapsuleData {
   title: string;
-  description?: string;
-  open_at?: string;
-  lat?: number;
-  lng?: number;
+  description?: string | null;
+  open_at?: string | null;
+  lat?: number | null;
+  lng?: number | null;
   is_public?: boolean;
   content_refs?: any[];
-  media_url?: string;
+  media_url?: string | null;
   media_type?: 'image' | 'video' | 'none';
   is_locked?: boolean;
 }
@@ -75,7 +75,7 @@ export class CapsuleService {
           .insert({
             id: user.id,
             display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
-          });
+          } as any);
 
         if (insertError) {
           console.error('Failed to create profile:', insertError);
@@ -98,7 +98,7 @@ export class CapsuleService {
           media_url: capsuleData.media_url || null,
           media_type: capsuleData.media_type || 'none',
           is_locked: capsuleData.is_locked || false,
-        })
+        } as any)
         .select()
         .single();
 
@@ -132,7 +132,7 @@ export class CapsuleService {
     try {
       const { data, error } = await supabase
         .from('capsules')
-        .update(updates)
+        .update(updates as any)
         .eq('id', capsuleId)
         .select()
         .single();

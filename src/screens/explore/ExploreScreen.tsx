@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, Circle, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { CapsuleService } from '../../services/capsuleService';
+import CapsuleDetailModal from '../../components/CapsuleDetailModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -19,6 +20,7 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
   const [loading, setLoading] = useState(true);
   const [nearbyCapsules, setNearbyCapsules] = useState<any[]>([]);
   const [selectedCapsule, setSelectedCapsule] = useState<any>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [mapView, setMapView] = useState<'standard' | 'satellite'>('standard');
 
   useEffect(() => {
@@ -97,6 +99,7 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
   };
 
   const handleCapsuleTap = (capsule: any) => {
+    if (!location) return;
     const distance = calculateDistance(
       location.coords.latitude,
       location.coords.longitude,
@@ -124,11 +127,12 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
       }
     }
 
-    // Capsule can be opened
-    Alert.alert(
-      capsule.title,
-      `Distance: ${formatDistance(distance)}\n\nYou can open this capsule!`
-    );
+    // Capsule can be opened - show detail modal
+    setSelectedCapsule(capsule);
+    setShowDetailModal(true);
+
+    // Increment view count
+    CapsuleService.incrementViewCount(capsule.id);
   };
 
   return (
@@ -263,6 +267,13 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
           </View>
         </>
       )}
+
+      <CapsuleDetailModal
+        visible={showDetailModal}
+        capsule={selectedCapsule}
+        capsules={nearbyCapsules}
+        onClose={() => setShowDetailModal(false)}
+      />
 
     </View>
   );

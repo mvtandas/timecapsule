@@ -27,7 +27,7 @@ export class MediaService {
             uri: asset.uri,
             type: asset.mimeType || 'image/jpeg',
             name: asset.fileName || `image_${Date.now()}.jpg`,
-            size: fileInfo.size || 0,
+            size: (fileInfo.exists && 'size' in fileInfo ? fileInfo.size : 0),
           });
         }
       }
@@ -58,7 +58,7 @@ export class MediaService {
         uri: asset.uri,
         type: asset.mimeType || 'image/jpeg',
         name: asset.fileName || `photo_${Date.now()}.jpg`,
-        size: fileInfo.size || 0,
+        size: (fileInfo.exists && 'size' in fileInfo ? fileInfo.size : 0),
       };
     } catch (error) {
       console.error('Error taking photo:', error);
@@ -85,7 +85,7 @@ export class MediaService {
         uri: asset.uri,
         type: asset.mimeType || 'video/mp4',
         name: asset.fileName || `video_${Date.now()}.mp4`,
-        size: fileInfo.size || 0,
+        size: (fileInfo.exists && 'size' in fileInfo ? fileInfo.size : 0),
       };
     } catch (error) {
       console.error('Error picking video:', error);
@@ -99,7 +99,7 @@ export class MediaService {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Videos,
         quality: 0.8,
-        maxDuration: 60, // 60 seconds max
+        videoMaxDuration: 60, // 60 seconds max
       });
 
       if (result.canceled || !result.assets[0]?.uri) {
@@ -113,7 +113,7 @@ export class MediaService {
         uri: asset.uri,
         type: asset.mimeType || 'video/mp4',
         name: asset.fileName || `video_${Date.now()}.mp4`,
-        size: fileInfo.size || 0,
+        size: (fileInfo.exists && 'size' in fileInfo ? fileInfo.size : 0),
       };
     } catch (error) {
       console.error('Error recording video:', error);
@@ -134,7 +134,7 @@ export class MediaService {
 
       // Read file as base64
       const base64 = await FileSystem.readAsStringAsync(file.uri, {
-        encoding: FileSystem.EncodingType.Base64,
+        encoding: 'base64' as any,
       });
 
       // Upload to Supabase
@@ -165,8 +165,6 @@ export class MediaService {
     userId: string
   ): Promise<{ url: string | null; error: any }> {
     try {
-      console.log('Starting avatar upload for user:', userId);
-      console.log('Image URI:', imageUri);
 
       const fileExt = imageUri.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `avatar-${userId}-${Date.now()}.${fileExt}`;
@@ -178,7 +176,6 @@ export class MediaService {
       }
 
       // Read file as base64
-      console.log('Reading file as base64...');
       const base64 = await FileSystem.readAsStringAsync(imageUri, {
         encoding: 'base64',
       });
@@ -187,14 +184,11 @@ export class MediaService {
         throw new Error('Failed to read file as base64');
       }
 
-      console.log('Base64 length:', base64.length);
 
       // Convert base64 to array buffer
       const arrayBuffer = this.base64ToArrayBuffer(base64);
-      console.log('Array buffer size:', arrayBuffer.byteLength);
 
       // Upload to Supabase Storage
-      console.log('Uploading to Supabase...');
       const { data, error } = await supabase.storage
         .from('capsule-media')
         .upload(filePath, arrayBuffer, {
@@ -207,14 +201,12 @@ export class MediaService {
         throw error;
       }
 
-      console.log('Upload successful:', data);
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('capsule-media')
         .getPublicUrl(filePath);
 
-      console.log('Public URL:', publicUrl);
 
       return { url: publicUrl, error: null };
     } catch (error: any) {
@@ -257,7 +249,7 @@ export class MediaService {
     try {
       const fileInfo = await FileSystem.getInfoAsync(uri);
       return {
-        size: fileInfo.size || 0,
+        size: (fileInfo.exists && 'size' in fileInfo ? fileInfo.size : 0),
         exists: fileInfo.exists,
       };
     } catch (error) {

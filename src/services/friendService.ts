@@ -44,7 +44,7 @@ export class FriendService {
           sender_id: user.id,
           receiver_id: receiverId,
           status: 'pending'
-        })
+        } as any)
         .select()
         .single();
 
@@ -53,7 +53,6 @@ export class FriendService {
         return { data: null, error };
       }
 
-      console.log('✅ Friend request sent:', data);
       return { data, error: null };
     } catch (error: any) {
       console.error('Error in sendFriendRequest:', error);
@@ -92,19 +91,21 @@ export class FriendService {
         return { status: 'none' };
       }
 
+      const row = data as any;
+
       // If accepted, they are friends
-      if (data.status === 'accepted') {
-        return { status: 'friends', requestId: data.id };
+      if (row.status === 'accepted') {
+        return { status: 'friends', requestId: row.id };
       }
 
       // If pending and current user is sender
-      if (data.status === 'pending' && data.sender_id === user.id) {
-        return { status: 'pending_sent', requestId: data.id };
+      if (row.status === 'pending' && row.sender_id === user.id) {
+        return { status: 'pending_sent', requestId: row.id };
       }
 
       // If pending and current user is receiver
-      if (data.status === 'pending' && data.receiver_id === user.id) {
-        return { status: 'pending_received', requestId: data.id };
+      if (row.status === 'pending' && row.receiver_id === user.id) {
+        return { status: 'pending_received', requestId: row.id };
       }
 
       return { status: 'none' };
@@ -121,7 +122,7 @@ export class FriendService {
     try {
       const { error } = await supabase
         .from('friend_requests')
-        .update({ status: 'accepted' })
+        .update({ status: 'accepted' } as any)
         .eq('id', requestId);
 
       if (error) {
@@ -129,7 +130,6 @@ export class FriendService {
         return { error };
       }
 
-      console.log('✅ Friend request accepted');
       return { error: null };
     } catch (error: any) {
       console.error('Error in acceptFriendRequest:', error);
@@ -144,7 +144,7 @@ export class FriendService {
     try {
       const { error } = await supabase
         .from('friend_requests')
-        .update({ status: 'rejected' })
+        .update({ status: 'rejected' } as any)
         .eq('id', requestId);
 
       if (error) {
@@ -152,7 +152,6 @@ export class FriendService {
         return { error };
       }
 
-      console.log('✅ Friend request rejected');
       return { error: null };
     } catch (error: any) {
       console.error('Error in rejectFriendRequest:', error);
@@ -175,7 +174,6 @@ export class FriendService {
         return { error };
       }
 
-      console.log('✅ Friend request canceled');
       return { error: null };
     } catch (error: any) {
       console.error('Error in cancelFriendRequest:', error);
@@ -236,7 +234,7 @@ export class FriendService {
       }
 
       // Extract friend IDs (the other user in each request)
-      const friendIds = (data || []).map((request) => 
+      const friendIds = (data || []).map((request: any) =>
         request.sender_id === user.id ? request.receiver_id : request.sender_id
       );
 

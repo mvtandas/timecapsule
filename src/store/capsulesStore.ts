@@ -30,8 +30,8 @@ export const useCapsulesStore = create<CapsulesStore>((set, get) => ({
 
       if (error) throw error;
       set({ capsules: data || [], loading: false });
-    } catch (error) {
-      set({ error: error.message, loading: false });
+    } catch (error: any) {
+      set({ error: error?.message || 'Unknown error', loading: false });
     }
   },
 
@@ -40,27 +40,30 @@ export const useCapsulesStore = create<CapsulesStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      const { contents, allowed_users, ...capsuleData } = data;
+
       const { data: capsule, error } = await supabase
         .from('capsules')
         .insert({
-          ...data,
+          ...capsuleData,
           owner_id: user.id,
-        })
+          allowed_users: allowed_users || [],
+        } as any)
         .select()
         .single();
 
       if (error) throw error;
 
       // Insert capsule contents
-      if (data.contents && data.contents.length > 0) {
-        const contentsToInsert = data.contents.map(content => ({
+      if (contents && contents.length > 0) {
+        const contentsToInsert = contents.map(content => ({
           ...content,
-          capsule_id: capsule.id,
+          capsule_id: (capsule as any).id,
         }));
 
         await supabase
           .from('capsule_contents')
-          .insert(contentsToInsert);
+          .insert(contentsToInsert as any);
       }
 
       set(state => ({
@@ -77,7 +80,7 @@ export const useCapsulesStore = create<CapsulesStore>((set, get) => ({
     try {
       const { error } = await supabase
         .from('capsules')
-        .update(updates)
+        .update(updates as any)
         .eq('id', id);
 
       if (error) throw error;
@@ -136,21 +139,34 @@ export const useCapsulesStore = create<CapsulesStore>((set, get) => ({
   fetchSharedCapsules: async () => {
     set({ loading: true, error: null });
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // First get shared capsule IDs
+      const { data: sharedData, error: sharedError } = await supabase
+        .from('shared_capsules')
+        .select('capsule_id')
+        .eq('user_id', user.id);
+
+      if (sharedError) throw sharedError;
+
+      const capsuleIds = (sharedData || []).map((item: any) => item.capsule_id);
+
+      if (capsuleIds.length === 0) {
+        set({ capsules: [], loading: false });
+        return;
+      }
+
       const { data, error } = await supabase
         .from('capsules')
         .select('*')
-        .in('id', 
-          supabase
-            .from('shared_capsules')
-            .select('capsule_id')
-            .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
-        )
+        .in('id', capsuleIds)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      set({ capsules: data || [], loading: false });
-    } catch (error) {
-      set({ error: error.message, loading: false });
+      set({ capsules: (data as any[]) || [], loading: false });
+    } catch (error: any) {
+      set({ error: error?.message || 'Unknown error', loading: false });
     }
   },
 
@@ -162,7 +178,7 @@ export const useCapsulesStore = create<CapsulesStore>((set, get) => ({
           capsule_id: capsuleId,
           user_id: userId,
           permission,
-        });
+        } as any);
 
       return { error };
     } catch (error) {

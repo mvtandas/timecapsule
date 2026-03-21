@@ -13,7 +13,7 @@ interface FriendsScreenProps {
 
 interface FriendWithActivity {
   id: string;
-  username: string;
+  username: string | null;
   display_name: string | null;
   avatar_url: string | null;
   lastCapsule?: {
@@ -38,6 +38,9 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Search bar visibility
+  const [showSearchBar, setShowSearchBar] = useState(false);
+
   // Friend requests state
   const [pendingRequests, setPendingRequests] = useState<FriendRequest[]>([]);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
@@ -50,6 +53,9 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
     loadRecentVisits();
     loadFriends();
     loadPendingRequests();
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
   }, []);
 
   const loadRecentVisits = async () => {
@@ -66,7 +72,6 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
         return;
       }
       setPendingRequests(data || []);
-      console.log('🔔 Pending requests loaded:', data?.length || 0);
     } catch (error) {
       console.error('Error loading pending requests:', error);
     }
@@ -98,20 +103,19 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
   const handleAcceptRequest = async (requestId: string, senderId: string) => {
     try {
       setProcessingRequestId(requestId);
-      
+
       const { error } = await FriendService.acceptFriendRequest(requestId);
-      
+
       if (error) {
         console.error('Error accepting request:', error);
         return;
       }
 
-      console.log('✅ Friend request accepted');
-      
+
       // Reload requests and friends
       await loadPendingRequests();
       await loadFriends();
-      
+
       // Remove from pending list
       setPendingRequests(prev => prev.filter(req => req.id !== requestId));
     } catch (error) {
@@ -125,19 +129,18 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
   const handleDeclineRequest = async (requestId: string) => {
     try {
       setProcessingRequestId(requestId);
-      
+
       const { error } = await FriendService.rejectFriendRequest(requestId);
-      
+
       if (error) {
         console.error('Error declining request:', error);
         return;
       }
 
-      console.log('✅ Friend request declined');
-      
+
       // Reload requests
       await loadPendingRequests();
-      
+
       // Remove from pending list
       setPendingRequests(prev => prev.filter(req => req.id !== requestId));
     } catch (error) {
@@ -151,7 +154,7 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
   const loadFriends = async () => {
     try {
       setLoadingFriends(true);
-      
+
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -159,30 +162,27 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
         return;
       }
 
-      // For now, get users who have interacted with current user's capsules
-      // or users the current user has shared capsules with
-      const { data: capsulesData, error: capsulesError } = await supabase
-        .from('capsules')
-        .select('owner_id, shared_with')
-        .or(`owner_id.eq.${user.id},shared_with.cs.{${user.id}}`);
+      // Get friends from accepted friend requests
+      const { data: friendRequestsData, error: friendRequestsError } = await supabase
+        .from('friend_requests')
+        .select('sender_id, receiver_id')
+        .eq('status', 'accepted')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
 
-      if (capsulesError) {
+      if (friendRequestsError) {
         // Silently handle error - don't break the app
         setFriends([]);
         setLoadingFriends(false);
         return;
       }
 
-      // Extract unique user IDs (friends)
+      // Extract unique friend IDs
       const friendIds = new Set<string>();
-      capsulesData?.forEach(capsule => {
-        if (capsule.owner_id && capsule.owner_id !== user.id) {
-          friendIds.add(capsule.owner_id);
-        }
-        if (capsule.shared_with && Array.isArray(capsule.shared_with)) {
-          capsule.shared_with.forEach((id: string) => {
-            if (id !== user.id) friendIds.add(id);
-          });
+      friendRequestsData?.forEach(request => {
+        if (request.sender_id === user.id) {
+          friendIds.add(request.receiver_id);
+        } else {
+          friendIds.add(request.sender_id);
         }
       });
 
@@ -215,13 +215,13 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
             .eq('owner_id', profile.id)
             .order('created_at', { ascending: false })
             .limit(1)
-            .single();
+            .maybeSingle();
 
           return {
             ...profile,
             lastCapsule: lastCapsule ? {
               title: lastCapsule.title || 'Untitled',
-              location: lastCapsule.lat && lastCapsule.lng 
+              location: lastCapsule.lat && lastCapsule.lng
                 ? `${lastCapsule.lat.toFixed(2)}, ${lastCapsule.lng.toFixed(2)}`
                 : undefined,
               created_at: lastCapsule.created_at,
@@ -287,7 +287,8 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
     setShowSearchDropdown(false);
     setUserSearchQuery('');
     setSearchResults([]);
-    
+    setShowSearchBar(false);
+
     // Add to recent visits
     await addRecentVisit({
       id: user.id,
@@ -295,10 +296,10 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
       display_name: user.display_name,
       avatar_url: user.avatar_url,
     });
-    
+
     // Reload recent visits
     await loadRecentVisits();
-    
+
     onNavigate('FriendProfile', { friend: user });
   };
 
@@ -311,10 +312,10 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
       display_name: visit.display_name,
       avatar_url: visit.avatar_url,
     });
-    
+
     // Reload recent visits
     await loadRecentVisits();
-    
+
     onNavigate('FriendProfile', { friend: visit });
   };
 
@@ -323,14 +324,14 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
     // Add to recent visits
     await addRecentVisit({
       id: friend.id,
-      username: friend.username,
-      display_name: friend.display_name,
-      avatar_url: friend.avatar_url,
+      username: friend.username || '',
+      display_name: friend.display_name || '',
+      avatar_url: friend.avatar_url || undefined,
     });
-    
+
     // Reload recent visits
     await loadRecentVisits();
-    
+
     onNavigate('FriendProfile', { friend });
   };
 
@@ -351,216 +352,238 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
     return date.toLocaleDateString();
   };
 
+  const cancelSearch = () => {
+    setShowSearchBar(false);
+    setUserSearchQuery('');
+    setSearchResults([]);
+    setShowSearchDropdown(false);
+  };
+
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Friends</Text>
-        
-        {/* Friend Requests Notification Icon */}
-        <TouchableOpacity
-          style={styles.notificationButton}
-          onPress={openRequestsModal}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="person-add" size={24} color="#1e293b" />
-          {pendingRequests.length > 0 && (
-            <View style={styles.notificationBadge}>
-              <Text style={styles.notificationBadgeText}>
-                {pendingRequests.length > 9 ? '9+' : pendingRequests.length}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Search Section */}
-        <View style={styles.searchSection}>
-          <Text style={styles.sectionTitle}>Find Friends</Text>
-          
-          <View style={styles.userSearchContainer}>
-            <View style={styles.userSearchInputWrapper}>
-              <Ionicons name="search" size={20} color="#94a3b8" style={styles.userSearchIcon} />
-              <TextInput
-                style={styles.userSearchInput}
-                placeholder="Search by username"
-                placeholderTextColor="#94a3b8"
-                value={userSearchQuery}
-                onChangeText={handleUserSearch}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              {isSearching && (
-                <ActivityIndicator size="small" color="#FAC638" style={styles.searchLoader} />
-              )}
-            </View>
-
-            {/* Search Dropdown */}
-            {showSearchDropdown && (
-              <View style={styles.searchDropdown}>
-                {searchResults.length > 0 ? (
-                  <ScrollView 
-                    style={styles.searchResultsList}
-                    keyboardShouldPersistTaps="handled"
-                    nestedScrollEnabled={true}
-                  >
-                    {searchResults.map((user) => (
-                      <TouchableOpacity
-                        key={user.id}
-                        style={styles.searchResultItem}
-                        onPress={() => handleUserSelect(user)}
-                        activeOpacity={0.7}
-                      >
-                        {user.avatar_url ? (
-                          <Image source={{ uri: user.avatar_url }} style={styles.searchResultAvatar} />
-                        ) : (
-                          <View style={[styles.searchResultAvatar, styles.searchResultAvatarPlaceholder]}>
-                            <Ionicons name="person" size={20} color="#94a3b8" />
-                          </View>
-                        )}
-                        <View style={styles.searchResultInfo}>
-                          <Text style={styles.searchResultUsername}>@{user.username}</Text>
-                          {user.display_name && (
-                            <Text style={styles.searchResultName}>{user.display_name}</Text>
-                          )}
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                ) : (
-                  <View style={styles.searchEmptyState}>
-                    <Ionicons name="search-outline" size={32} color="#cbd5e1" />
-                    <Text style={styles.searchEmptyText}>No users found</Text>
-                  </View>
-                )}
+        <Text style={styles.headerTitle}>Friends</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.headerIconButton}
+            onPress={() => setShowSearchBar(!showSearchBar)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="search" size={22} color="#1e293b" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerIconButton}
+            onPress={openRequestsModal}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="person-add" size={22} color="#1e293b" />
+            {pendingRequests.length > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {pendingRequests.length > 9 ? '9+' : pendingRequests.length}
+                </Text>
               </View>
             )}
-          </View>
+          </TouchableOpacity>
         </View>
+      </View>
 
-        {/* Recent Visits Section */}
-        <View style={styles.friendsListSection}>
-          <Text style={styles.sectionTitle}>
-            Recent Visits {recentVisits.length > 0 && `(${recentVisits.length})`}
-          </Text>
-          
-          {recentVisits.length > 0 ? (
-            <View style={styles.friendsGrid}>
-              {recentVisits.map((visit) => (
+      {/* Search Bar */}
+      {showSearchBar && (
+        <View style={styles.searchBarContainer}>
+          <View style={styles.searchInputWrapper}>
+            <Ionicons name="search" size={18} color="#94a3b8" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by username"
+              placeholderTextColor="#94a3b8"
+              value={userSearchQuery}
+              onChangeText={handleUserSearch}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus
+            />
+            {isSearching && (
+              <ActivityIndicator size="small" color="#FAC638" />
+            )}
+          </View>
+          <TouchableOpacity onPress={cancelSearch} style={styles.cancelButton}>
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Search Results Dropdown */}
+      {showSearchBar && showSearchDropdown && (
+        <View style={styles.searchDropdown}>
+          {searchResults.length > 0 ? (
+            <ScrollView
+              style={styles.searchResultsList}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled={true}
+            >
+              {searchResults.map((user) => (
+                <TouchableOpacity
+                  key={user.id}
+                  style={styles.searchResultItem}
+                  onPress={() => handleUserSelect(user)}
+                  activeOpacity={0.7}
+                >
+                  {user.avatar_url ? (
+                    <Image source={{ uri: user.avatar_url }} style={styles.searchResultAvatar} />
+                  ) : (
+                    <View style={[styles.searchResultAvatar, styles.avatarPlaceholder]}>
+                      <Ionicons name="person" size={18} color="#94a3b8" />
+                    </View>
+                  )}
+                  <View style={styles.searchResultInfo}>
+                    <Text style={styles.searchResultName} numberOfLines={1}>
+                      {user.display_name || user.username}
+                    </Text>
+                    <Text style={styles.searchResultUsername} numberOfLines={1}>
+                      @{user.username}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={styles.searchEmpty}>
+              <Ionicons name="search-outline" size={28} color="#cbd5e1" />
+              <Text style={styles.searchEmptyText}>No users found</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Stories Row */}
+        <View style={styles.storiesSection}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.storiesContent}
+          >
+            {recentVisits.length > 0 ? (
+              recentVisits.map((visit) => (
                 <TouchableOpacity
                   key={visit.id}
-                  style={styles.friendCard}
+                  style={styles.storyItem}
                   onPress={() => handleRecentVisitPress(visit)}
                   activeOpacity={0.7}
                 >
-                  {visit.avatar_url ? (
-                    <Image source={{ uri: visit.avatar_url }} style={styles.friendAvatar} />
-                  ) : (
-                    <View style={[styles.friendAvatar, styles.friendAvatarPlaceholder]}>
-                      <Ionicons name="person" size={32} color="#94a3b8" />
-                    </View>
-                  )}
-                  <Text style={styles.friendName} numberOfLines={1}>
-                    {visit.display_name || `@${visit.username}`}
+                  <View style={styles.storyRing}>
+                    {visit.avatar_url ? (
+                      <Image source={{ uri: visit.avatar_url }} style={styles.storyAvatar} />
+                    ) : (
+                      <View style={[styles.storyAvatar, styles.avatarPlaceholder]}>
+                        <Ionicons name="person" size={26} color="#94a3b8" />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.storyUsername} numberOfLines={1}>
+                    {visit.username}
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={48} color="#cbd5e1" />
-              <Text style={styles.emptyStateText}>No recent visits</Text>
-              <Text style={styles.emptyStateSubtext}>
-                Search for users above and visit their profiles to see them here
-              </Text>
-            </View>
-          )}
+              ))
+            ) : (
+              <TouchableOpacity
+                style={styles.storyItem}
+                onPress={() => setShowSearchBar(true)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.storyRingPlaceholder}>
+                  <View style={[styles.storyAvatar, styles.addFriendPlaceholder]}>
+                    <Ionicons name="person-add" size={24} color="#FAC638" />
+                  </View>
+                </View>
+                <Text style={styles.storyUsername}>Add Friends</Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
         </View>
 
-        {/* My Friends Section - Full List */}
-        <View style={styles.allFriendsSection}>
-          <Text style={styles.sectionTitle}>
-            My Friends {friends.length > 0 && `(${friends.length})`}
-          </Text>
-          
-          {loadingFriends ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#FAC638" />
-              <Text style={styles.loadingText}>Loading friends...</Text>
-            </View>
-          ) : friends.length > 0 ? (
-            <View style={styles.friendsList}>
-              {friends.map((friend, index) => (
-                <TouchableOpacity
-                  key={friend.id}
-                  style={[
-                    styles.friendListItem,
-                    index < friends.length - 1 && styles.friendListItemBorder
-                  ]}
-                  onPress={() => handleFriendPress(friend)}
-                  activeOpacity={0.7}
-                >
-                  {/* Left: Avatar */}
-                  {friend.avatar_url ? (
-                    <Image source={{ uri: friend.avatar_url }} style={styles.friendListAvatar} />
-                  ) : (
-                    <View style={[styles.friendListAvatar, styles.friendListAvatarPlaceholder]}>
-                      <Ionicons name="person" size={24} color="#94a3b8" />
-                    </View>
-                  )}
+        {/* Pending Requests Banner */}
+        {pendingRequests.length > 0 && (
+          <TouchableOpacity
+            style={styles.requestsBanner}
+            onPress={openRequestsModal}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="people" size={20} color="#1e293b" />
+            <Text style={styles.requestsBannerText}>
+              You have {pendingRequests.length} friend request{pendingRequests.length > 1 ? 's' : ''}
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color="#1e293b" />
+          </TouchableOpacity>
+        )}
 
-                  {/* Center: Name and Username */}
-                  <View style={styles.friendListInfo}>
-                    <Text style={styles.friendListName} numberOfLines={1}>
-                      {friend.display_name || friend.username}
-                    </Text>
-                    {friend.display_name && (
-                      <Text style={styles.friendListUsername} numberOfLines={1}>
-                        @{friend.username}
+        {/* Friends List */}
+        {loadingFriends ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#FAC638" />
+            <Text style={styles.loadingText}>Loading friends...</Text>
+          </View>
+        ) : friends.length > 0 ? (
+          <View style={styles.friendsList}>
+            {friends.map((friend, index) => (
+              <TouchableOpacity
+                key={friend.id}
+                style={styles.friendRow}
+                onPress={() => handleFriendPress(friend)}
+                activeOpacity={0.6}
+              >
+                {/* Avatar */}
+                {friend.avatar_url ? (
+                  <Image source={{ uri: friend.avatar_url }} style={styles.friendAvatar} />
+                ) : (
+                  <View style={[styles.friendAvatar, styles.avatarPlaceholder]}>
+                    <Ionicons name="person" size={22} color="#94a3b8" />
+                  </View>
+                )}
+
+                {/* Name + Username */}
+                <View style={styles.friendInfo}>
+                  <Text style={styles.friendName} numberOfLines={1}>
+                    {friend.display_name || friend.username}
+                  </Text>
+                  <Text style={styles.friendUsername} numberOfLines={1}>
+                    @{friend.username}
+                  </Text>
+                </View>
+
+                {/* Right side: last capsule info or time */}
+                <View style={styles.friendMeta}>
+                  {friend.lastCapsule ? (
+                    <>
+                      <Text style={styles.friendMetaText} numberOfLines={1}>
+                        {friend.lastCapsule.title}
                       </Text>
-                    )}
-                  </View>
+                      <Text style={styles.friendMetaTime}>
+                        {formatTimeAgo(friend.lastCapsule.created_at)}
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={styles.friendMetaMuted}>No capsules</Text>
+                  )}
+                </View>
 
-                  {/* Right: Activity Indicator */}
-                  <View style={styles.friendListActivity}>
-                    {friend.lastCapsule ? (
-                      <>
-                        <View style={styles.activityRow}>
-                          <Ionicons name="time-outline" size={14} color="#64748b" />
-                          <Text style={styles.activityText} numberOfLines={1}>
-                            {formatTimeAgo(friend.lastCapsule.created_at)}
-                          </Text>
-                        </View>
-                        {friend.lastCapsule.location && (
-                          <View style={styles.activityRow}>
-                            <Ionicons name="location-outline" size={14} color="#64748b" />
-                            <Text style={styles.activityText} numberOfLines={1}>
-                              {friend.lastCapsule.title}
-                            </Text>
-                          </View>
-                        )}
-                      </>
-                    ) : (
-                      <Text style={styles.activityTextMuted}>No activity</Text>
-                    )}
-                  </View>
-
-                  {/* Chevron */}
-                  <Ionicons name="chevron-forward" size={20} color="#cbd5e1" style={styles.friendListChevron} />
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={48} color="#cbd5e1" />
-              <Text style={styles.emptyStateText}>No friends yet</Text>
-              <Text style={styles.emptyStateSubtext}>
-                Start by creating and sharing capsules with others
-              </Text>
-            </View>
-          )}
-        </View>
+                {/* Separator */}
+                {index < friends.length - 1 && <View style={styles.separator} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons name="person-add-outline" size={52} color="#cbd5e1" />
+            <Text style={styles.emptyTitle}>Add friends to see them here</Text>
+            <Text style={styles.emptySubtitle}>
+              Search for people by username or share your profile
+            </Text>
+          </View>
+        )}
 
         {/* Bottom padding for tab bar */}
         <View style={{ height: 100 }} />
@@ -601,9 +624,10 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
           >
             {/* Modal Header */}
             <View style={styles.modalHeader}>
+              <View style={styles.modalHandle} />
               <Text style={styles.modalTitle}>Friend Requests</Text>
               <TouchableOpacity onPress={closeRequestsModal} style={styles.modalCloseButton}>
-                <Ionicons name="close" size={24} color="#64748b" />
+                <Ionicons name="close-circle" size={28} color="#94a3b8" />
               </TouchableOpacity>
             </View>
 
@@ -620,7 +644,7 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
                 </View>
               ) : pendingRequests.length === 0 ? (
                 <View style={styles.modalEmptyState}>
-                  <Ionicons name="people-outline" size={64} color="#cbd5e1" />
+                  <Ionicons name="people-outline" size={56} color="#cbd5e1" />
                   <Text style={styles.modalEmptyText}>No new friend requests</Text>
                   <Text style={styles.modalEmptySubtext}>
                     When someone sends you a friend request, it will appear here
@@ -671,7 +695,7 @@ const FriendRequestItem: React.FC<FriendRequestItemProps> = ({
         .from('profiles')
         .select('id, username, display_name, avatar_url')
         .eq('id', request.sender_id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error loading sender profile:', error);
@@ -714,8 +738,8 @@ const FriendRequestItem: React.FC<FriendRequestItemProps> = ({
       {senderProfile.avatar_url ? (
         <Image source={{ uri: senderProfile.avatar_url }} style={styles.requestAvatar} />
       ) : (
-        <View style={[styles.requestAvatar, styles.requestAvatarPlaceholder]}>
-          <Ionicons name="person" size={24} color="#94a3b8" />
+        <View style={[styles.requestAvatar, styles.avatarPlaceholder]}>
+          <Ionicons name="person" size={22} color="#94a3b8" />
         </View>
       )}
 
@@ -735,25 +759,25 @@ const FriendRequestItem: React.FC<FriendRequestItemProps> = ({
       {/* Actions */}
       <View style={styles.requestActions}>
         <TouchableOpacity
-          style={[styles.requestButton, styles.acceptButton]}
+          style={styles.acceptButton}
           onPress={() => onAccept(request.id, request.sender_id)}
           disabled={isProcessing}
           activeOpacity={0.7}
         >
           {isProcessing ? (
-            <ActivityIndicator size="small" color="white" />
+            <ActivityIndicator size="small" color="#1e293b" />
           ) : (
-            <Ionicons name="checkmark" size={20} color="white" />
+            <Text style={styles.acceptButtonText}>Accept</Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.requestButton, styles.declineButton]}
+          style={styles.declineButton}
           onPress={() => onDecline(request.id)}
           disabled={isProcessing}
           activeOpacity={0.7}
         >
-          <Ionicons name="close" size={20} color="white" />
+          <Ionicons name="close" size={18} color="#64748b" />
         </TouchableOpacity>
       </View>
     </View>
@@ -763,141 +787,134 @@ const FriendRequestItem: React.FC<FriendRequestItemProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f8f8f5',
   },
+
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'white',
-    paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight ? StatusBar.currentHeight + 16 : 16,
+    backgroundColor: '#ffffff',
+    paddingTop: Platform.OS === 'ios' ? 54 : StatusBar.currentHeight ? StatusBar.currentHeight + 16 : 16,
     paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e2e8f0',
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: '800',
     color: '#1e293b',
-    flex: 1,
+    letterSpacing: -0.5,
   },
-  notificationButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: '#ef4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 5,
-  },
-  notificationBadgeText: {
-    color: 'white',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  content: {
-    flex: 1,
-  },
-  searchSection: {
-    backgroundColor: 'white',
-    padding: 20,
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 16,
-  },
-  userSearchContainer: {
-    position: 'relative',
-    zIndex: 1000,
-  },
-  userSearchInputWrapper: {
+  headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    paddingHorizontal: 12,
-    height: 48,
+    gap: 4,
   },
-  userSearchIcon: {
-    marginRight: 8,
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
   },
-  userSearchInput: {
+  badge: {
+    position: 'absolute',
+    top: 4,
+    right: 2,
+    backgroundColor: '#FAC638',
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+  badgeText: {
+    color: '#1e293b',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+
+  // Search Bar
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e2e8f0',
+    gap: 10,
+  },
+  searchInputWrapper: {
     flex: 1,
-    fontSize: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 40,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
     color: '#1e293b',
   },
-  searchLoader: {
-    marginLeft: 8,
+  cancelButton: {
+    paddingHorizontal: 4,
   },
+  cancelButtonText: {
+    fontSize: 15,
+    color: '#FAC638',
+    fontWeight: '600',
+  },
+
+  // Search Dropdown
   searchDropdown: {
-    position: 'absolute',
-    top: 52,
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-    maxHeight: 300,
-    zIndex: 1001,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e2e8f0',
+    maxHeight: 280,
+    zIndex: 100,
   },
   searchResultsList: {
-    maxHeight: 300,
+    maxHeight: 280,
   },
   searchResultItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderBottomWidth: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#f1f5f9',
   },
   searchResultAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     marginRight: 12,
-  },
-  searchResultAvatarPlaceholder: {
-    backgroundColor: '#f1f5f9',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   searchResultInfo: {
     flex: 1,
   },
-  searchResultUsername: {
+  searchResultName: {
     fontSize: 15,
     fontWeight: '600',
     color: '#1e293b',
   },
-  searchResultName: {
+  searchResultUsername: {
     fontSize: 13,
     color: '#64748b',
-    marginTop: 2,
+    marginTop: 1,
   },
-  searchEmptyState: {
-    padding: 32,
+  searchEmpty: {
+    paddingVertical: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -906,136 +923,184 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     marginTop: 8,
   },
-  friendsListSection: {
-    backgroundColor: 'white',
-    padding: 20,
-    marginBottom: 20,
-  },
-  friendsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -8,
-  },
-  friendCard: {
-    width: '33.33%',
-    padding: 8,
-    alignItems: 'center',
-  },
-  friendAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+
+  // Stories Row
+  storiesSection: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 16,
     marginBottom: 8,
   },
-  friendAvatarPlaceholder: {
+  storiesContent: {
+    paddingHorizontal: 16,
+    gap: 16,
+  },
+  storyItem: {
+    alignItems: 'center',
+    width: 72,
+  },
+  storyRing: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    borderWidth: 2.5,
+    borderColor: '#FAC638',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 2,
+  },
+  storyRingPlaceholder: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    borderWidth: 2.5,
+    borderColor: '#e2e8f0',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 2,
+  },
+  storyAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  addFriendPlaceholder: {
+    backgroundColor: '#FFFBEB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  storyUsername: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 6,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+
+  // Pending Requests Banner
+  requestsBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FAC638',
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 10,
+  },
+  requestsBannerText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+
+  // Content
+  content: {
+    flex: 1,
+  },
+
+  // Friends List
+  friendsList: {
+    backgroundColor: '#ffffff',
+    marginTop: 4,
+  },
+  friendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+  },
+  friendAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 14,
+  },
+  avatarPlaceholder: {
     backgroundColor: '#f1f5f9',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  friendName: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#1e293b',
-    textAlign: 'center',
+  friendInfo: {
+    flex: 1,
+    justifyContent: 'center',
+    marginRight: 12,
   },
+  friendName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  friendUsername: {
+    fontSize: 13,
+    color: '#64748b',
+  },
+  friendMeta: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    maxWidth: 110,
+  },
+  friendMetaText: {
+    fontSize: 12,
+    color: '#64748b',
+    marginBottom: 2,
+  },
+  friendMetaTime: {
+    fontSize: 11,
+    color: '#94a3b8',
+  },
+  friendMetaMuted: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+  },
+  separator: {
+    position: 'absolute',
+    left: 82,
+    right: 20,
+    bottom: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#e2e8f0',
+  },
+
+  // Empty State
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 32,
+    paddingVertical: 64,
+    paddingHorizontal: 40,
   },
-  emptyStateText: {
+  emptyTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#64748b',
-    marginTop: 16,
+    marginTop: 20,
     marginBottom: 8,
   },
-  emptyStateSubtext: {
+  emptySubtitle: {
     fontSize: 14,
     color: '#94a3b8',
     textAlign: 'center',
     lineHeight: 20,
   },
-  // All Friends Section - List View
-  allFriendsSection: {
-    backgroundColor: 'white',
-    padding: 20,
-    marginBottom: 20,
-  },
+
+  // Loading
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
+    paddingVertical: 64,
   },
   loadingText: {
     fontSize: 14,
     color: '#64748b',
     marginTop: 12,
   },
-  friendsList: {
-    marginTop: 8,
-  },
-  friendListItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  friendListItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  friendListAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    marginRight: 12,
-  },
-  friendListAvatarPlaceholder: {
-    backgroundColor: '#f1f5f9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  friendListInfo: {
-    flex: 1,
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  friendListName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 2,
-  },
-  friendListUsername: {
-    fontSize: 14,
-    color: '#64748b',
-  },
-  friendListActivity: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  activityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  activityText: {
-    fontSize: 12,
-    color: '#64748b',
-    marginLeft: 4,
-    maxWidth: 120,
-  },
-  activityTextMuted: {
-    fontSize: 12,
-    color: '#94a3b8',
-    fontStyle: 'italic',
-  },
-  friendListChevron: {
-    marginLeft: 4,
-  },
-  // Modal Styles
+
+  // Modal
   modalContainer: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -1044,31 +1109,40 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   modalContent: {
-    backgroundColor: 'white',
+    backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '80%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
     elevation: 10,
   },
   modalHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
+    paddingTop: 12,
+    paddingBottom: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e2e8f0',
   },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#d1d5db',
+    marginBottom: 14,
+  },
   modalTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
     color: '#1e293b',
   },
   modalCloseButton: {
+    position: 'absolute',
+    right: 16,
+    top: 28,
     width: 36,
     height: 36,
     alignItems: 'center',
@@ -1078,7 +1152,7 @@ const styles = StyleSheet.create({
     maxHeight: 500,
   },
   requestsListContent: {
-    paddingBottom: 32,
+    paddingBottom: 40,
   },
   modalLoadingState: {
     paddingVertical: 80,
@@ -1097,7 +1171,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalEmptyText: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
     color: '#64748b',
     marginTop: 16,
@@ -1109,39 +1183,36 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
+
+  // Request Item
   requestItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#f1f5f9',
   },
   requestAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     marginRight: 12,
-  },
-  requestAvatarPlaceholder: {
-    backgroundColor: '#f1f5f9',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   requestInfo: {
     flex: 1,
     marginRight: 12,
   },
   requestName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#1e293b',
     marginBottom: 2,
   },
   requestUsername: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#64748b',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   requestTime: {
     fontSize: 12,
@@ -1149,20 +1220,29 @@ const styles = StyleSheet.create({
   },
   requestActions: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
-  requestButton: {
-    width: 40,
-    height: 40,
+  acceptButton: {
+    backgroundColor: '#FAC638',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  acceptButton: {
-    backgroundColor: '#10b981',
+  acceptButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1e293b',
   },
   declineButton: {
-    backgroundColor: '#ef4444',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, RefreshControl, TextInput, Dimensions, Platform, Animated, PanResponder, Modal, Image, KeyboardAvoidingView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, RefreshControl, TextInput, Dimensions, Platform, Animated, PanResponder, Modal, Image, KeyboardAvoidingView, Share } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { BlurView } from 'expo-blur';
 import { CapsuleService } from '../../services/capsuleService';
 import { CapsuleIcon } from '../../components/common/CapsuleIcon';
+import { supabase } from '../../lib/supabase';
+import CapsuleDetailModal from '../../components/CapsuleDetailModal';
 
 interface DashboardScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -27,6 +29,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
   const [capsules, setCapsules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCapsule, setSelectedCapsule] = useState<any>(null);
+  const [selectedCapsuleOwner, setSelectedCapsuleOwner] = useState<any>(null);
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [lastTappedCapsule, setLastTappedCapsule] = useState<string | null>(null);
   const modalOpacity = useRef(new Animated.Value(0)).current;
@@ -116,7 +119,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
         const newValue = -gestureState.dy;
         
         // Calculate what the actual height would be
-        const potentialHeight = bottomSheetHeight._offset + newValue;
+        const potentialHeight = (bottomSheetHeight as any)._offset + newValue;
         
         // Allow free movement between min and max with slight resistance at edges
         if (potentialHeight < SNAP_POINTS.COLLAPSED) {
@@ -128,7 +131,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
           // Add resistance when dragging above expanded
           const resistance = 0.3;
           const excess = potentialHeight - SNAP_POINTS.EXPANDED;
-          bottomSheetHeight.setValue(SNAP_POINTS.EXPANDED - bottomSheetHeight._offset + (excess * resistance));
+          bottomSheetHeight.setValue(SNAP_POINTS.EXPANDED - (bottomSheetHeight as any)._offset + (excess * resistance));
         } else {
           // Free movement in valid range
           bottomSheetHeight.setValue(newValue);
@@ -138,7 +141,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
         // Flatten offset to get actual value
         bottomSheetHeight.flattenOffset();
         
-        const currentHeight = bottomSheetHeight._value;
+        const currentHeight = (bottomSheetHeight as any)._value;
         const velocity = gestureState.vy; // Negative = up, Positive = down
         
         // Find nearest snap point based on position and velocity
@@ -185,8 +188,15 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    // TODO: Implement search functionality
   };
+
+  // Filter capsules based on search query
+  const filteredCapsules = searchQuery.trim()
+    ? capsules.filter((c: any) =>
+        c.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : capsules;
 
   const handleCreateCapsule = () => {
     onNavigate('Create');
@@ -216,41 +226,35 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
   };
 
   const getMediaUrl = (capsule: any): string | null => {
-    // content_refs can be:
-    // 1. Array of URL strings: ["https://..."]
-    // 2. Array of objects: [{url: "https://...", type: "image"}]
-    // 3. Single URL string: "https://..."
-    // 4. null/undefined
-    
+    // Prefer media_url (the correct Supabase Storage URL)
+    if (capsule.media_url) {
+      return capsule.media_url;
+    }
+
+    // Fallback to content_refs for backwards compatibility
     if (!capsule.content_refs) return null;
-    
-    // If it's an array
+
     if (Array.isArray(capsule.content_refs)) {
       if (capsule.content_refs.length === 0) return null;
-      
+
       const firstItem = capsule.content_refs[0];
-      
-      // If first item is a string (direct URL)
-      if (typeof firstItem === 'string') {
+
+      if (typeof firstItem === 'string' && firstItem.startsWith('http')) {
         return firstItem;
       }
-      
-      // If first item is an object with url property
-      if (firstItem && typeof firstItem === 'object' && firstItem.url) {
-        return firstItem.url;
-      }
-      
-      // If first item is an object with file_url property
-      if (firstItem && typeof firstItem === 'object' && firstItem.file_url) {
-        return firstItem.file_url;
+
+      if (firstItem && typeof firstItem === 'object') {
+        const url = firstItem.url || firstItem.file_url;
+        if (url && typeof url === 'string' && url.startsWith('http')) {
+          return url;
+        }
       }
     }
-    
-    // If it's a direct string URL
-    if (typeof capsule.content_refs === 'string') {
+
+    if (typeof capsule.content_refs === 'string' && capsule.content_refs.startsWith('http')) {
       return capsule.content_refs;
     }
-    
+
     return null;
   };
 
@@ -282,36 +286,69 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
     setLastTappedCapsule(capsule.id);
   };
 
-  const handleCalloutPress = async (capsule: any) => {
-    // Tapping "Tap for details" should always open the detail modal
+  const [selectedCapsuleAddress, setSelectedCapsuleAddress] = useState<string | null>(null);
+
+  const loadCapsuleOwner = async (ownerId: string) => {
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, display_name, username, avatar_url')
+        .eq('id', ownerId)
+        .maybeSingle();
+      setSelectedCapsuleOwner(data);
+    } catch {
+      setSelectedCapsuleOwner(null);
+    }
+  };
+
+  const loadCapsuleAddress = async (lat: number, lng: number) => {
+    try {
+      const results = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+      if (results.length > 0) {
+        const addr = results[0];
+        const parts = [addr.name, addr.street, addr.city, addr.region].filter(Boolean);
+        setSelectedCapsuleAddress(parts.join(', '));
+      } else {
+        setSelectedCapsuleAddress(null);
+      }
+    } catch {
+      setSelectedCapsuleAddress(null);
+    }
+  };
+
+  const openCapsuleDetail = async (capsule: any) => {
     setSelectedCapsule(capsule);
+    setSelectedCapsuleOwner(null);
+    setSelectedCapsuleAddress(null);
     setShowTimeModal(true);
     openDetailModal();
-    
-    // Increment view count (silently fail if not set up)
+
+    // Load owner profile
+    if (capsule?.owner_id) {
+      loadCapsuleOwner(capsule.owner_id);
+    }
+
+    // Load address from coordinates
+    if (capsule?.lat && capsule?.lng) {
+      loadCapsuleAddress(capsule.lat, capsule.lng);
+    }
+
+    // Increment view count
     if (capsule?.id) {
       try {
         await CapsuleService.incrementViewCount(capsule.id);
-      } catch (error) {
-        // Silently ignore - view count feature not critical
+      } catch {
+        // Silently ignore
       }
     }
   };
 
+  const handleCalloutPress = async (capsule: any) => {
+    openCapsuleDetail(capsule);
+  };
+
   const handleMarkerPress = async (capsule: any) => {
-    // When grid item or marker is tapped, open detail modal
-    setSelectedCapsule(capsule);
-    setShowTimeModal(true);
-    openDetailModal();
-    
-    // Increment view count (silently fail if not set up)
-    if (capsule?.id) {
-      try {
-        await CapsuleService.incrementViewCount(capsule.id);
-      } catch (error) {
-        // Silently ignore - view count feature not critical
-      }
-    }
+    openCapsuleDetail(capsule);
   };
 
   const openDetailModal = () => {
@@ -362,7 +399,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
       },
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
-        detailModalTranslateY.setOffset(detailModalTranslateY._value);
+        detailModalTranslateY.setOffset((detailModalTranslateY as any)._value);
         detailModalTranslateY.setValue(0);
       },
       onPanResponderMove: (_, gestureState) => {
@@ -374,7 +411,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
       onPanResponderRelease: (_, gestureState) => {
         detailModalTranslateY.flattenOffset();
         
-        const currentTranslate = detailModalTranslateY._value;
+        const currentTranslate = (detailModalTranslateY as any)._value;
         const velocity = gestureState.vy;
         
         // Close if dragged down more than 25% or fast swipe down
@@ -404,9 +441,37 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
   };
 
   const isMediaShared = (capsule: any): boolean => {
-    // Check if capsule allows media sharing (is_public or user in allowed_users)
-    // For now, we'll show media if content_refs exists and has items
-    return capsule?.content_refs && Array.isArray(capsule.content_refs) && capsule.content_refs.length > 0;
+    // Check if capsule has any media (media_url or content_refs)
+    if (capsule?.media_url && capsule.media_type !== 'none') return true;
+    if (capsule?.content_refs && Array.isArray(capsule.content_refs) && capsule.content_refs.length > 0) return true;
+    return false;
+  };
+
+  // Get all media URLs for a capsule (combines media_url and content_refs)
+  const getCapsuleMediaUrls = (capsule: any): string[] => {
+    const urls: string[] = [];
+
+    // Add media_url first (primary media)
+    if (capsule?.media_url && capsule.media_type !== 'none') {
+      urls.push(capsule.media_url);
+    }
+
+    // Add content_refs URLs
+    if (capsule?.content_refs && Array.isArray(capsule.content_refs)) {
+      for (const item of capsule.content_refs) {
+        let url: string | null = null;
+        if (typeof item === 'string' && item.startsWith('http')) {
+          url = item;
+        } else if (item && typeof item === 'object') {
+          url = item.url || item.file_url || null;
+        }
+        if (url && url.startsWith('http') && !urls.includes(url)) {
+          urls.push(url);
+        }
+      }
+    }
+
+    return urls;
   };
 
   const getTimeComponents = (openDate: string | null | undefined): { days: number; hours: number; minutes: number; seconds: number } => {
@@ -531,7 +596,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
       },
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
-        inviteModalTranslateY.setOffset(inviteModalTranslateY._value);
+        inviteModalTranslateY.setOffset((inviteModalTranslateY as any)._value);
         inviteModalTranslateY.setValue(0);
       },
       onPanResponderMove: (_, gestureState) => {
@@ -543,7 +608,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
       onPanResponderRelease: (_, gestureState) => {
         inviteModalTranslateY.flattenOffset();
         
-        const currentTranslate = inviteModalTranslateY._value;
+        const currentTranslate = (inviteModalTranslateY as any)._value;
         const velocity = gestureState.vy;
         
         // Close if dragged down more than 25% or fast swipe down
@@ -622,7 +687,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
           rotateEnabled={false}
         >
           {/* Sample markers for capsules */}
-          {capsules.map((capsule, index) => {
+          {filteredCapsules.map((capsule, index) => {
             // Use stable coordinates - prevent re-calculation on every render
             const markerCoordinate = {
               latitude: capsule.displayLat || capsule.lat || userLocation.latitude,
@@ -836,9 +901,30 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
         </KeyboardAvoidingView>
       </Animated.View>
 
-      {/* Capsule Detail Modal - Bottom Sheet */}
-      <Modal
+      <CapsuleDetailModal
         visible={showTimeModal}
+        capsule={selectedCapsule}
+        capsules={filteredCapsules}
+        onClose={() => {
+          setShowTimeModal(false);
+          setSelectedCapsule(null);
+        }}
+        onOwnerPress={(owner) => {
+          setShowTimeModal(false);
+          onNavigate('FriendProfile', {
+            friend: {
+              id: owner.id,
+              username: owner.username || '',
+              display_name: owner.display_name || '',
+              avatar_url: owner.avatar_url,
+            }
+          });
+        }}
+      />
+
+      {/* OLD Modal removed - start */}
+      {false && <Modal
+        visible={false}
         transparent
         animationType="none"
         onRequestClose={closeDetailModal}
@@ -891,76 +977,77 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
               >
                 {selectedCapsule && (
                 <>
-                  {/* Shared With Section - Always at Top (Not Blurred) */}
+                  {/* Owner & Visibility */}
                   <View style={styles.detailModalSharedSection}>
-                    <Text style={styles.detailModalSharedTitle}>Shared With</Text>
-                    
-                    {selectedCapsule.is_public ? (
-                      <View style={styles.detailModalPublicBadge}>
-                        <Ionicons name="globe-outline" size={20} color="#06D6A0" />
-                        <Text style={styles.detailModalPublicText}>This capsule is public</Text>
-            </View>
-                    ) : (
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.detailModalSharedScrollContent}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      {/* Owner info - tappable to go to profile */}
+                      <TouchableOpacity
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+                        onPress={() => {
+                          if (selectedCapsuleOwner) {
+                            closeDetailModal();
+                            onNavigate('FriendProfile', {
+                              friend: {
+                                id: selectedCapsuleOwner.id,
+                                username: selectedCapsuleOwner.username || '',
+                                display_name: selectedCapsuleOwner.display_name || '',
+                                avatar_url: selectedCapsuleOwner.avatar_url,
+                              }
+                            });
+                          }
+                        }}
+                        activeOpacity={0.7}
                       >
-                        {selectedCapsule.allowed_users && selectedCapsule.allowed_users.map((username: string, index: number) => {
-                          // Check if this is the current user
-                          const isCurrentUser = username === 'you' || index === 0; // Mock check
-                          const friend = friends.find(f => f.username === username);
-                          
-                          return (
-                            <View key={index} style={styles.detailModalSharedUser}>
-                              <View style={styles.detailModalSharedAvatar}>
-                                {friend?.avatar_url ? (
-                                  <Image source={{ uri: friend.avatar_url }} style={styles.detailModalSharedAvatarImage} />
-                                ) : (
-                                  <View style={styles.detailModalSharedAvatarPlaceholder}>
-          <Ionicons name="person" size={24} color="#94a3b8" />
-          </View>
-                                )}
-                                {isCurrentUser && (
-                                  <View style={styles.detailModalSharedBadge}>
-                                    <Ionicons name="checkmark-circle" size={16} color="#FAC638" />
-                                  </View>
-                                )}
-                              </View>
-                              <Text style={styles.detailModalSharedName} numberOfLines={1}>
-                                {friend?.name.split(' ')[0] || username}
-                              </Text>
-                              {isCurrentUser && (
-                                <Text style={styles.detailModalSharedYouBadge}>You</Text>
-                              )}
-                            </View>
-                          );
-                        })}
-                      </ScrollView>
-                    )}
+                        <View style={styles.detailModalAvatar}>
+                          {selectedCapsuleOwner?.avatar_url ? (
+                            <Image source={{ uri: selectedCapsuleOwner.avatar_url }} style={{ width: 36, height: 36, borderRadius: 18 }} />
+                          ) : (
+                            <Ionicons name="person" size={20} color="#64748b" />
+                          )}
+                        </View>
+                        <View>
+                          <Text style={{ fontSize: 15, fontWeight: '600', color: '#1e293b' }}>
+                            {selectedCapsuleOwner?.display_name || selectedCapsuleOwner?.username || 'Loading...'}
+                          </Text>
+                          {selectedCapsuleOwner?.username && (
+                            <Text style={{ fontSize: 13, color: '#94a3b8' }}>@{selectedCapsuleOwner.username}</Text>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+
+                      {/* Visibility badge */}
+                      {selectedCapsule.is_public ? (
+                        <View style={[styles.detailModalPublicBadge, { marginBottom: 0 }]}>
+                          <Ionicons name="globe-outline" size={16} color="#06D6A0" />
+                          <Text style={[styles.detailModalPublicText, { fontSize: 12 }]}>Public</Text>
+                        </View>
+                      ) : (
+                        <View style={[styles.detailModalPublicBadge, { marginBottom: 0 }]}>
+                          <Ionicons name="lock-closed-outline" size={16} color="#64748b" />
+                          <Text style={[styles.detailModalPublicText, { color: '#64748b', fontSize: 12 }]}>Private</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
 
                   {/* Media Preview Section - Hidden when locked */}
                   {isMediaShared(selectedCapsule) && !isCapsuleLocked(selectedCapsule.open_at) && (
                     <View style={styles.detailModalMediaHeader}>
                       <View style={styles.detailModalMediaPreview}>
-                        {selectedCapsule.content_refs.slice(0, 1).map((item: any, index: number) => {
-                          const mediaUrl = item.uri || item.url || item;
-                          const isImage = typeof mediaUrl === 'string' && 
-                            (mediaUrl.includes('image') || 
-                             mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i));
-                          
+                        {(() => {
+                          const allUrls = getCapsuleMediaUrls(selectedCapsule);
+                          const firstUrl = allUrls[0];
+                          if (!firstUrl) return null;
                           return (
-                            <Image 
-                              key={index}
-                              source={{ uri: isImage ? mediaUrl : undefined }} 
+                            <Image
+                              source={{ uri: firstUrl }}
                               style={styles.detailModalHeaderImage}
                               resizeMode="cover"
                             />
                           );
-                        })}
-            </View>
-          </View>
+                        })()}
+                      </View>
+                    </View>
                   )}
 
                   {/* Locked Media Placeholder */}
@@ -984,65 +1071,73 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                     </Text>
                   )}
 
-                  {/* Time Countdown Cards */}
-                  <View style={styles.detailModalCountdownContainer}>
-                    {(() => {
-                      const timeData = getTimeComponents(selectedCapsule.open_at);
-                      return (
-                        <>
-                          <View style={styles.detailModalCountdownCard}>
-                            <Text style={styles.detailModalCountdownValue}>{timeData.days}</Text>
-                            <Text style={styles.detailModalCountdownLabel}>Days</Text>
-                          </View>
-                          <View style={styles.detailModalCountdownCard}>
-                            <Text style={styles.detailModalCountdownValue}>{timeData.hours}</Text>
-                            <Text style={styles.detailModalCountdownLabel}>Hours</Text>
-                          </View>
-                          <View style={styles.detailModalCountdownCard}>
-                            <Text style={styles.detailModalCountdownValue}>{timeData.minutes}</Text>
-                            <Text style={styles.detailModalCountdownLabel}>Minutes</Text>
-                          </View>
-                          <View style={[styles.detailModalCountdownCard, styles.detailModalCountdownCardLast]}>
-                            <Text style={styles.detailModalCountdownValue}>{timeData.seconds}</Text>
-                            <Text style={styles.detailModalCountdownLabel}>Seconds</Text>
-                          </View>
-                        </>
-                      );
-                    })()}
-                  </View>
-
-                  {/* From Section */}
-                  <View style={styles.detailModalInfoSection}>
-                    <Text style={styles.detailModalInfoLabel}>From</Text>
-                    <View style={styles.detailModalInfoCard}>
-                      <View style={styles.detailModalAvatar}>
-                        <Ionicons name="person" size={24} color="#64748b" />
-                      </View>
-                      <Text style={styles.detailModalInfoText}>You</Text>
+                  {/* Time Countdown Cards - Only when open_at is set and capsule is locked */}
+                  {selectedCapsule.open_at && isCapsuleLocked(selectedCapsule.open_at) && (
+                    <View style={styles.detailModalCountdownContainer}>
+                      {(() => {
+                        const timeData = getTimeComponents(selectedCapsule.open_at);
+                        return (
+                          <>
+                            <View style={styles.detailModalCountdownCard}>
+                              <Text style={styles.detailModalCountdownValue}>{timeData.days}</Text>
+                              <Text style={styles.detailModalCountdownLabel}>Days</Text>
+                            </View>
+                            <View style={styles.detailModalCountdownCard}>
+                              <Text style={styles.detailModalCountdownValue}>{timeData.hours}</Text>
+                              <Text style={styles.detailModalCountdownLabel}>Hours</Text>
+                            </View>
+                            <View style={styles.detailModalCountdownCard}>
+                              <Text style={styles.detailModalCountdownValue}>{timeData.minutes}</Text>
+                              <Text style={styles.detailModalCountdownLabel}>Minutes</Text>
+                            </View>
+                            <View style={[styles.detailModalCountdownCard, styles.detailModalCountdownCardLast]}>
+                              <Text style={styles.detailModalCountdownValue}>{timeData.seconds}</Text>
+                              <Text style={styles.detailModalCountdownLabel}>Seconds</Text>
+                            </View>
+                          </>
+                        );
+                      })()}
                     </View>
-                  </View>
+                  )}
 
-                  {/* Opening Conditions */}
+                  {/* Details Section */}
                   <View style={styles.detailModalInfoSection}>
-                    <Text style={styles.detailModalInfoLabel}>Opening Conditions</Text>
-                    
+                    <Text style={styles.detailModalInfoLabel}>Details</Text>
+
+                    {/* Created date */}
                     <View style={styles.detailModalConditionRow}>
                       <View style={styles.detailModalConditionIcon}>
-                        <Ionicons name="calendar-outline" size={20} color="#64748b" />
+                        <Ionicons name="time-outline" size={20} color="#64748b" />
                       </View>
                       <View style={styles.detailModalConditionContent}>
-                        <Text style={styles.detailModalConditionTitle}>
-                          {formatDate(selectedCapsule.open_at)}
-                        </Text>
+                        <Text style={styles.detailModalConditionTitle}>Created</Text>
                         <Text style={styles.detailModalConditionSubtitle}>
-                          Time: {new Date(selectedCapsule.open_at || '').toLocaleTimeString('en-US', { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                          })}
+                          {formatDate(selectedCapsule.created_at)}
                         </Text>
                       </View>
                     </View>
 
+                    {/* Open date - only if set */}
+                    {selectedCapsule.open_at && (
+                      <View style={styles.detailModalConditionRow}>
+                        <View style={styles.detailModalConditionIcon}>
+                          <Ionicons name="calendar-outline" size={20} color="#64748b" />
+                        </View>
+                        <View style={styles.detailModalConditionContent}>
+                          <Text style={styles.detailModalConditionTitle}>
+                            {isCapsuleLocked(selectedCapsule.open_at) ? 'Opens on' : 'Opened on'}
+                          </Text>
+                          <Text style={styles.detailModalConditionSubtitle}>
+                            {formatDate(selectedCapsule.open_at)} - {new Date(selectedCapsule.open_at).toLocaleTimeString('en-US', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Location - only if set */}
                     {(selectedCapsule.lat && selectedCapsule.lng) && (
                       <View style={styles.detailModalConditionRow}>
                         <View style={styles.detailModalConditionIcon}>
@@ -1051,43 +1146,54 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                         <View style={styles.detailModalConditionContent}>
                           <Text style={styles.detailModalConditionTitle}>Location</Text>
                           <Text style={styles.detailModalConditionSubtitle}>
-                            View on Map
+                            {selectedCapsuleAddress || 'Loading address...'}
                           </Text>
                         </View>
                       </View>
                     )}
+
+                    {/* View count */}
+                    <View style={styles.detailModalConditionRow}>
+                      <View style={styles.detailModalConditionIcon}>
+                        <Ionicons name="eye-outline" size={20} color="#64748b" />
+                      </View>
+                      <View style={styles.detailModalConditionContent}>
+                        <Text style={styles.detailModalConditionTitle}>Views</Text>
+                        <Text style={styles.detailModalConditionSubtitle}>
+                          {selectedCapsule.view_count || 0}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
 
                   {/* Additional Media Grid - Only show when unlocked */}
-                  {isMediaShared(selectedCapsule) && !isCapsuleLocked(selectedCapsule.open_at) && selectedCapsule.content_refs.length > 1 && (
-                    <View style={styles.detailModalMediaGrid}>
-                      {selectedCapsule.content_refs.slice(1).map((item: any, index: number) => {
-                        const mediaUrl = item.uri || item.url || item;
-                        const isImage = typeof mediaUrl === 'string' && 
-                          (mediaUrl.includes('image') || 
-                           mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i));
-                        const isVideo = typeof mediaUrl === 'string' && 
-                          (mediaUrl.includes('video') || 
-                           mediaUrl.match(/\.(mp4|mov|avi|webm)$/i));
-
-                        return (
-                          <View key={index} style={styles.detailModalMediaGridItem}>
-                            {isImage ? (
-                              <Image 
-                                source={{ uri: mediaUrl }} 
-                                style={styles.detailModalMediaGridImage}
-                                resizeMode="cover"
-                              />
-                            ) : isVideo ? (
-                              <View style={styles.detailModalMediaGridVideo}>
-                                <Ionicons name="play-circle" size={32} color="white" />
-                              </View>
-                            ) : null}
-                          </View>
-                        );
-                      })}
-                    </View>
-                  )}
+                  {(() => {
+                    if (!isMediaShared(selectedCapsule) || isCapsuleLocked(selectedCapsule.open_at)) return null;
+                    const allUrls = getCapsuleMediaUrls(selectedCapsule);
+                    if (allUrls.length <= 1) return null;
+                    return (
+                      <View style={styles.detailModalMediaGrid}>
+                        {allUrls.slice(1).map((url: string, index: number) => {
+                          const isVideo = url.match(/\.(mp4|mov|avi|webm)$/i);
+                          return (
+                            <View key={index} style={styles.detailModalMediaGridItem}>
+                              {isVideo ? (
+                                <View style={styles.detailModalMediaGridVideo}>
+                                  <Ionicons name="play-circle" size={32} color="white" />
+                                </View>
+                              ) : (
+                                <Image
+                                  source={{ uri: url }}
+                                  style={styles.detailModalMediaGridImage}
+                                  resizeMode="cover"
+                                />
+                              )}
+                            </View>
+                          );
+                        })}
+                      </View>
+                    );
+                  })()}
 
                   {/* Bottom Padding for Fixed Button */}
                   <View style={styles.detailModalBottomPadding} />
@@ -1121,7 +1227,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
             <View style={styles.detailModalFooter}>
               <TouchableOpacity 
                 style={styles.detailModalShareButton}
-                onPress={() => Alert.alert('Share', 'Share functionality coming soon!')}
+                onPress={() => Share.share({ message: 'Check out this time capsule on TimeCapsule!' })}
                 activeOpacity={0.8}
               >
                 <Ionicons name="share-social" size={20} color="#1e293b" style={styles.detailModalShareIcon} />
@@ -1130,7 +1236,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
       </View>
           </Animated.View>
         </View>
-      </Modal>
+      </Modal>}
 
       {/* Invite Friend Modal - Bottom Sheet */}
       <Modal
@@ -1400,7 +1506,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 16,
     paddingHorizontal: 16,
-    cursor: 'grab',
+    cursor: 'grab' as any,
   },
   detailModalDragBar: {
     width: 40,
@@ -1962,7 +2068,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 16,
     paddingHorizontal: 16,
-    cursor: 'grab',
+    cursor: 'grab' as any,
   },
   inviteModalDragBar: {
     width: 40,

@@ -14,6 +14,7 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onNavigate }) =>
   const tabs = [
     { id: 'Friends', label: 'Friends', icon: 'people' as const },
     { id: 'Dashboard', label: 'Map', icon: 'map' as const },
+    { id: 'Notifications', label: 'Notifications', icon: 'notifications' as const },
     { id: 'Profile', label: 'Profile', icon: 'person' as const },
   ];
 

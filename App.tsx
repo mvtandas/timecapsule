@@ -15,6 +15,7 @@ import ProfileScreen from './src/screens/profile/ProfileScreen';
 import FriendProfileScreen from './src/screens/friends/FriendProfileScreen';
 import FriendsScreen from './src/screens/friends/FriendsScreen';
 import AccountSettingsScreen from './src/screens/profile/AccountSettingsScreen';
+import NotificationsScreen from './src/screens/notifications/NotificationsScreen';
 import BottomTabBar from './src/components/common/BottomTabBar';
 import { Friend } from './src/types';
 
@@ -240,7 +241,7 @@ export default function App() {
   }
 
   // Check if current screen should show bottom tabs
-  const shouldShowBottomTabs = ['Dashboard', 'Friends', 'Profile'].includes(currentScreen);
+  const shouldShowBottomTabs = ['Dashboard', 'Friends', 'Notifications', 'Profile'].includes(currentScreen);
 
   return (
     <SafeAreaProvider>
@@ -266,7 +267,8 @@ export default function App() {
           {currentScreen === 'FriendProfile' && navigationData?.friend && (
             <FriendProfileScreen onNavigate={navigate} friend={navigationData.friend} onGoBack={goBack} />
           )}
-          {currentScreen === 'AccountSettings' && <AccountSettingsScreen onNavigate={navigate} onGoBack={goBack} />}
+          {currentScreen === 'AccountSettings' && <AccountSettingsScreen onNavigate={navigate} onGoBack={goBack} onLogout={handleLogout} />}
+          {currentScreen === 'Notifications' && <NotificationsScreen onNavigate={navigate} onGoBack={goBack} />}
         </Animated.View>
         
         {/* Bottom Tab Bar - Fixed at bottom, outside scroll context */}

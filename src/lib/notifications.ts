@@ -19,7 +19,6 @@ export class NotificationService {
       // Request permissions
       const { status } = await Notifications.requestPermissionsAsync();
       if (status !== 'granted') {
-        console.warn('Notification permissions not granted');
         return;
       }
 
@@ -36,15 +35,15 @@ export class NotificationService {
       // Set notification handler
       Notifications.setNotificationHandler({
         handleNotification: async (notification) => {
-          console.log('Notification received:', notification);
           return {
             shouldShowAlert: true,
             shouldPlaySound: true,
             shouldSetBadge: true,
+            shouldShowBanner: true,
+            shouldShowList: true,
           };
         },
         handleSuccess: (notificationId) => {
-          console.log('Notification shown:', notificationId);
         },
         handleError: (error) => {
           console.error('Notification error:', error);
@@ -53,11 +52,9 @@ export class NotificationService {
 
       // Set up notification listener for when app is in foreground
       Notifications.addNotificationResponseReceivedListener((response) => {
-        console.log('Notification response:', response);
         this.handleNotificationResponse(response);
       });
 
-      console.log('Notifications initialized');
     } catch (error) {
       console.error('Error initializing notifications:', error);
     }
@@ -138,11 +135,7 @@ export class NotificationService {
   static async sendNotification(
     notification: NotificationData
   ): Promise<string | null> {
-    const trigger: Notifications.NotificationTriggerInput = {
-      type: Notifications.SchedulableTriggerInputTypes.IMMEDIATE,
-    };
-
-    return this.scheduleNotification(notificationData, trigger);
+    return this.scheduleNotification(notification, null);
   }
 
   // Handle notification response
@@ -156,21 +149,17 @@ export class NotificationService {
       case 'capsule_open':
         // Navigate to capsule details
         // This would be handled by navigation
-        console.log('Opening capsule:', data.capsuleId);
         break;
 
       case 'capsule_nearby':
         // Navigate to map or capsule details
-        console.log('Nearby capsule:', data.capsuleId);
         break;
 
       case 'capsule_shared':
         // Navigate to shared capsules
-        console.log('Capsule shared:', data.capsuleId);
         break;
 
       default:
-        console.log('Unknown notification type:', data.type);
     }
   }
 
@@ -236,29 +225,15 @@ export class NotificationService {
 
   // Open notification settings
   static openNotificationSettings(): void {
-    if (Platform.OS === 'ios') {
-      Notifications.openAppSettings();
-    } else {
-      // Android doesn't have a direct way to open notification settings
-      // You might need to use Linking to open app settings
-      console.log('Please enable notifications in app settings');
-    }
+    // Linking to app settings can be done via expo-linking if needed
   }
 
   // Register device for push notifications
   static async registerForPushNotifications(): Promise<string | null> {
     try {
       const token = await Notifications.getExpoPushTokenAsync();
-      
+
       if (token) {
-        // Save token to Supabase
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await supabase
-            .from('profiles')
-            .update({ push_token: token.data })
-            .eq('id', user.id);
-        }
       }
 
       return token.data;
@@ -271,14 +246,6 @@ export class NotificationService {
   // Unregister from push notifications
   static async unregisterFromPushNotifications(): Promise<void> {
     try {
-      // Clear token from Supabase
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase
-          .from('profiles')
-          .update({ push_token: null })
-          .eq('id', user.id);
-      }
     } catch (error) {
       console.error('Error unregistering from push notifications:', error);
     }

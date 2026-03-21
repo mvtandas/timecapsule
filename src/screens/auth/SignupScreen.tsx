@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Linking } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/authStore';
 
@@ -19,6 +19,13 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { signUp } = useAuthStore();
+
+  // Refs for keyboard navigation
+  const displayNameRef = useRef<TextInput>(null);
+  const usernameRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const confirmPasswordRef = useRef<TextInput>(null);
 
   const validateUsername = (username: string): { valid: boolean; message?: string } => {
     // Check length
@@ -71,7 +78,6 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
     setLoading(false);
     
     if (error) {
-      console.log('Signup error:', error);
       // Check for username uniqueness error
       const errorMessage = error.message || '';
       if (errorMessage.toLowerCase().includes('username') && errorMessage.toLowerCase().includes('already')) {
@@ -107,10 +113,12 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
         <MaterialIcons name="arrow-back" size={24} color="#111827" />
       </TouchableOpacity>
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <View style={styles.header}>
@@ -128,15 +136,19 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
           <View style={styles.inputContainer}>
             <MaterialIcons name="person" size={24} color="#6b7280" style={styles.inputIcon} />
             <TextInput
+              ref={displayNameRef}
               value={displayName}
               onChangeText={setDisplayName}
               placeholder="Full Name"
               placeholderTextColor="#9ca3af"
               autoCapitalize="words"
               autoCorrect={false}
+              spellCheck={false}
               autoComplete="off"
-              importantForAutofill="no"
               textContentType="none"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => usernameRef.current?.focus()}
               style={styles.input}
               editable={!loading}
             />
@@ -145,15 +157,19 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
           <View style={styles.inputContainer}>
             <MaterialIcons name="alternate-email" size={24} color="#6b7280" style={styles.inputIcon} />
             <TextInput
+              ref={usernameRef}
               value={username}
               onChangeText={setUsername}
               placeholder="Username (3-20 characters)"
               placeholderTextColor="#9ca3af"
               autoCapitalize="none"
               autoCorrect={false}
+              spellCheck={false}
               autoComplete="off"
-              importantForAutofill="no"
               textContentType="none"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => emailRef.current?.focus()}
               style={styles.input}
               editable={!loading}
             />
@@ -162,6 +178,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
           <View style={styles.inputContainer}>
             <MaterialIcons name="email" size={24} color="#6b7280" style={styles.inputIcon} />
             <TextInput
+              ref={emailRef}
               value={email}
               onChangeText={setEmail}
               placeholder="Email Address"
@@ -169,9 +186,12 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+              spellCheck={false}
               autoComplete="off"
-              importantForAutofill="no"
               textContentType="none"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => passwordRef.current?.focus()}
               style={styles.input}
               editable={!loading}
             />
@@ -180,6 +200,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
           <View style={styles.inputContainer}>
             <MaterialIcons name="lock" size={24} color="#6b7280" style={styles.inputIcon} />
             <TextInput
+              ref={passwordRef}
               value={password}
               onChangeText={setPassword}
               placeholder="Password (min. 6 characters)"
@@ -187,9 +208,13 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
               secureTextEntry={!showPassword}
               autoCapitalize="none"
               autoCorrect={false}
+              spellCheck={false}
               autoComplete="off"
+              textContentType="oneTimeCode"
               importantForAutofill="no"
-              textContentType="none"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => confirmPasswordRef.current?.focus()}
               style={styles.input}
               editable={!loading}
             />
@@ -209,6 +234,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
           <View style={styles.inputContainer}>
             <MaterialIcons name="lock" size={24} color="#6b7280" style={styles.inputIcon} />
             <TextInput
+              ref={confirmPasswordRef}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               placeholder="Confirm Password"
@@ -216,9 +242,12 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
               secureTextEntry={!showConfirmPassword}
               autoCapitalize="none"
               autoCorrect={false}
+              spellCheck={false}
               autoComplete="off"
+              textContentType="oneTimeCode"
               importantForAutofill="no"
-              textContentType="none"
+              returnKeyType="done"
+              onSubmitEditing={handleSignUp}
               style={styles.input}
               editable={!loading}
             />
@@ -250,8 +279,8 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
 
           <Text style={styles.termsText}>
             By signing up, you agree to our{'\n'}
-            <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
-            <Text style={styles.termsLink}>Privacy Policy</Text>
+            <Text style={styles.termsLink} onPress={() => Linking.openURL('https://timecapsule.app/terms')}>Terms of Service</Text> and{' '}
+            <Text style={styles.termsLink} onPress={() => Linking.openURL('https://timecapsule.app/privacy')}>Privacy Policy</Text>
           </Text>
         </View>
 

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/authStore';
+import { AuthService } from '../../lib/auth';
 
 interface LoginScreenProps {
   onNavigate: (screen: 'Welcome' | 'Login' | 'Signup') => void;
@@ -16,6 +17,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigate, onLogin, onGoBack
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuthStore();
 
+  // Refs for keyboard navigation
+  const identifierRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+
   const handleSignIn = async () => {
     if (!identifier || !password) {
       Alert.alert('Error', 'Please enter your username/email and password');
@@ -29,7 +34,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigate, onLogin, onGoBack
     setLoading(false);
     
     if (error) {
-      console.log('Login error:', error);
       Alert.alert(
         'Login Failed', 
         error.message || 'Invalid username/email or password. Please try again.'
@@ -71,15 +75,19 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigate, onLogin, onGoBack
           <View style={styles.inputContainer}>
             <MaterialIcons name="person" size={24} color="#6b7280" style={styles.inputIcon} />
             <TextInput
+              ref={identifierRef}
               value={identifier}
               onChangeText={setIdentifier}
               placeholder="Username or Email"
               placeholderTextColor="#9ca3af"
               autoCapitalize="none"
               autoCorrect={false}
+              spellCheck={false}
               autoComplete="off"
-              importantForAutofill="no"
               textContentType="none"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => passwordRef.current?.focus()}
               style={styles.input}
               editable={!loading}
             />
@@ -88,6 +96,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigate, onLogin, onGoBack
           <View style={styles.inputContainer}>
             <MaterialIcons name="lock" size={24} color="#6b7280" style={styles.inputIcon} />
             <TextInput
+              ref={passwordRef}
               value={password}
               onChangeText={setPassword}
               placeholder="Enter your password"
@@ -95,9 +104,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigate, onLogin, onGoBack
               secureTextEntry={!showPassword}
               autoCapitalize="none"
               autoCorrect={false}
+              spellCheck={false}
               autoComplete="off"
+              textContentType="oneTimeCode"
               importantForAutofill="no"
-              textContentType="none"
+              returnKeyType="done"
+              onSubmitEditing={handleSignIn}
               style={styles.input}
               editable={!loading}
             />
@@ -127,7 +139,21 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigate, onLogin, onGoBack
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.forgotPassword}>
+          <TouchableOpacity style={styles.forgotPassword} onPress={() => {
+            if (!identifier) {
+              Alert.alert('Email Required', 'Please enter your email address first.');
+              return;
+            }
+            const email = identifier.includes('@') ? identifier : '';
+            if (!email) {
+              Alert.alert('Email Required', 'Please enter your email address (not username) to reset password.');
+              return;
+            }
+            AuthService.resetPassword(email).then(({ error }: any) => {
+              if (error) Alert.alert('Error', 'Failed to send reset email.');
+              else Alert.alert('Check Your Email', 'Password reset link has been sent to your email.');
+            });
+          }}>
             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
           </TouchableOpacity>
         </View>

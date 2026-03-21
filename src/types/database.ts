@@ -12,92 +12,267 @@ export interface Database {
       profiles: {
         Row: {
           id: string
-          user_id: string
-          username: string
-          full_name: string | null
+          display_name: string | null
+          username: string | null
+          email: string | null
           avatar_url: string | null
-          bio: string | null
+          phone_number: string | null
           created_at: string
-          updated_at: string
         }
         Insert: {
-          id?: string
-          user_id: string
-          username: string
-          full_name?: string | null
+          id: string
+          display_name?: string | null
+          username?: string | null
+          email?: string | null
           avatar_url?: string | null
-          bio?: string | null
+          phone_number?: string | null
           created_at?: string
-          updated_at?: string
         }
         Update: {
           id?: string
-          user_id?: string
-          username?: string
-          full_name?: string | null
+          display_name?: string | null
+          username?: string | null
+          email?: string | null
           avatar_url?: string | null
-          bio?: string | null
+          phone_number?: string | null
           created_at?: string
-          updated_at?: string
         }
+        Relationships: []
       }
       capsules: {
         Row: {
           id: string
-          user_id: string
+          owner_id: string
           title: string
           description: string | null
-          message: string
-          unlock_date: string
-          latitude: number
-          longitude: number
-          location_name: string | null
+          content_refs: Json[] | null
+          open_at: string | null
+          lat: number | null
+          lng: number | null
           is_public: boolean
-          media_urls: string[]
+          allowed_users: Json[] | null
+          blockchain_hash: string | null
           created_at: string
-          updated_at: string
-          unlocked_at: string | null
+          media_url: string | null
+          media_type: 'image' | 'video' | 'none' | null
+          is_locked: boolean
+          view_count: number
         }
         Insert: {
           id?: string
-          user_id: string
+          owner_id: string
           title: string
           description?: string | null
-          message: string
-          unlock_date: string
-          latitude: number
-          longitude: number
-          location_name?: string | null
+          content_refs?: Json[] | null
+          open_at?: string | null
+          lat?: number | null
+          lng?: number | null
           is_public?: boolean
-          media_urls?: string[]
+          allowed_users?: Json[] | null
+          blockchain_hash?: string | null
           created_at?: string
-          updated_at?: string
-          unlocked_at?: string | null
+          media_url?: string | null
+          media_type?: 'image' | 'video' | 'none' | null
+          is_locked?: boolean
+          view_count?: number
         }
         Update: {
           id?: string
-          user_id?: string
+          owner_id?: string
           title?: string
           description?: string | null
-          message?: string
-          unlock_date?: string
-          latitude?: number
-          longitude?: number
-          location_name?: string | null
+          content_refs?: Json[] | null
+          open_at?: string | null
+          lat?: number | null
+          lng?: number | null
           is_public?: boolean
-          media_urls?: string[]
+          allowed_users?: Json[] | null
+          blockchain_hash?: string | null
+          created_at?: string
+          media_url?: string | null
+          media_type?: 'image' | 'video' | 'none' | null
+          is_locked?: boolean
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'capsules_owner_id_fkey'
+            columns: ['owner_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      capsule_contents: {
+        Row: {
+          id: string
+          capsule_id: string
+          content_type: 'image' | 'video' | 'audio' | 'text'
+          file_url: string
+          metadata: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          capsule_id: string
+          content_type: 'image' | 'video' | 'audio' | 'text'
+          file_url: string
+          metadata?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          capsule_id?: string
+          content_type?: 'image' | 'video' | 'audio' | 'text'
+          file_url?: string
+          metadata?: Json
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'capsule_contents_capsule_id_fkey'
+            columns: ['capsule_id']
+            isOneToOne: false
+            referencedRelation: 'capsules'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      shared_capsules: {
+        Row: {
+          id: string
+          capsule_id: string
+          user_id: string
+          permission: 'view' | 'edit'
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          capsule_id: string
+          user_id: string
+          permission: 'view' | 'edit'
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          capsule_id?: string
+          user_id?: string
+          permission?: 'view' | 'edit'
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'shared_capsules_capsule_id_fkey'
+            columns: ['capsule_id']
+            isOneToOne: false
+            referencedRelation: 'capsules'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'shared_capsules_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      friend_requests: {
+        Row: {
+          id: string
+          sender_id: string
+          receiver_id: string
+          status: 'pending' | 'accepted' | 'rejected'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          sender_id: string
+          receiver_id: string
+          status?: 'pending' | 'accepted' | 'rejected'
           created_at?: string
           updated_at?: string
-          unlocked_at?: string | null
         }
+        Update: {
+          id?: string
+          sender_id?: string
+          receiver_id?: string
+          status?: 'pending' | 'accepted' | 'rejected'
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      comments: {
+        Row: {
+          id: string
+          capsule_id: string
+          user_id: string
+          content: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          capsule_id: string
+          user_id: string
+          content: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          capsule_id?: string
+          user_id?: string
+          content?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'comments_capsule_id_fkey'
+            columns: ['capsule_id']
+            isOneToOne: false
+            referencedRelation: 'capsules'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      likes: {
+        Row: {
+          id: string
+          capsule_id: string
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          capsule_id: string
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          capsule_id?: string
+          user_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'likes_capsule_id_fkey'
+            columns: ['capsule_id']
+            isOneToOne: false
+            referencedRelation: 'capsules'
+            referencedColumns: ['id']
+          }
+        ]
       }
       notifications: {
         Row: {
           id: string
           user_id: string
+          from_user_id: string | null
           capsule_id: string | null
-          type: string
-          title: string
+          type: 'like' | 'comment' | 'friend_request' | 'friend_accepted' | 'capsule_opened'
           message: string
           is_read: boolean
           created_at: string
@@ -105,9 +280,9 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
+          from_user_id?: string | null
           capsule_id?: string | null
-          type: string
-          title: string
+          type: 'like' | 'comment' | 'friend_request' | 'friend_accepted' | 'capsule_opened'
           message: string
           is_read?: boolean
           created_at?: string
@@ -115,24 +290,27 @@ export interface Database {
         Update: {
           id?: string
           user_id?: string
+          from_user_id?: string | null
           capsule_id?: string | null
-          type?: string
-          title?: string
+          type?: 'like' | 'comment' | 'friend_request' | 'friend_accepted' | 'capsule_opened'
           message?: string
           is_read?: boolean
           created_at?: string
         }
+        Relationships: []
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_capsule_view_count: {
+        Args: { capsule_uuid: string }
+        Returns: void
+      }
     }
     Enums: {
       [_ in never]: never
     }
   }
 }
-

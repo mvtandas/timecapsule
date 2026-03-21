@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, TextInput, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/authStore';
 import { AuthService } from '../../lib/auth';
@@ -7,38 +7,48 @@ import { AuthService } from '../../lib/auth';
 interface AccountSettingsScreenProps {
   onNavigate: (screen: string, data?: any) => void;
   onGoBack?: () => void;
+  onLogout: () => void;
 }
 
-const AccountSettingsScreen = ({ onNavigate, onGoBack }: AccountSettingsScreenProps) => {
+const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettingsScreenProps) => {
   const { user, updateProfile } = useAuthStore();
-  
-  // User info edit state
-  const [isEditingInfo, setIsEditingInfo] = useState(false);
+
+  // Edit fields
+  const [editDisplayName, setEditDisplayName] = useState(user?.display_name || '');
   const [editEmail, setEditEmail] = useState(user?.email || '');
   const [editUsername, setEditUsername] = useState(user?.username || '');
   const [editPhoneNumber, setEditPhoneNumber] = useState(user?.phone_number || '');
   const [savingInfo, setSavingInfo] = useState(false);
 
+  // Track original values to detect changes
+  const [originalValues, setOriginalValues] = useState({
+    displayName: user?.display_name || '',
+    email: user?.email || '',
+    username: user?.username || '',
+    phoneNumber: user?.phone_number || '',
+  });
+
   useEffect(() => {
-    // Update edit fields when user data changes
     if (user) {
-      setEditEmail(user.email || '');
-      setEditUsername(user.username || '');
-      setEditPhoneNumber(user.phone_number || '');
+      const vals = {
+        displayName: user.display_name || '',
+        email: user.email || '',
+        username: user.username || '',
+        phoneNumber: user.phone_number || '',
+      };
+      setEditDisplayName(vals.displayName);
+      setEditEmail(vals.email);
+      setEditUsername(vals.username);
+      setEditPhoneNumber(vals.phoneNumber);
+      setOriginalValues(vals);
     }
   }, [user]);
 
-  const handleEditInfo = () => {
-    setIsEditingInfo(true);
-  };
-
-  const handleCancelEditInfo = () => {
-    // Reset to original values
-    setEditEmail(user?.email || '');
-    setEditUsername(user?.username || '');
-    setEditPhoneNumber(user?.phone_number || '');
-    setIsEditingInfo(false);
-  };
+  const hasChanges =
+    editDisplayName !== originalValues.displayName ||
+    editEmail !== originalValues.email ||
+    editUsername !== originalValues.username ||
+    editPhoneNumber !== originalValues.phoneNumber;
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -46,13 +56,11 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack }: AccountSettingsScreenPr
   };
 
   const validateUsername = (username: string): boolean => {
-    // Username: 3-20 characters, alphanumeric and underscores only
     const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
     return usernameRegex.test(username);
   };
 
   const validatePhoneNumber = (phone: string): boolean => {
-    // Allow empty or valid phone format (at least 10 digits)
     if (!phone) return true;
     const phoneRegex = /^\+?[\d\s\-()]{10,}$/;
     return phoneRegex.test(phone);
@@ -78,35 +86,39 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack }: AccountSettingsScreenPr
     try {
       setSavingInfo(true);
 
-      const emailChanged = editEmail !== user?.email;
-      const usernameChanged = editUsername !== user?.username;
-      const phoneChanged = editPhoneNumber !== user?.phone_number;
+      const emailChanged = editEmail !== originalValues.email;
+      const usernameChanged = editUsername !== originalValues.username;
+      const phoneChanged = editPhoneNumber !== originalValues.phoneNumber;
+      const displayNameChanged = editDisplayName !== originalValues.displayName;
 
       // Update email separately via auth if changed
       if (emailChanged) {
         const { error: emailError } = await AuthService.updateEmail(editEmail);
         if (emailError) {
-          throw new Error(emailError.message || 'Failed to update email');
+          throw new Error((emailError as any).message || 'Failed to update email');
         }
       }
 
-      // Update username and phone via profiles if changed
-      if (usernameChanged || phoneChanged) {
+      // Update profile fields if changed
+      if (usernameChanged || phoneChanged || displayNameChanged) {
         const profileUpdates: any = {};
-        
+
         if (usernameChanged) {
           profileUpdates.username = editUsername;
         }
-        
+
         if (phoneChanged) {
           profileUpdates.phone_number = editPhoneNumber;
         }
 
+        if (displayNameChanged) {
+          profileUpdates.display_name = editDisplayName;
+        }
+
         const { error: profileError } = await updateProfile(profileUpdates);
-        
+
         if (profileError) {
           const errorMsg = profileError.message || '';
-          // Provide specific error messages
           if (errorMsg.toLowerCase().includes('username') && errorMsg.toLowerCase().includes('already')) {
             throw new Error('Username is already taken. Please choose a different one.');
           }
@@ -114,19 +126,25 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack }: AccountSettingsScreenPr
         }
       }
 
-      // Refresh user data to reflect changes
+      // Refresh user data
       const { user: updatedUser } = await AuthService.getCurrentUser();
       if (updatedUser) {
-        // The auth store will automatically update via the listener
-        // but we can manually update if needed
+        // Auth store will update via listener
       }
 
-      Alert.alert('Success', 'Account information updated successfully!');
-      setIsEditingInfo(false);
+      // Update original values to reflect saved state
+      setOriginalValues({
+        displayName: editDisplayName,
+        email: editEmail,
+        username: editUsername,
+        phoneNumber: editPhoneNumber,
+      });
+
+      Alert.alert('Success', 'Profile updated successfully!');
     } catch (error: any) {
       console.error('Error updating account info:', error);
       Alert.alert(
-        'Update Failed', 
+        'Update Failed',
         error.message || 'Failed to update account information. Please try again.'
       );
     } finally {
@@ -134,155 +152,197 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack }: AccountSettingsScreenPr
     }
   };
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete your account, all your capsules, comments, and data. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Forever',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await AuthService.deleteAccount();
+              if (error) {
+                Alert.alert('Error', 'Failed to delete account. Please try again.');
+              } else {
+                onLogout();
+              }
+            } catch {
+              Alert.alert('Error', 'Something went wrong.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleLogoutPress = () => {
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Logout', onPress: onLogout, style: 'destructive' },
+    ]);
+  };
+
+  const renderMenuItem = (
+    icon: string,
+    label: string,
+    onPress: () => void,
+    options?: { destructive?: boolean; isLast?: boolean }
+  ) => (
+    <TouchableOpacity
+      style={[styles.menuItem, options?.isLast && styles.menuItemLast]}
+      onPress={onPress}
+      activeOpacity={0.6}
+    >
+      <View style={styles.menuItemLeft}>
+        <Ionicons
+          name={icon as any}
+          size={20}
+          color={options?.destructive ? '#FF3B30' : '#1e293b'}
+        />
+        <Text style={[styles.menuItemLabel, options?.destructive && styles.menuItemLabelDestructive]}>
+          {label}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color="#c7c7cc" />
+    </TouchableOpacity>
+  );
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => onGoBack && onGoBack()}
         >
           <Ionicons name="arrow-back" size={24} color="#1e293b" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Account Settings</Text>
+        <Text style={styles.headerTitle}>Settings</Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView 
-        style={styles.content} 
+      <ScrollView
+        style={styles.content}
         contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={true}
+        showsVerticalScrollIndicator={false}
       >
-        {/* Account Information Section */}
-        <View style={styles.infoCard}>
-          <View style={styles.infoCardHeader}>
-            <Text style={styles.infoCardTitle}>Account Information</Text>
-            {!isEditingInfo && (
-              <TouchableOpacity 
-                style={styles.editIconButton}
-                onPress={handleEditInfo}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="pencil" size={20} color="#FAC638" />
-              </TouchableOpacity>
+        {/* Profile Card */}
+        <View style={styles.profileCard}>
+          <View style={styles.profileCardAvatar}>
+            {user?.avatar_url ? (
+              <Image source={{ uri: user.avatar_url }} style={styles.profileCardAvatarImage} />
+            ) : (
+              <View style={styles.profileCardAvatarPlaceholder}>
+                <Ionicons name="person" size={36} color="white" />
+              </View>
             )}
           </View>
+          <Text style={styles.profileCardName}>{user?.display_name || 'User'}</Text>
+          <Text style={styles.profileCardUsername}>@{user?.username || 'username'}</Text>
+        </View>
 
-          {!isEditingInfo ? (
-            // Display Mode
-            <View style={styles.infoDisplayContainer}>
-              <View style={styles.infoRow}>
-                <View style={styles.infoLabelContainer}>
-                  <Ionicons name="mail-outline" size={20} color="#64748b" />
-                  <Text style={styles.infoLabel}>Email</Text>
-                </View>
-                <Text style={styles.infoValue}>{user?.email || 'Not set'}</Text>
-              </View>
+        {/* Edit Profile Section */}
+        <Text style={styles.sectionHeader}>EDIT PROFILE</Text>
+        <View style={styles.card}>
+          <View style={styles.editField}>
+            <Text style={styles.editFieldLabel}>Display Name</Text>
+            <TextInput
+              style={styles.editFieldInput}
+              value={editDisplayName}
+              onChangeText={setEditDisplayName}
+              placeholder="Enter display name"
+              placeholderTextColor="#c7c7cc"
+              autoCapitalize="words"
+            />
+          </View>
+          <View style={styles.editFieldSeparator} />
 
-              <View style={styles.infoRow}>
-                <View style={styles.infoLabelContainer}>
-                  <Ionicons name="at-outline" size={20} color="#64748b" />
-                  <Text style={styles.infoLabel}>Username</Text>
-                </View>
-                <Text style={styles.infoValue}>{user?.username || 'Not set'}</Text>
-              </View>
+          <View style={styles.editField}>
+            <Text style={styles.editFieldLabel}>Username</Text>
+            <TextInput
+              style={styles.editFieldInput}
+              value={editUsername}
+              onChangeText={setEditUsername}
+              placeholder="Enter username"
+              placeholderTextColor="#c7c7cc"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+          <View style={styles.editFieldSeparator} />
 
-              <View style={styles.infoRow}>
-                <View style={styles.infoLabelContainer}>
-                  <Ionicons name="call-outline" size={20} color="#64748b" />
-                  <Text style={styles.infoLabel}>Phone Number</Text>
-                </View>
-                <Text style={styles.infoValue}>{user?.phone_number || 'Not set'}</Text>
-              </View>
-            </View>
-          ) : (
-            // Edit Mode
-            <View style={styles.infoEditContainer}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Email</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="mail-outline" size={20} color="#94a3b8" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    value={editEmail}
-                    onChangeText={setEditEmail}
-                    placeholder="Enter your email"
-                    placeholderTextColor="#94a3b8"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </View>
-              </View>
+          <View style={styles.editField}>
+            <Text style={styles.editFieldLabel}>Email</Text>
+            <TextInput
+              style={styles.editFieldInput}
+              value={editEmail}
+              onChangeText={setEditEmail}
+              placeholder="Enter email"
+              placeholderTextColor="#c7c7cc"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+          <View style={styles.editFieldSeparator} />
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Username</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="at-outline" size={20} color="#94a3b8" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    value={editUsername}
-                    onChangeText={setEditUsername}
-                    placeholder="Enter your username"
-                    placeholderTextColor="#94a3b8"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </View>
-                <Text style={styles.inputHint}>3-20 characters, letters, numbers, and underscores only</Text>
-              </View>
+          <View style={styles.editFieldLast}>
+            <Text style={styles.editFieldLabel}>Phone</Text>
+            <TextInput
+              style={styles.editFieldInput}
+              value={editPhoneNumber}
+              onChangeText={setEditPhoneNumber}
+              placeholder="Enter phone number"
+              placeholderTextColor="#c7c7cc"
+              keyboardType="phone-pad"
+            />
+          </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Phone Number</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="call-outline" size={20} color="#94a3b8" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    value={editPhoneNumber}
-                    onChangeText={setEditPhoneNumber}
-                    placeholder="Enter your phone number"
-                    placeholderTextColor="#94a3b8"
-                    keyboardType="phone-pad"
-                  />
-                </View>
-                <Text style={styles.inputHint}>Optional</Text>
-              </View>
-
-              <View style={styles.editButtonsContainer}>
-                <TouchableOpacity
-                  style={[styles.editButton, styles.cancelButton]}
-                  onPress={handleCancelEditInfo}
-                  activeOpacity={0.7}
-                  disabled={savingInfo}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.editButton, styles.saveButton]}
-                  onPress={handleSaveInfo}
-                  activeOpacity={0.7}
-                  disabled={savingInfo}
-                >
-                  {savingInfo ? (
-                    <ActivityIndicator size="small" color="white" />
-                  ) : (
-                    <Text style={styles.saveButtonText}>Save Changes</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
+          {hasChanges && (
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleSaveInfo}
+              activeOpacity={0.7}
+              disabled={savingInfo}
+            >
+              {savingInfo ? (
+                <ActivityIndicator size="small" color="#1e293b" />
+              ) : (
+                <Text style={styles.saveButtonText}>Save Changes</Text>
+              )}
+            </TouchableOpacity>
           )}
         </View>
 
-        {/* Additional Settings Sections */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Preferences</Text>
-          <Text style={styles.sectionDescription}>
-            Additional account preferences and settings will be available here.
-          </Text>
+        {/* Account Group */}
+        <Text style={styles.sectionHeader}>ACCOUNT</Text>
+        <View style={styles.card}>
+          {renderMenuItem('notifications-outline', 'Notifications', () => onNavigate('Notifications'), { isLast: true })}
         </View>
 
+        {/* Support Group */}
+        <Text style={styles.sectionHeader}>SUPPORT</Text>
+        <View style={styles.card}>
+          {renderMenuItem('help-circle-outline', 'Help & Support', () => {
+            Alert.alert('Help & Support', 'Need help? Contact us at support@timecapsule.app');
+          })}
+          {renderMenuItem('information-circle-outline', 'About', () => {
+            Alert.alert('About TimeCapsule', 'TimeCapsule v1.0.0\n\nSave your memories for the future.');
+          }, { isLast: true })}
+        </View>
+
+        {/* Actions Group */}
+        <Text style={styles.sectionHeader}>ACTIONS</Text>
+        <View style={styles.card}>
+          {renderMenuItem('log-out-outline', 'Logout', handleLogoutPress, { destructive: true })}
+          {renderMenuItem('trash-outline', 'Delete Account', handleDeleteAccount, { destructive: true, isLast: true })}
+        </View>
+
+        {/* Version */}
+        <Text style={styles.versionText}>TimeCapsule v1.0.0</Text>
       </ScrollView>
     </View>
   );
@@ -291,7 +351,7 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack }: AccountSettingsScreenPr
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: '#f2f2f7',
   },
   header: {
     flexDirection: 'row',
@@ -300,7 +360,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 60,
     paddingBottom: 16,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: '#f2f2f7',
   },
   backButton: {
     padding: 4,
@@ -313,7 +373,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#FAC638',
+    color: '#1e293b',
     flex: 1,
     textAlign: 'center',
   },
@@ -321,153 +381,143 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    padding: 16,
+    paddingHorizontal: 16,
     paddingBottom: 40,
   },
-  infoCard: {
+  // Profile Card
+  profileCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: 14,
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    marginBottom: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  infoCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  profileCardAvatar: {
+    marginBottom: 12,
+  },
+  profileCardAvatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  profileCardAvatarPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FAC638',
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  infoCardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  editIconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FEF3C7',
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  infoDisplayContainer: {
-    gap: 12,
-  },
-  infoRow: {
-    flexDirection: 'column',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    gap: 8,
-  },
-  infoLabelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  infoLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#64748b',
-  },
-  infoValue: {
-    fontSize: 16,
+  profileCardName: {
+    fontSize: 20,
+    fontWeight: '700',
     color: '#1e293b',
-    paddingLeft: 28,
+    marginBottom: 2,
   },
-  infoEditContainer: {
-    gap: 16,
+  profileCardUsername: {
+    fontSize: 15,
+    color: '#8e8e93',
   },
-  inputGroup: {
-    gap: 8,
+  // Section Header
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8e8e93',
+    marginBottom: 8,
+    marginLeft: 4,
+    letterSpacing: 0.5,
   },
-  inputLabel: {
-    fontSize: 14,
+  // Card
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    overflow: 'hidden',
+  },
+  // Edit Fields
+  editField: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  editFieldLast: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  editFieldSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#c6c6c8',
+    marginLeft: 16,
+  },
+  editFieldLabel: {
+    fontSize: 13,
     fontWeight: '500',
-    color: '#475569',
+    color: '#8e8e93',
     marginBottom: 4,
   },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    paddingHorizontal: 12,
-  },
-  inputIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: 12,
+  editFieldInput: {
     fontSize: 16,
     color: '#1e293b',
+    paddingVertical: 4,
   },
-  inputHint: {
-    fontSize: 12,
-    color: '#94a3b8',
-    marginTop: 4,
-  },
-  editButtonsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
-  editButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#64748b',
-  },
+  // Save Button
   saveButton: {
     backgroundColor: '#FAC638',
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
   },
   saveButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1e293b',
   },
-  sectionCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
+  // Menu Items
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    height: 44,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#c6c6c8',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+  menuItemLast: {
+    borderBottomWidth: 0,
+  },
+  menuItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  menuItemLabel: {
+    fontSize: 16,
     color: '#1e293b',
-    marginBottom: 8,
   },
-  sectionDescription: {
-    fontSize: 14,
-    color: '#64748b',
-    lineHeight: 20,
+  menuItemLabelDestructive: {
+    color: '#FF3B30',
+  },
+  // Version
+  versionText: {
+    textAlign: 'center',
+    fontSize: 13,
+    color: '#8e8e93',
+    marginTop: 8,
+    marginBottom: 20,
   },
 });
 
 export default AccountSettingsScreen;
-

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,15 +8,16 @@ import {
   Image,
   Dimensions,
   ActivityIndicator,
-  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { FriendService, FriendshipStatus } from '../../services/friendService';
+import CapsuleDetailModal from '../../components/CapsuleDetailModal';
 
 const { width } = Dimensions.get('window');
+const CARD_WIDTH = (width - 48 - 12) / 2;
 
 type FriendProfileUser = {
   id: string;
@@ -48,29 +49,21 @@ type CapsuleSummary = {
   open_at: string | null;
   created_at: string;
   is_public: boolean;
-  lat: number | null;
-  lng: number | null;
-  shared_at?: string | null;
-};
-
-type ActivityEvent = {
-  id: string;
-  icon: string;
-  message: string;
-  timestamp: string | null;
+  media_url?: string | null;
 };
 
 const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => {
   const { user } = useAuthStore();
   const [profile, setProfile] = useState<FriendProfileUser | null>(null);
-  const [sharedCapsules, setSharedCapsules] = useState<CapsuleSummary[]>([]);
   const [publicCapsules, setPublicCapsules] = useState<CapsuleSummary[]>([]);
-  const [activityEvents, setActivityEvents] = useState<ActivityEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCapsule, setSelectedCapsule] = useState<CapsuleSummary | null>(null);
   const [friendshipStatus, setFriendshipStatus] = useState<FriendshipStatus>({ status: 'none' });
   const [sendingRequest, setSendingRequest] = useState<boolean>(false);
+  const [capsulesCount, setCapsulesCount] = useState(0);
+  const [friendsCount, setFriendsCount] = useState(0);
+  const [daysActive, setDaysActive] = useState(0);
 
   const viewedProfileId = friend?.id;
 
@@ -86,136 +79,31 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
     return profile?.avatar_url || friend?.avatar_url || null;
   }, [profile?.avatar_url, friend?.avatar_url]);
 
-  const formatTimeAgo = useCallback((dateString?: string | null) => {
-    if (!dateString) return '—';
-    const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return '—';
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMinutes = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMinutes / 60);
-    const diffDays = Math.floor(diffHours / 24);
-    const diffWeeks = Math.floor(diffDays / 7);
-    const diffMonths = Math.floor(diffDays / 30);
-    const diffYears = Math.floor(diffDays / 365);
-
-    if (diffMinutes < 1) return 'Just now';
-    if (diffMinutes < 60) return `${diffMinutes}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    if (diffWeeks < 5) return `${diffWeeks}w ago`;
-    if (diffMonths < 12) return `${diffMonths}mo ago`;
-    return `${diffYears}y ago`;
-  }, []);
-
   const getMediaUrl = (capsule: CapsuleSummary): string | null => {
+    if (capsule.media_url) return capsule.media_url;
     const refs = capsule.content_refs;
     if (!refs || refs.length === 0) return null;
     const firstItem = refs[0];
-    if (typeof firstItem === 'string') {
-      return firstItem;
-    }
+    if (typeof firstItem === 'string') return firstItem;
     if (firstItem && typeof firstItem === 'object') {
-      if (firstItem.url) return firstItem.url;
-      if (firstItem.file_url) return firstItem.file_url;
-      if (firstItem.media_url) return firstItem.media_url;
+      return firstItem.url || firstItem.file_url || firstItem.media_url || null;
     }
     return null;
   };
 
-  const isCapsuleLocked = (capsule: CapsuleSummary): boolean => {
-    if (!capsule.open_at) return false;
-    const openDate = new Date(capsule.open_at);
-    return openDate.getTime() > Date.now();
-  };
-
-  const formatOpenLabel = (capsule: CapsuleSummary): string | null => {
-    if (!capsule.open_at) return null;
-    const openDate = new Date(capsule.open_at);
-    const now = Date.now();
-    if (openDate.getTime() <= now) {
-      return `Opened ${formatTimeAgo(capsule.open_at)}`;
-    }
-    const diffMs = openDate.getTime() - now;
-    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays <= 1) return 'Opens tomorrow';
-    if (diffDays < 7) return `Opens in ${diffDays} days`;
-    return `Opens on ${openDate.toLocaleDateString()}`;
-  };
-
-  const buildActivityFeed = (publicList: CapsuleSummary[], sharedList: CapsuleSummary[]) => {
-    const events: ActivityEvent[] = [];
-    const uniqueCaps = new Map<string, CapsuleSummary>();
-
-    publicList.forEach((capsule) => {
-      uniqueCaps.set(capsule.id, capsule);
-    });
-
-    sharedList.forEach((capsule) => {
-      if (!uniqueCaps.has(capsule.id)) {
-        uniqueCaps.set(capsule.id, capsule);
-      } else {
-        const existing = uniqueCaps.get(capsule.id);
-        if (existing && !existing.shared_at && capsule.shared_at) {
-          uniqueCaps.set(capsule.id, { ...existing, shared_at: capsule.shared_at });
-        }
-      }
-    });
-
-    uniqueCaps.forEach((capsule) => {
-      events.push({
-        id: `created-${capsule.id}`,
-        icon: '📍',
-        message: `Dropped "${capsule.title || 'Untitled Capsule'}"`,
-        timestamp: capsule.created_at,
-      });
-
-      if (capsule.shared_at) {
-        events.push({
-          id: `shared-${capsule.id}-${capsule.shared_at}`,
-          icon: '🤝',
-          message: 'Shared a capsule with you',
-          timestamp: capsule.shared_at,
-        });
-      }
-
-      if (capsule.open_at) {
-        const openDate = new Date(capsule.open_at);
-        const now = new Date();
-        if (openDate <= now) {
-          events.push({
-            id: `opened-${capsule.id}`,
-            icon: '🗝️',
-            message: `Opened "${capsule.title || 'Untitled Capsule'}"`,
-            timestamp: capsule.open_at,
-          });
-        } else {
-          const openLabel = formatOpenLabel(capsule);
-          events.push({
-            id: `unlock-${capsule.id}`,
-            icon: '🔒',
-            message: `Capsule unlocks ${openLabel}`,
-            timestamp: capsule.open_at,
-          });
-        }
-      }
-    });
-
-    events.sort((a, b) => {
-      const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-      const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-      return timeB - timeA;
-    });
-
-    return events.slice(0, 12);
+  const timeAgo = (d: string): string => {
+    const diff = Date.now() - new Date(d).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    const days = Math.floor(h / 24);
+    if (days < 30) return `${days}d ago`;
+    return `${Math.floor(days / 30)}mo ago`;
   };
 
   const loadProfileData = async () => {
-    console.log('🔍 FriendProfileScreen: Starting loadProfileData for userId:', viewedProfileId);
-    
     if (!viewedProfileId) {
-      console.error('❌ FriendProfileScreen: No viewedProfileId provided');
       setError('Profile not found');
       setLoading(false);
       return;
@@ -226,23 +114,15 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
 
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
-      console.log('👤 Current user:', currentUser?.id);
 
-      // Fetch profile basics
+      // Fetch profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('id, display_name, username, avatar_url, created_at')
         .eq('id', viewedProfileId)
         .maybeSingle();
 
-      console.log('📊 Profile data fetched:', profileData);
-      
-      if (profileError) {
-        console.error('❌ Profile fetch error:', profileError.message);
-      }
-
-      if (!profileData) {
-        console.error('❌ No profile data found for userId:', viewedProfileId);
+      if (profileError || !profileData) {
         setError('Profile not found');
         setLoading(false);
         return;
@@ -250,78 +130,47 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
 
       setProfile({
         id: viewedProfileId,
-        display_name: profileData?.display_name || 'TimeCapsule User',
-        username: profileData?.username || null,
-        avatar_url: profileData?.avatar_url || null,
-        created_at: profileData?.created_at || null,
+        display_name: profileData.display_name || 'TimeCapsule User',
+        username: profileData.username || null,
+        avatar_url: profileData.avatar_url || null,
+        created_at: profileData.created_at || null,
       });
 
+      // Calculate days since joined
+      if (profileData.created_at) {
+        const joinDate = new Date(profileData.created_at);
+        const now = new Date();
+        const days = Math.floor((now.getTime() - joinDate.getTime()) / (1000 * 60 * 60 * 24));
+        setDaysActive(days);
+      }
+
       // Fetch public capsules
-      const { data: publicData, error: publicError } = await supabase
+      const { data: publicData } = await supabase
         .from('capsules')
-        .select('id, owner_id, title, description, content_refs, open_at, created_at, is_public, lat, lng')
+        .select('id, owner_id, title, description, content_refs, open_at, created_at, is_public, media_url')
         .eq('owner_id', viewedProfileId)
         .eq('is_public', true)
         .order('created_at', { ascending: false });
 
-      if (publicError) {
-        console.error('❌ Public capsules error:', publicError);
-      }
-
-      console.log('📦 Public capsules:', publicData?.length || 0);
-
-      const publicList: CapsuleSummary[] = (publicData || []).map((capsule) => ({
-        ...capsule,
-        shared_at: null,
-      }));
-
+      const publicList: CapsuleSummary[] = (publicData || []).map((c) => ({ ...c }));
       setPublicCapsules(publicList);
+      setCapsulesCount(publicList.length);
 
-      // Fetch shared capsules (only if current user is different from viewed profile)
-      let sharedList: CapsuleSummary[] = [];
-      if (currentUser && currentUser.id !== viewedProfileId) {
-        const { data: sharedData, error: sharedError } = await supabase
-          .from('shared_capsules')
-          .select('capsule_id, created_at, capsules (id, owner_id, title, description, content_refs, open_at, created_at, is_public, lat, lng)')
-          .eq('user_id', currentUser.id)
-          .eq('capsules.owner_id', viewedProfileId)
-          .order('created_at', { ascending: false });
+      // Fetch friends count
+      const { data: friendsData } = await supabase
+        .from('friend_requests')
+        .select('id')
+        .eq('status', 'accepted')
+        .or(`sender_id.eq.${viewedProfileId},receiver_id.eq.${viewedProfileId}`);
 
-        if (sharedError) {
-          console.error('❌ Shared capsules error:', sharedError);
-        }
-
-        console.log('🤝 Shared capsules:', sharedData?.length || 0);
-
-        sharedList =
-          sharedData
-            ?.map((item: any) => {
-              if (!item.capsules) return null;
-              return {
-                ...(item.capsules as CapsuleSummary),
-                shared_at: item.created_at as string,
-              };
-            })
-            .filter(Boolean) ?? [];
-
-        setSharedCapsules(sharedList);
-      } else {
-        setSharedCapsules([]);
-      }
-
-      const activity = buildActivityFeed(publicList, sharedList);
-      setActivityEvents(activity);
+      setFriendsCount(friendsData?.length || 0);
 
       // Load friendship status
       if (currentUser && currentUser.id !== viewedProfileId) {
         const status = await FriendService.getFriendshipStatus(viewedProfileId);
         setFriendshipStatus(status);
-        console.log('🤝 Friendship status:', status);
       }
-      
-      console.log('✅ Profile data loaded successfully');
     } catch (err) {
-      console.error('❌ Failed to load public profile:', err);
       setError('Unable to load profile right now. Please try again later.');
     } finally {
       setLoading(false);
@@ -329,337 +178,249 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
   };
 
   useEffect(() => {
-    console.log('🚀 FriendProfileScreen mounted, viewedProfileId:', viewedProfileId);
     loadProfileData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewedProfileId]);
 
-  const handleAddFriend = async () => {
+  const handleFriendAction = async () => {
     if (!viewedProfileId) return;
 
     try {
       setSendingRequest(true);
 
       if (friendshipStatus.status === 'none') {
-        // Send friend request
         const { error } = await FriendService.sendFriendRequest(viewedProfileId);
-        
-        if (error) {
-          console.error('Error sending friend request:', error);
-          return;
-        }
-
-        // Update local state
+        if (error) return;
         const newStatus = await FriendService.getFriendshipStatus(viewedProfileId);
         setFriendshipStatus(newStatus);
-        console.log('✅ Friend request sent successfully');
       } else if (friendshipStatus.status === 'pending_sent' && friendshipStatus.requestId) {
-        // Cancel friend request
         const { error } = await FriendService.cancelFriendRequest(friendshipStatus.requestId);
-        
-        if (error) {
-          console.error('Error canceling friend request:', error);
-          return;
-        }
-
+        if (error) return;
         setFriendshipStatus({ status: 'none' });
-        console.log('✅ Friend request canceled');
+      } else if (friendshipStatus.status === 'pending_received' && friendshipStatus.requestId) {
+        const { error } = await FriendService.acceptFriendRequest(friendshipStatus.requestId);
+        if (error) return;
+        const newStatus = await FriendService.getFriendshipStatus(viewedProfileId);
+        setFriendshipStatus(newStatus);
       }
-    } catch (error) {
-      console.error('Error handling friend request:', error);
+    } catch (_) {
+      // silent
     } finally {
       setSendingRequest(false);
     }
   };
 
-  const getButtonConfig = () => {
-    const isOwnProfile = user?.id === viewedProfileId;
+  const renderActionButton = () => {
+    if (user?.id === viewedProfileId) return null;
 
-    if (isOwnProfile) {
-      return null; // Don't show button on own profile
-    }
+    let label = 'Add Friend';
+    let bgColor = '#FAC638';
+    let textColor = '#fff';
+    let borderColor = '#FAC638';
+    let iconName: keyof typeof Ionicons.glyphMap = 'person-add';
+    let outlined = false;
+    let disabled = false;
 
     switch (friendshipStatus.status) {
       case 'friends':
-        return {
-          label: 'Friends',
-          icon: 'checkmark-circle' as const,
-          disabled: true,
-          style: styles.friendButton,
-        };
+        label = 'Friends \u2713';
+        iconName = 'checkmark-circle';
+        bgColor = 'transparent';
+        textColor = '#1e293b';
+        borderColor = '#cbd5e1';
+        outlined = true;
+        disabled = true;
+        break;
       case 'pending_sent':
-        return {
-          label: 'Request Sent',
-          icon: 'time' as const,
-          disabled: false,
-          style: styles.pendingButton,
-        };
+        label = 'Request Sent';
+        iconName = 'time';
+        bgColor = 'transparent';
+        textColor = '#94a3b8';
+        borderColor = '#cbd5e1';
+        outlined = true;
+        break;
       case 'pending_received':
-        return {
-          label: 'Accept Request',
-          icon: 'person-add' as const,
-          disabled: false,
-          style: styles.addButton,
-        };
+        label = 'Accept';
+        iconName = 'checkmark';
+        bgColor = '#06D6A0';
+        textColor = '#fff';
+        borderColor = '#06D6A0';
+        break;
       case 'none':
       default:
-        return {
-          label: 'Add Friend',
-          icon: 'person-add' as const,
-          disabled: false,
-          style: styles.addButton,
-        };
+        break;
     }
-  };
-
-  const renderCapsuleCard = (capsule: CapsuleSummary) => {
-    const mediaUrl = getMediaUrl(capsule);
-    const locked = isCapsuleLocked(capsule);
-    const openLabel = formatOpenLabel(capsule);
 
     return (
       <TouchableOpacity
-        key={capsule.id}
-        style={styles.capsuleCard}
-        activeOpacity={0.85}
-        onPress={() => setSelectedCapsule(capsule)}
+        style={[
+          styles.actionButton,
+          {
+            backgroundColor: bgColor,
+            borderWidth: outlined ? 1.5 : 0,
+            borderColor: borderColor,
+          },
+        ]}
+        onPress={handleFriendAction}
+        disabled={disabled || sendingRequest}
+        activeOpacity={0.7}
       >
-        <View style={styles.capsuleMedia}>
-          {mediaUrl ? (
-            <Image source={{ uri: mediaUrl }} style={styles.capsuleImage} resizeMode="cover" />
-          ) : (
-            <View style={styles.capsulePlaceholder}>
-              <Ionicons name="image-outline" size={32} color="#94a3b8" />
-            </View>
-          )}
-          {locked && (
-            <BlurView intensity={65} tint="dark" style={styles.capsuleLockOverlay}>
-              <Ionicons name="lock-closed" size={20} color="white" />
-              <Text style={styles.capsuleLockText}>Locked</Text>
-            </BlurView>
-          )}
-        </View>
-        <View style={styles.capsuleInfo}>
-          <Text style={styles.capsuleTitle}>{capsule.title || 'Untitled Capsule'}</Text>
-          <Text style={styles.capsuleTimestamp}>
-            Dropped {formatTimeAgo(capsule.created_at)}
-          </Text>
-          {capsule.shared_at && (
-            <View style={styles.tag}>
-              <Ionicons name="people" size={14} color="#0f172a" />
-              <Text style={styles.tagText}>Shared with you {formatTimeAgo(capsule.shared_at)}</Text>
-            </View>
-          )}
-          {openLabel && (
-            <View style={[styles.tag, styles.openTag]}>
-              <Ionicons name={locked ? 'lock-closed' : 'unlock'} size={14} color="#0f172a" />
-              <Text style={styles.tagText}>{openLabel}</Text>
-            </View>
-          )}
-        </View>
+        {sendingRequest ? (
+          <ActivityIndicator size="small" color={textColor} />
+        ) : (
+          <>
+            <Ionicons name={iconName} size={18} color={textColor} />
+            <Text style={[styles.actionButtonText, { color: textColor }]}>{label}</Text>
+          </>
+        )}
       </TouchableOpacity>
     );
   };
 
-  const renderCapsuleSection = (
-    title: string,
-    capsules: CapsuleSummary[],
-    emptyMessage: string,
-    helperText?: string
-  ) => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        <Text style={styles.sectionCount}>{capsules.length}</Text>
-      </View>
-      {helperText ? <Text style={styles.sectionHelper}>{helperText}</Text> : null}
-      {capsules.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="sparkles-outline" size={24} color="#94a3b8" />
-          <Text style={styles.emptyStateText}>{emptyMessage}</Text>
-        </View>
-      ) : (
-        <View style={styles.capsuleList}>{capsules.map(renderCapsuleCard)}</View>
-      )}
-    </View>
-  );
-
-  const renderActivitySection = () => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
-      </View>
-      {activityEvents.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="time-outline" size={24} color="#94a3b8" />
-          <Text style={styles.emptyStateText}>No recent activity yet.</Text>
-        </View>
-      ) : (
-        <View style={styles.activityList}>
-          {activityEvents.map((event) => (
-            <View key={event.id} style={styles.activityItem}>
-              <Text style={styles.activityIcon}>{event.icon}</Text>
-              <View style={styles.activityInfo}>
-                <Text style={styles.activityMessage}>{event.message}</Text>
-                <Text style={styles.activityTimestamp}>{formatTimeAgo(event.timestamp)}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => onGoBack && onGoBack()}>
           <Ionicons name="arrow-back" size={24} color="#1e293b" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{displayName}</Text>
+        <Text style={styles.headerTitle}>@{username}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {loading ? (
-          <View style={styles.loadingState}>
+          <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color="#FAC638" />
-            <Text style={styles.loadingText}>Loading profile…</Text>
           </View>
         ) : error ? (
-          <View style={styles.errorState}>
+          <View style={styles.errorContainer}>
             <Ionicons name="alert-circle" size={28} color="#ef4444" />
             <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : (
           <>
-            <View style={styles.profileSection}>
-              {avatarUrl ? (
-                <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                  <Ionicons name="person" size={60} color="#94a3b8" />
+            {/* Profile Hero */}
+            <View style={styles.heroSection}>
+              {/* Avatar - centered, NOT tappable */}
+              <View style={styles.avatarWrapper}>
+                <View style={styles.avatarRing}>
+                  {avatarUrl ? (
+                    <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+                  ) : (
+                    <View style={styles.avatarPlaceholder}>
+                      <Ionicons name="person" size={44} color="#FAC638" />
+                    </View>
+                  )}
                 </View>
-              )}
-              <Text style={styles.name}>{displayName}</Text>
-              <Text style={styles.username}>@{username}</Text>
-              {friend.friends_since ? (
-                <Text style={styles.metaText}>Friends since {friend.friends_since}</Text>
-              ) : null}
-              {profile?.created_at ? (
-                <Text style={styles.metaSubtext}>
-                  Joined {new Date(profile.created_at).toLocaleDateString()}
-                </Text>
-              ) : null}
-              
-              {/* Add Friend Button */}
-              {(() => {
-                const buttonConfig = getButtonConfig();
-                if (!buttonConfig) return null;
+              </View>
 
-                return (
-                  <TouchableOpacity
-                    style={[styles.actionButton, buttonConfig.style]}
-                    onPress={handleAddFriend}
-                    disabled={buttonConfig.disabled || sendingRequest}
-                    activeOpacity={0.7}
-                  >
-                    {sendingRequest ? (
-                      <ActivityIndicator size="small" color="white" />
-                    ) : (
-                      <>
-                        <Ionicons name={buttonConfig.icon} size={18} color="white" />
-                        <Text style={styles.actionButtonText}>{buttonConfig.label}</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                );
-              })()}
+              {/* Name */}
+              <Text style={styles.displayName}>{displayName}</Text>
+              <Text style={styles.username}>@{username}</Text>
+
+              {/* Stats Row */}
+              <View style={styles.statsRow}>
+                <View style={styles.statPill}>
+                  <Ionicons name="time" size={16} color="#FAC638" />
+                  <Text style={styles.statValue}>{capsulesCount}</Text>
+                  <Text style={styles.statLabel}>Capsules</Text>
+                </View>
+
+                <View style={styles.statPill}>
+                  <Ionicons name="people" size={16} color="#FAC638" />
+                  <Text style={styles.statValue}>{friendsCount}</Text>
+                  <Text style={styles.statLabel}>Friends</Text>
+                </View>
+
+                <View style={styles.statPill}>
+                  <Ionicons name="flame" size={16} color="#FAC638" />
+                  <Text style={styles.statValue}>{daysActive}</Text>
+                  <Text style={styles.statLabel}>Days</Text>
+                </View>
+              </View>
+
+              {/* Action Button */}
+              {renderActionButton()}
             </View>
 
-            {renderCapsuleSection(
-              'Shared With You',
-              sharedCapsules,
-              user && user.id !== viewedProfileId
-                ? 'No capsules have been shared with you yet.'
-                : 'Share capsules with your friends to see them here.',
-              user && user.id === viewedProfileId
-                ? 'You are viewing your own profile. Capsules you share with friends will appear here.'
-                : undefined
-            )}
+            {/* Section Header */}
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Public Capsules</Text>
+              {publicCapsules.length > 0 && (
+                <Text style={styles.sectionCount}>{publicCapsules.length}</Text>
+              )}
+            </View>
 
-            {renderCapsuleSection(
-              'Public Capsules',
-              publicCapsules,
-              'This explorer keeps their memories private for now.'
-            )}
+            {/* Capsules - 2 column card layout */}
+            {publicCapsules.length === 0 ? (
+              <View style={styles.emptyBox}>
+                <View style={styles.emptyIcon}>
+                  <Ionicons name="time-outline" size={40} color="#FAC638" />
+                </View>
+                <Text style={styles.emptyTitle}>No Public Capsules</Text>
+                <Text style={styles.emptyText}>
+                  This user hasn't shared any public capsules yet
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.cardsGrid}>
+                {publicCapsules.map((capsule, index) => {
+                  const mediaUrl = getMediaUrl(capsule);
+                  const isLocked = capsule.open_at && new Date(capsule.open_at).getTime() > Date.now();
 
-            {renderActivitySection()}
+                  return (
+                    <TouchableOpacity
+                      key={capsule.id || index}
+                      style={styles.card}
+                      onPress={() => setSelectedCapsule(capsule)}
+                      activeOpacity={0.85}
+                    >
+                      {/* Card Image */}
+                      <View style={styles.cardImageContainer}>
+                        {mediaUrl ? (
+                          <Image source={{ uri: mediaUrl }} style={styles.cardImage} resizeMode="cover" />
+                        ) : (
+                          <LinearGradient
+                            colors={['#FAC638', '#F59E0B']}
+                            style={styles.cardImagePlaceholder}
+                          >
+                            <Ionicons name="time" size={28} color="#fff" />
+                          </LinearGradient>
+                        )}
+                        {isLocked && (
+                          <View style={styles.cardLockBadge}>
+                            <Ionicons name="lock-closed" size={12} color="#fff" />
+                          </View>
+                        )}
+                        {capsule.is_public && (
+                          <View style={styles.cardPublicBadge}>
+                            <Ionicons name="globe-outline" size={10} color="#fff" />
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Card Info */}
+                      <View style={styles.cardInfo}>
+                        <Text style={styles.cardTitle} numberOfLines={1}>{capsule.title}</Text>
+                        <Text style={styles.cardTime}>{timeAgo(capsule.created_at)}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
           </>
         )}
       </ScrollView>
 
-      <Modal
+      {/* Capsule Detail */}
+      <CapsuleDetailModal
         visible={!!selectedCapsule}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setSelectedCapsule(null)}
-      >
-        <View style={styles.detailOverlay}>
-          <TouchableOpacity
-            style={styles.detailBackdrop}
-            activeOpacity={1}
-            onPress={() => setSelectedCapsule(null)}
-          />
-          {selectedCapsule && (
-            <View style={styles.detailCard}>
-              <View style={styles.detailHeader}>
-                <Text style={styles.detailTitle}>{selectedCapsule.title || 'Untitled Capsule'}</Text>
-                <TouchableOpacity onPress={() => setSelectedCapsule(null)}>
-                  <Ionicons name="close" size={22} color="#64748b" />
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.detailSubtitle}>
-                Dropped {formatTimeAgo(selectedCapsule.created_at)}
-              </Text>
-              {selectedCapsule.open_at && (
-                <Text style={styles.detailSubtitle}>{formatOpenLabel(selectedCapsule)}</Text>
-              )}
-              <View style={styles.detailImageWrapper}>
-                {(() => {
-                  const mediaUrl = getMediaUrl(selectedCapsule);
-                  const locked = isCapsuleLocked(selectedCapsule);
-                  return mediaUrl ? (
-                    <View style={styles.detailImageContainer}>
-                      <Image source={{ uri: mediaUrl }} style={styles.detailImage} resizeMode="cover" />
-                      {locked && (
-                        <BlurView intensity={70} tint="dark" style={styles.detailImageOverlay}>
-                          <Ionicons name="lock-closed" size={28} color="white" />
-                          <Text style={styles.detailLockedText}>Locked</Text>
-                        </BlurView>
-                      )}
-                    </View>
-                  ) : (
-                    <View style={styles.detailPlaceholder}>
-                      <Ionicons name="image-outline" size={40} color="#94a3b8" />
-                      <Text style={styles.detailPlaceholderText}>No preview available</Text>
-                    </View>
-                  );
-                })()}
-              </View>
-              <View style={styles.detailFooter}>
-                <Text style={styles.detailFooterText}>
-                  Only public capsules or those shared with you are visible here.
-                </Text>
-              </View>
-            </View>
-          )}
-        </View>
-      </Modal>
+        capsule={selectedCapsule}
+        capsules={publicCapsules}
+        onClose={() => setSelectedCapsule(null)}
+      />
     </View>
   );
 };
@@ -667,16 +428,18 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#fafaf8',
   },
+
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 52,
+    paddingTop: 58,
     paddingBottom: 12,
-    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 20,
+    backgroundColor: '#fafaf8',
   },
   backButton: {
     width: 40,
@@ -684,31 +447,208 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1e293b',
+    letterSpacing: -0.3,
+  },
   headerSpacer: {
     width: 40,
   },
-  headerTitle: {
-    fontSize: 20,
+
+  // Hero
+  heroSection: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
+  },
+
+  // Avatar
+  avatarWrapper: {
+    position: 'relative',
+    marginBottom: 14,
+  },
+  avatarRing: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: '#FAC638',
+    padding: 3,
+    backgroundColor: '#fff',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 47,
+  },
+  avatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 47,
+    backgroundColor: '#FFF8E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Name
+  displayName: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1e293b',
+    letterSpacing: -0.3,
+  },
+  username: {
+    fontSize: 14,
+    color: '#94a3b8',
+    marginTop: 2,
+    marginBottom: 18,
+  },
+
+  // Stats
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 18,
+  },
+  statPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fff',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  statValue: {
+    fontSize: 16,
     fontWeight: '700',
     color: '#1e293b',
   },
-  content: {
-    flex: 1,
+  statLabel: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '500',
   },
-  contentContainer: {
-    paddingBottom: 120,
-  },
-  loadingState: {
-    paddingVertical: 80,
+
+  // Action Button
+  actionButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 24,
+    gap: 8,
+  },
+  actionButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+
+  // Section
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  sectionCount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#94a3b8',
+  },
+
+  // Cards Grid
+  cardsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 20,
     gap: 12,
   },
-  loadingText: {
-    fontSize: 16,
-    color: '#64748b',
+  card: {
+    width: CARD_WIDTH,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  errorState: {
+  cardImageContainer: {
+    width: '100%',
+    aspectRatio: 1,
+    position: 'relative',
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  cardImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardLockBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardPublicBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(6,214,160,0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardInfo: {
+    padding: 10,
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 3,
+  },
+  cardTime: {
+    fontSize: 12,
+    color: '#94a3b8',
+  },
+
+  // Loading
+  loadingBox: {
+    paddingVertical: 60,
+    alignItems: 'center',
+  },
+
+  // Error
+  errorContainer: {
     padding: 32,
     margin: 16,
     borderRadius: 16,
@@ -721,295 +661,41 @@ const styles = StyleSheet.create({
     color: '#b91c1c',
     textAlign: 'center',
   },
-  profileSection: {
+
+  // Empty
+  emptyBox: {
+    marginHorizontal: 20,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 32,
     alignItems: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 20,
-    backgroundColor: '#f8f9fa',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
   },
-  avatar: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    marginBottom: 16,
-  },
-  avatarPlaceholder: {
-    backgroundColor: '#e2e8f0',
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#FFF8E1',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 16,
   },
-  name: {
-    fontSize: 28,
+  emptyTitle: {
+    fontSize: 18,
     fontWeight: '700',
     color: '#1e293b',
     marginBottom: 6,
-    textAlign: 'center',
   },
-  username: {
-    fontSize: 16,
-    color: '#64748b',
-    marginBottom: 8,
-  },
-  metaText: {
+  emptyText: {
     fontSize: 14,
-    color: '#475569',
-  },
-  metaSubtext: {
-    fontSize: 13,
-    color: '#94a3b8',
-    marginTop: 4,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 24,
-    marginTop: 16,
-    gap: 8,
-    minWidth: 160,
-  },
-  actionButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: 'white',
-  },
-  addButton: {
-    backgroundColor: '#FAC638',
-  },
-  pendingButton: {
-    backgroundColor: '#94a3b8',
-  },
-  friendButton: {
-    backgroundColor: '#10b981',
-    opacity: 0.8,
-  },
-  section: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    backgroundColor: '#ffffff',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 20,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  sectionCount: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#94a3b8',
-  },
-  sectionHelper: {
-    fontSize: 13,
-    color: '#94a3b8',
-    marginBottom: 12,
-  },
-  capsuleList: {
-    gap: 16,
-  },
-  capsuleCard: {
-    flexDirection: 'row',
-    backgroundColor: '#f8fafc',
-    borderRadius: 18,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  capsuleMedia: {
-    width: width * 0.28,
-    height: width * 0.28,
-    backgroundColor: '#e2e8f0',
-  },
-  capsuleImage: {
-    width: '100%',
-    height: '100%',
-  },
-  capsulePlaceholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#e2e8f0',
-  },
-  capsuleLockOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  capsuleLockText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  capsuleInfo: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 18,
-    justifyContent: 'center',
-    gap: 8,
-  },
-  capsuleTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  capsuleTimestamp: {
-    fontSize: 13,
-    color: '#64748b',
-  },
-  tag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#e2e8f0',
-    alignSelf: 'flex-start',
-    borderRadius: 999,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-  },
-  openTag: {
-    backgroundColor: '#fef3c7',
-  },
-  tagText: {
-    fontSize: 12,
-    color: '#0f172a',
-    fontWeight: '600',
-  },
-  emptyState: {
-    paddingVertical: 32,
-    alignItems: 'center',
-    gap: 12,
-  },
-  emptyStateText: {
-    fontSize: 15,
     color: '#94a3b8',
     textAlign: 'center',
-    lineHeight: 22,
-  },
-  activityList: {
-    gap: 16,
-  },
-  activityItem: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'center',
-  },
-  activityIcon: {
-    fontSize: 20,
-  },
-  activityInfo: {
-    flex: 1,
-  },
-  activityMessage: {
-    fontSize: 15,
-    color: '#0f172a',
-    fontWeight: '600',
-  },
-  activityTimestamp: {
-    fontSize: 13,
-    color: '#94a3b8',
-    marginTop: 2,
-  },
-  detailOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(15, 23, 42, 0.35)',
-  },
-  detailBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  detailCard: {
-    backgroundColor: 'white',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 36,
-  },
-  detailHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  detailTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#0f172a',
-    flex: 1,
-    marginRight: 16,
-  },
-  detailSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 4,
-  },
-  detailImageWrapper: {
-    marginTop: 16,
-    marginBottom: 20,
-  },
-  detailImageContainer: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: '#e2e8f0',
-    height: width * 0.6,
-  },
-  detailImage: {
-    width: '100%',
-    height: '100%',
-  },
-  detailImageOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  detailLockedText: {
-    color: 'white',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  detailPlaceholder: {
-    height: width * 0.6,
-    borderRadius: 20,
-    backgroundColor: '#e2e8f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  detailPlaceholderText: {
-    color: '#94a3b8',
-  },
-  detailFooter: {
-    backgroundColor: '#f8fafc',
-    padding: 14,
-    borderRadius: 16,
-  },
-  detailFooterText: {
-    fontSize: 13,
-    color: '#64748b',
-    textAlign: 'center',
+    lineHeight: 20,
   },
 });
 
 export default FriendProfileScreen;
-
-

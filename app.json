@@ -1,43 +1,71 @@
 {
   "expo": {
-    "name": "Time Capsule",
+    "name": "TimeCapsule",
     "slug": "time-capsule",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "scheme": "timecapsule",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FAC638"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.timecapsule.app"
+      "bundleIdentifier": "com.timecapsule.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "TimeCapsule needs camera access to take photos for your time capsules and profile picture.",
+        "NSPhotoLibraryUsageDescription": "TimeCapsule needs photo library access to add photos to your time capsules.",
+        "NSLocationWhenInUseUsageDescription": "TimeCapsule uses your location to place capsules on the map and discover nearby capsules.",
+        "NSUserNotificationsUsageDescription": "TimeCapsule sends notifications when your capsules are ready to open or when friends interact with you."
+      }
     },
     "android": {
       "package": "com.timecapsule.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FAC638"
+      },
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
       "intentFilters": [
         {
           "action": "VIEW",
-          "data": [
-            {
-              "scheme": "timecapsule"
-            }
-          ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
+          "data": [{ "scheme": "timecapsule" }],
+          "category": ["BROWSABLE", "DEFAULT"]
         }
       ]
     },
     "platforms": ["ios", "android"],
     "plugins": [
-      "expo-location",
-      "expo-notifications",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "TimeCapsule uses your location to place capsules on the map and discover nearby capsules."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#FAC638"
+        }
+      ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "The app accesses your photos to let you add them to your time capsules."
+          "photosPermission": "TimeCapsule needs photo library access to add photos to your time capsules.",
+          "cameraPermission": "TimeCapsule needs camera access to take photos for your capsules and profile picture."
         }
       ]
     ],

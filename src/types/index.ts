@@ -1,10 +1,10 @@
 export interface User {
   id: string;
-  email: string;
-  display_name?: string;
-  username?: string;
-  phone_number?: string;
-  avatar_url?: string;
+  email: string | null;
+  display_name: string | null;
+  username: string | null;
+  phone_number?: string | null;
+  avatar_url: string | null;
   created_at: string;
 }
 
@@ -20,16 +20,19 @@ export interface Capsule {
   id: string;
   owner_id: string;
   title: string;
-  description?: string;
-  content_refs: string[];
-  open_at?: string;
-  lat?: number;
-  lng?: number;
+  description: string | null;
+  content_refs: any[] | null;
+  open_at: string | null;
+  lat: number | null;
+  lng: number | null;
   is_public: boolean;
-  allowed_users: string[];
-  blockchain_hash?: string;
+  allowed_users: any[] | null;
+  blockchain_hash: string | null;
   created_at: string;
-  updated_at?: string;
+  media_url: string | null;
+  media_type: 'image' | 'video' | 'none' | null;
+  is_locked: boolean;
+  view_count: number;
 }
 
 export interface CapsuleContent {
@@ -64,13 +67,16 @@ export interface MediaFile {
 
 export interface CreateCapsuleData {
   title: string;
-  description?: string;
-  open_at?: string;
-  lat?: number;
-  lng?: number;
+  description?: string | null;
+  open_at?: string | null;
+  lat?: number | null;
+  lng?: number | null;
   is_public: boolean;
   allowed_users: string[];
-  contents: Omit<CapsuleContent, 'id' | 'capsule_id' | 'created_at'>[];
+  media_url?: string | null;
+  media_type?: 'image' | 'video' | 'none';
+  is_locked?: boolean;
+  contents?: Omit<CapsuleContent, 'id' | 'capsule_id' | 'created_at'>[];
 }
 
 export interface AuthState {

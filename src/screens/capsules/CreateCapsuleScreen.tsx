@@ -53,50 +53,62 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
 
   const [newUsername, setNewUsername] = useState('');
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
-  
-  // Mock friends data - sorted by interaction frequency
-  const [friends] = useState<Friend[]>([
-    {
-      id: '1',
-      name: 'Elif Yılmaz',
-      username: 'elifyilmaz',
-      avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
-      friends_since: '2021',
-    },
-    {
-      id: '2',
-      name: 'Ahmet Demir',
-      username: 'ahmetdemir',
-      avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
-      friends_since: '2022',
-    },
-    {
-      id: '3',
-      name: 'Zeynep Kaya',
-      username: 'zeynepkaya',
-      avatar_url: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400',
-      friends_since: '2020',
-    },
-    {
-      id: '4',
-      name: 'Mehmet Öztürk',
-      username: 'mehmetozturk',
-      avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
-      friends_since: '2023',
-    },
-    {
-      id: '5',
-      name: 'Ayşe Şahin',
-      username: 'aysesahin',
-      avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400',
-      friends_since: '2021',
-    },
-  ]);
+
+  // Friends loaded from Supabase
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [loadingFriends, setLoadingFriends] = useState(false);
 
   useEffect(() => {
-    // Get current location on mount
     getCurrentLocation();
+    loadFriends();
   }, []);
+
+  const loadFriends = async () => {
+    try {
+      setLoadingFriends(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get accepted friend requests
+      const { data: friendRequests, error } = await supabase
+        .from('friend_requests')
+        .select('sender_id, receiver_id')
+        .eq('status', 'accepted')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+
+      if (error || !friendRequests || friendRequests.length === 0) {
+        setFriends([]);
+        return;
+      }
+
+      // Extract friend IDs
+      const friendIds = (friendRequests as any[]).map((req) =>
+        req.sender_id === user.id ? req.receiver_id : req.sender_id
+      );
+
+      // Get friend profiles
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .in('id', friendIds);
+
+      if (profiles) {
+        setFriends(
+          (profiles as any[]).map((p) => ({
+            id: p.id,
+            name: p.display_name || p.username || 'User',
+            username: p.username || '',
+            avatar_url: p.avatar_url || undefined,
+            friends_since: '',
+          }))
+        );
+      }
+    } catch (error) {
+      console.error('Error loading friends:', error);
+    } finally {
+      setLoadingFriends(false);
+    }
+  };
 
   const getCurrentLocation = async () => {
     try {
@@ -176,25 +188,29 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
       // Generate temporary capsule ID for media upload
       const tempCapsuleId = `temp_${Date.now()}`;
 
-      // Upload media if exists
+      // Upload all media to Supabase Storage
       let mediaUrl: string | null = null;
       let mediaType: 'image' | 'video' | 'none' = 'none';
+      const uploadedRefs: { url: string; type: string }[] = [];
 
       if (capsuleData.media.length > 0) {
-        // Upload the first media item (you can extend this to support multiple)
-        const firstMedia = capsuleData.media[0];
-        const uploadResult = await MediaService.uploadMedia(
-          firstMedia.uri,
-          user.id,
-          tempCapsuleId
-        );
+        for (const mediaItem of capsuleData.media) {
+          const uploadResult = await MediaService.uploadMedia(
+            mediaItem.uri,
+            user.id,
+            tempCapsuleId
+          );
 
-        if (uploadResult) {
-          mediaUrl = uploadResult.url;
-          mediaType = uploadResult.type;
-        } else {
-          // Silently continue without media if upload fails
-          console.warn('Media upload failed, creating capsule without media');
+          if (uploadResult) {
+            uploadedRefs.push({ url: uploadResult.url, type: uploadResult.type });
+            // Use first media as the main media_url
+            if (!mediaUrl) {
+              mediaUrl = uploadResult.url;
+              mediaType = uploadResult.type as 'image' | 'video';
+            }
+          } else {
+            console.warn('Media upload failed for item, skipping');
+          }
         }
       }
 
@@ -208,7 +224,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
         lat: capsuleData.location?.lat || null,
         lng: capsuleData.location?.lng || null,
         is_public: capsuleData.isPublic,
-        content_refs: capsuleData.media,
+        content_refs: uploadedRefs.length > 0 ? uploadedRefs : undefined,
         media_url: mediaUrl,
         media_type: mediaType,
         is_locked: isLocked,

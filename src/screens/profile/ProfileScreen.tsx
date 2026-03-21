@@ -1,12 +1,27 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, TextInput, Modal, Image, Dimensions, Animated, PanResponder } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  Modal,
+  Image,
+  Dimensions,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../../store/authStore';
 import { CapsuleService } from '../../services/capsuleService';
 import { MediaService } from '../../services/mediaService';
+import { supabase } from '../../lib/supabase';
+import CapsuleDetailModal from '../../components/CapsuleDetailModal';
 
-const { height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
+const CARD_WIDTH = (width - 48 - 12) / 2; // 2 columns
 
 interface ProfileScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -14,726 +29,283 @@ interface ProfileScreenProps {
   onGoBack?: () => void;
 }
 
-const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
-  const { user, updateProfile } = useAuthStore();
-  const [stats, setStats] = useState([
-    { id: 'created', label: 'Capsules Created', value: '0', icon: 'archive', tappable: true },
-    { id: 'memories', label: 'Memories Saved', value: '0', icon: 'images', tappable: false },
-    { id: 'days', label: 'Days Active', value: '0', icon: 'calendar', tappable: false },
-  ]);
-  const [capsulesCreated, setCapsulesCreated] = useState(0);
-  const [capsulesReceived, setCapsulesReceived] = useState(0);
+const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
+  const { user } = useAuthStore();
+  const [capsulesCount, setCapsulesCount] = useState(0);
+  const [friendsCount, setFriendsCount] = useState(0);
+  const [daysActive, setDaysActive] = useState(0);
+  const [capsulesList, setCapsulesList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editName, setEditName] = useState(user?.display_name || '');
   const [photoPickerVisible, setPhotoPickerVisible] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(user?.avatar_url || null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-
-  // Invite modal state
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteIdentifier, setInviteIdentifier] = useState('');
-  const INVITE_MODAL_HEIGHT = height * 0.9;
-  const inviteModalTranslateY = useRef(new Animated.Value(INVITE_MODAL_HEIGHT)).current;
-  const inviteModalBackdropOpacity = useRef(new Animated.Value(0)).current;
+  const [selectedCapsule, setSelectedCapsule] = useState<any>(null);
 
   useEffect(() => {
     loadStats();
   }, []);
 
   useEffect(() => {
-    // Update profile photo when user data changes
-    if (user?.avatar_url) {
-      setProfilePhoto(user.avatar_url);
-    }
+    if (user?.avatar_url) setProfilePhoto(user.avatar_url);
   }, [user?.avatar_url]);
 
   const loadStats = async () => {
     try {
       setLoading(true);
-      
-      // Fetch created capsules
       const { data, error } = await CapsuleService.getUserCapsules();
-      
-      // Fetch received/shared capsules
-      const { data: sharedData, error: sharedError } = await CapsuleService.getSharedCapsules();
-      
+
       if (!error && data) {
-        const capsulesCount = data.length;
-        const memoriesCount = data.reduce((acc, capsule) => {
-          return acc + (capsule.content_refs?.length || 0);
-        }, 0);
-        
-        // Calculate days active (from oldest capsule)
-        let daysActive = 0;
+        setCapsulesCount(data.length);
+        setCapsulesList(data);
         if (data.length > 0) {
-          const oldestDate = new Date(data[data.length - 1].created_at);
-          const now = new Date();
-          daysActive = Math.floor((now.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24));
+          const oldest = new Date(data[data.length - 1].created_at);
+          setDaysActive(Math.floor((Date.now() - oldest.getTime()) / 86400000));
         }
-
-        // Set capsules counts
-        setCapsulesCreated(capsulesCount);
-        setCapsulesReceived(!sharedError && sharedData ? sharedData.length : 0);
-
-        setStats([
-          { id: 'created', label: 'Capsules Created', value: capsulesCount.toString(), icon: 'archive', tappable: true },
-          { id: 'memories', label: 'Memories Saved', value: memoriesCount.toString(), icon: 'images', tappable: false },
-          { id: 'days', label: 'Days Active', value: daysActive.toString(), icon: 'calendar', tappable: false },
-        ]);
       }
-    } catch (error) {
-      console.error('Error loading stats:', error);
-    } finally {
+
+      if (user?.id) {
+        const { data: fd } = await supabase
+          .from('friend_requests')
+          .select('id')
+          .eq('status', 'accepted')
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+        setFriendsCount(fd?.length || 0);
+      }
+    } catch (e) { console.warn('loadStats:', e); } finally {
       setLoading(false);
     }
   };
 
-  const handleEditProfile = () => {
-    setEditName(user?.display_name || '');
-    setEditModalVisible(true);
-  };
-
-  const handleSaveProfile = async () => {
-    if (!editName.trim()) {
-      Alert.alert('Error', 'Please enter your name');
-      return;
-    }
-
-    try {
-      const { error } = await updateProfile({ display_name: editName });
-      
-      if (error) {
-        Alert.alert('Error', 'Failed to update profile');
-      } else {
-        Alert.alert('Success', 'Profile updated successfully!');
-        setEditModalVisible(false);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Something went wrong');
-    }
-  };
-
-  const menuItems = [
-    { id: 'account', label: 'Account Settings', icon: 'person-outline', color: '#FAC638' },
-    { id: 'notifications', label: 'Notifications', icon: 'notifications-outline', color: '#06D6A0' },
-    { id: 'privacy', label: 'Privacy & Security', icon: 'lock-closed-outline', color: '#FF6B6B' },
-    { id: 'help', label: 'Help & Support', icon: 'help-circle-outline', color: '#FFD166' },
-    { id: 'about', label: 'About', icon: 'information-circle-outline', color: '#94a3b8' },
-  ];
-
-  const handleMenuPress = (id: string) => {
-    if (id === 'account') {
-      onNavigate('AccountSettings');
-    } else if (id === 'notifications') {
-      Alert.alert('Notifications', 'This feature will be available soon!');
-    } else if (id === 'privacy') {
-      Alert.alert('Privacy & Security', 'This feature will be available soon!');
-    } else if (id === 'help') {
-      Alert.alert('Help & Support', 'Need help? Email us at support@timecapsule.app');
-    } else if (id === 'about') {
-      Alert.alert('About Time Capsule', 'Version 1.0.0\n\nCapture moments, share memories.');
-    }
-  };
-
-  const handleStatPress = (statId: string) => {
-    if (statId === 'created') {
-      onNavigate('MyCapsules');
-    }
-  };
-
-  const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', onPress: onLogout, style: 'destructive' },
-    ]);
-  };
-
-  const handleAvatarPress = () => {
-    setPhotoPickerVisible(true);
-  };
+  const handleAvatarPress = () => setPhotoPickerVisible(true);
 
   const handleTakePhoto = async () => {
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      
-      if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Camera permission is needed to take photos');
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        const imageUri = result.assets[0].uri;
-        setPhotoPickerVisible(false);
-        await uploadAndUpdateAvatar(imageUri);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to take photo');
-    }
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') { Alert.alert('Permission Required', 'Camera permission needed'); return; }
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1, 1], quality: 0.8 });
+    if (!result.canceled && result.assets[0]) { setPhotoPickerVisible(false); await uploadAndUpdateAvatar(result.assets[0].uri); }
   };
 
   const handleChooseFromGallery = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-      if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Gallery permission is needed to select photos');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        const imageUri = result.assets[0].uri;
-        setPhotoPickerVisible(false);
-        await uploadAndUpdateAvatar(imageUri);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to select photo');
-    }
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { Alert.alert('Permission Required', 'Gallery permission needed'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1, 1], quality: 0.8 });
+    if (!result.canceled && result.assets[0]) { setPhotoPickerVisible(false); await uploadAndUpdateAvatar(result.assets[0].uri); }
   };
 
   const uploadAndUpdateAvatar = async (imageUri: string) => {
-    if (!user?.id) {
-      Alert.alert('Hata', 'Kullanıcı bulunamadı');
-      return;
-    }
-
+    if (!user?.id) return;
     try {
       setUploadingPhoto(true);
-      
-      // Show optimistic update
       setProfilePhoto(imageUri);
-
-      // Upload image to Supabase Storage
       const { url, error: uploadError } = await MediaService.uploadAvatar(imageUri, user.id);
-
-      if (uploadError) {
-        console.error('Upload error details:', uploadError);
-        throw new Error(`Upload failed: ${uploadError.message || 'Unknown error'}`);
-      }
-
-      if (!url) {
-        throw new Error('No URL returned from upload');
-      }
-
-      // Update user profile with new avatar URL
-      const { error: updateError } = await updateProfile({ avatar_url: url });
-
-      if (updateError) {
-        console.error('Profile update error:', updateError);
-        throw new Error(`Profile update failed: ${updateError.message || 'Unknown error'}`);
-      }
-
-      // Update local state with the permanent URL
+      if (uploadError || !url) throw new Error('Upload failed');
+      const { error: updateError } = await (useAuthStore.getState().updateProfile({ avatar_url: url }));
+      if (updateError) throw new Error('Update failed');
       setProfilePhoto(url);
-      Alert.alert('Başarılı', 'Profil fotoğrafı güncellendi!');
-    } catch (error: any) {
-      console.error('Error uploading avatar:', error);
-      const errorMessage = error?.message || 'Bilinmeyen hata';
-      Alert.alert(
-        'Hata', 
-        `Profil fotoğrafı yüklenemedi.\n\n${errorMessage}\n\nLütfen tekrar deneyin veya internet bağlantınızı kontrol edin.`
-      );
-      // Revert to previous photo
+    } catch {
       setProfilePhoto(user?.avatar_url || null);
+      Alert.alert('Error', 'Failed to update photo');
     } finally {
       setUploadingPhoto(false);
     }
   };
 
-  // Invite modal functions
-  const openInviteModal = () => {
-    setShowInviteModal(true);
-    Animated.parallel([
-      Animated.spring(inviteModalTranslateY, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 50,
-        friction: 8,
-      }),
-      Animated.timing(inviteModalBackdropOpacity, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
+  const timeAgo = (d: string): string => {
+    const diff = Date.now() - new Date(d).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    const days = Math.floor(h / 24);
+    if (days < 30) return `${days}d ago`;
+    return `${Math.floor(days / 30)}mo ago`;
   };
 
-  const closeInviteModal = () => {
-    Animated.parallel([
-      Animated.spring(inviteModalTranslateY, {
-        toValue: INVITE_MODAL_HEIGHT,
-        useNativeDriver: true,
-        tension: 50,
-        friction: 8,
-      }),
-      Animated.timing(inviteModalBackdropOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setShowInviteModal(false);
-      setInviteIdentifier('');
-    });
-  };
-
-  const handleSendInvite = () => {
-    if (!inviteIdentifier.trim()) {
-      Alert.alert('Missing Information', 'Please enter a username or email address');
-      return;
+  const getMediaUrl = (capsule: any): string | null => {
+    if (capsule.media_url && capsule.media_type !== 'none') return capsule.media_url;
+    if (capsule.content_refs && Array.isArray(capsule.content_refs)) {
+      for (const item of capsule.content_refs) {
+        if (typeof item === 'string' && item.startsWith('http')) return item;
+        if (item?.url && item.url.startsWith('http')) return item.url;
+      }
     }
-
-    // Placeholder logic - will be replaced with actual API call
-    Alert.alert(
-      'Invitation Sent!',
-      `Invitation sent to ${inviteIdentifier}. They will receive 5 Premium Capsules when they join!`,
-      [
-        {
-          text: 'OK',
-          onPress: closeInviteModal,
-        },
-      ]
-    );
+    return null;
   };
-
-  // Pan responder for invite modal drag to dismiss
-  const inviteModalPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dy) > 5;
-      },
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy > 0) {
-          inviteModalTranslateY.setValue(gestureState.dy);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > 150 || gestureState.vy > 0.5) {
-          closeInviteModal();
-        } else {
-          Animated.spring(inviteModalTranslateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 50,
-            friction: 8,
-          }).start();
-        }
-      },
-    })
-  ).current;
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => onNavigate('Dashboard')}
-        >
-          <Ionicons name="arrow-back" size={24} color="#1e293b" />
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>Profile</Text>
-        <View style={styles.headerSpacer} />
+        <TouchableOpacity onPress={() => onNavigate('AccountSettings')} activeOpacity={0.7}>
+          <Ionicons name="settings-outline" size={24} color="#1e293b" />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView 
-        style={styles.content} 
-        contentContainerStyle={styles.contentContainer}
-        scrollEventThrottle={16}
-        decelerationRate="normal"
-        bounces={true}
-        overScrollMode="auto"
-        showsVerticalScrollIndicator={true}
-      >
-        {/* Profile Info */}
-        <View style={styles.profileCard}>
-          <TouchableOpacity 
-            style={styles.avatarContainer}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+        {/* Profile Hero */}
+        <View style={styles.heroSection}>
+          {/* Avatar - centered, large */}
+          <TouchableOpacity
+            style={styles.avatarWrapper}
             onPress={handleAvatarPress}
-            activeOpacity={0.7}
             disabled={uploadingPhoto}
+            activeOpacity={0.8}
           >
-            {profilePhoto ? (
-              <Image source={{ uri: profilePhoto }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatar}>
-                <Ionicons name="person" size={48} color="white" />
-              </View>
-            )}
+            <View style={styles.avatarRing}>
+              {profilePhoto ? (
+                <Image source={{ uri: profilePhoto }} style={styles.avatarImage} />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Ionicons name="person" size={44} color="#FAC638" />
+                </View>
+              )}
+            </View>
             {uploadingPhoto ? (
-              <View style={styles.avatarUploadingOverlay}>
-                <ActivityIndicator size="large" color="#FAC638" />
+              <View style={styles.avatarOverlay}>
+                <ActivityIndicator color="#FAC638" />
               </View>
             ) : (
-              <View style={styles.avatarEditBadge}>
-                <Ionicons name="camera" size={16} color="white" />
+              <View style={styles.cameraBadge}>
+                <Ionicons name="camera" size={14} color="#fff" />
               </View>
             )}
           </TouchableOpacity>
-          <Text style={styles.userName}>{user?.display_name || 'User'}</Text>
-          
-          {/* User Info Row - Centered & Tappable */}
-          <TouchableOpacity 
-            style={styles.userInfoRow}
-            onPress={() => onNavigate('AccountSettings')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.userInfoWrapper}>
-              <Text style={styles.userInfoText} numberOfLines={2}>
-                <Text style={styles.infoLabel}>Email: </Text>
-                <Text style={styles.infoValue}>{user?.email || 'Not set'}</Text>
-                <Text style={styles.infoDivider}> • </Text>
-                <Text style={styles.infoLabel}>Username: </Text>
-                <Text style={styles.infoValue}>{user?.username || 'Not set'}</Text>
-                <Text style={styles.infoDivider}> • </Text>
-                <Text style={styles.infoLabel}>Phone: </Text>
-                <Text style={styles.infoValue}>{user?.phone_number || 'Not set'}</Text>
-              </Text>
-            </View>
-            <View style={styles.chevronContainer}>
-              <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
-            </View>
-          </TouchableOpacity>
-        </View>
 
-        {/* Invite Friends Button */}
-        <TouchableOpacity 
-          style={styles.inviteFriendsButton}
-          onPress={openInviteModal}
-          activeOpacity={0.8}
-        >
-          <View style={styles.inviteFriendsIcon}>
-            <Ionicons name="person-add" size={22} color="white" />
-          </View>
-          <Text style={styles.inviteFriendsText}>Invite Friends</Text>
-          <Ionicons name="chevron-forward" size={20} color="white" />
-        </TouchableOpacity>
+          {/* Name */}
+          <Text style={styles.displayName}>{user?.display_name || 'User'}</Text>
+          <Text style={styles.username}>@{user?.username || 'username'}</Text>
 
-        {/* My Capsules Preview */}
-        <TouchableOpacity 
-          style={styles.capsulesPreviewCard}
-          onPress={() => onNavigate('MyCapsules')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.capsulesPreviewHeader}>
-            <Text style={styles.capsulesPreviewTitle}>My Capsules</Text>
-            <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
-          </View>
-          
-          <View style={styles.capsulesPreviewContent}>
-            <View style={styles.capsulePreviewItem}>
-              <View style={styles.capsulePreviewIconContainer}>
-                <Ionicons name="create-outline" size={28} color="#FAC638" />
-              </View>
-              <Text style={styles.capsulePreviewValue}>{capsulesCreated}</Text>
-              <Text style={styles.capsulePreviewLabel}>Created</Text>
-            </View>
-            
-            <View style={styles.capsulePreviewDivider} />
-            
-            <View style={styles.capsulePreviewItem}>
-              <View style={styles.capsulePreviewIconContainer}>
-                <Ionicons name="gift-outline" size={28} color="#10b981" />
-              </View>
-              <Text style={styles.capsulePreviewValue}>{capsulesReceived}</Text>
-              <Text style={styles.capsulePreviewLabel}>Received</Text>
-            </View>
-          </View>
-          
-          {capsulesCreated === 0 && capsulesReceived === 0 && (
-            <View style={styles.capsulesEmptyState}>
-              <Text style={styles.capsulesEmptyText}>No capsules yet</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        {/* Stats */}
-        <View style={styles.statsContainer}>
-          {stats.map((stat) => {
-            const StatContainer = stat.tappable ? TouchableOpacity : View;
-            return (
-              <StatContainer
-                key={stat.label}
-                style={styles.statItem}
-                onPress={stat.tappable ? () => handleStatPress(stat.id) : undefined}
-                activeOpacity={stat.tappable ? 0.7 : 1}
-              >
-                <Ionicons name={stat.icon as any} size={24} color="#FAC638" />
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
-                {stat.tappable && (
-                  <View style={styles.statTapIndicator}>
-                    <Ionicons name="chevron-forward" size={14} color="#94a3b8" />
-                  </View>
-                )}
-              </StatContainer>
-            );
-          })}
-        </View>
-
-        {/* Menu Items */}
-        <View style={styles.menuContainer}>
-          {menuItems.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              onPress={() => handleMenuPress(item.id)}
-              style={styles.menuItem}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: item.color + '20' }]}>
-                <Ionicons name={item.icon as any} size={24} color={item.color} />
-              </View>
-              <Text style={styles.menuLabel}>{item.label}</Text>
-              <Ionicons name="chevron-forward" size={24} color="#94a3b8" />
+          {/* Stats Row - capsule shaped pills */}
+          <View style={styles.statsRow}>
+            <TouchableOpacity style={styles.statPill} onPress={() => onNavigate('MyCapsules')} activeOpacity={0.7}>
+              <Ionicons name="time" size={16} color="#FAC638" />
+              <Text style={styles.statValue}>{capsulesCount}</Text>
+              <Text style={styles.statLabel}>Capsules</Text>
             </TouchableOpacity>
-          ))}
+
+            <View style={styles.statPill}>
+              <Ionicons name="people" size={16} color="#FAC638" />
+              <Text style={styles.statValue}>{friendsCount}</Text>
+              <Text style={styles.statLabel}>Friends</Text>
+            </View>
+
+            <View style={styles.statPill}>
+              <Ionicons name="flame" size={16} color="#FAC638" />
+              <Text style={styles.statValue}>{daysActive}</Text>
+              <Text style={styles.statLabel}>Days</Text>
+            </View>
+          </View>
         </View>
 
-        {/* Logout Button */}
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+        {/* Section Header */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>My Capsules</Text>
+          {capsulesList.length > 0 && (
+            <TouchableOpacity onPress={() => onNavigate('MyCapsules')}>
+              <Text style={styles.sectionAction}>See All</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
-        <View style={styles.bottomSpacer} />
+        {/* Capsules - 2 column card layout */}
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#FAC638" />
+          </View>
+        ) : capsulesList.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <View style={styles.emptyIcon}>
+              <Ionicons name="time-outline" size={40} color="#FAC638" />
+            </View>
+            <Text style={styles.emptyTitle}>No Capsules Yet</Text>
+            <Text style={styles.emptyText}>Create your first time capsule to preserve a memory</Text>
+            <TouchableOpacity style={styles.createButton} onPress={() => onNavigate('Create')} activeOpacity={0.8}>
+              <Ionicons name="add" size={20} color="#fff" />
+              <Text style={styles.createButtonText}>Create Capsule</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.cardsGrid}>
+            {capsulesList.map((capsule, index) => {
+              const mediaUrl = getMediaUrl(capsule);
+              const isLocked = capsule.open_at && new Date(capsule.open_at).getTime() > Date.now();
+
+              return (
+                <TouchableOpacity
+                  key={capsule.id || index}
+                  style={styles.card}
+                  onPress={() => setSelectedCapsule(capsule)}
+                  activeOpacity={0.85}
+                >
+                  {/* Card Image */}
+                  <View style={styles.cardImageContainer}>
+                    {mediaUrl ? (
+                      <Image source={{ uri: mediaUrl }} style={styles.cardImage} resizeMode="cover" />
+                    ) : (
+                      <LinearGradient
+                        colors={['#FAC638', '#F59E0B']}
+                        style={styles.cardImagePlaceholder}
+                      >
+                        <Ionicons name="time" size={28} color="#fff" />
+                      </LinearGradient>
+                    )}
+                    {isLocked && (
+                      <View style={styles.cardLockBadge}>
+                        <Ionicons name="lock-closed" size={12} color="#fff" />
+                      </View>
+                    )}
+                    {capsule.is_public && (
+                      <View style={styles.cardPublicBadge}>
+                        <Ionicons name="globe-outline" size={10} color="#fff" />
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Card Info */}
+                  <View style={styles.cardInfo}>
+                    <Text style={styles.cardTitle} numberOfLines={1}>{capsule.title}</Text>
+                    <Text style={styles.cardTime}>{timeAgo(capsule.created_at)}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
 
       {/* Photo Picker Modal */}
-      <Modal
-        visible={photoPickerVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setPhotoPickerVisible(false)}
-      >
-        <TouchableOpacity 
-          style={styles.photoPickerOverlay}
-          activeOpacity={1}
-          onPress={() => setPhotoPickerVisible(false)}
-        >
-          <View style={styles.photoPickerSheet}>
-            <View style={styles.photoPickerHandle} />
-            
-            <Text style={styles.photoPickerTitle}>Update Profile Photo</Text>
-            
-            <TouchableOpacity
-              style={styles.photoPickerOption}
-              onPress={handleTakePhoto}
-              activeOpacity={0.7}
-            >
-              <View style={styles.photoPickerIcon}>
-                <Ionicons name="camera" size={24} color="#FAC638" />
+      <Modal visible={photoPickerVisible} transparent animationType="slide" onRequestClose={() => setPhotoPickerVisible(false)}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setPhotoPickerVisible(false)}>
+          <View style={styles.pickerSheet}>
+            <View style={styles.pickerHandle} />
+            <Text style={styles.pickerTitle}>Profile Photo</Text>
+            <TouchableOpacity style={styles.pickerOption} onPress={handleTakePhoto}>
+              <View style={[styles.pickerIcon, { backgroundColor: '#FAC63820' }]}>
+                <Ionicons name="camera" size={22} color="#FAC638" />
               </View>
-              <Text style={styles.photoPickerOptionText}>Take Photo</Text>
-              <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+              <Text style={styles.pickerOptionText}>Take Photo</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.photoPickerOption}
-              onPress={handleChooseFromGallery}
-              activeOpacity={0.7}
-            >
-              <View style={styles.photoPickerIcon}>
-                <Ionicons name="images" size={24} color="#06D6A0" />
+            <TouchableOpacity style={styles.pickerOption} onPress={handleChooseFromGallery}>
+              <View style={[styles.pickerIcon, { backgroundColor: '#06D6A020' }]}>
+                <Ionicons name="images" size={22} color="#06D6A0" />
               </View>
-              <Text style={styles.photoPickerOptionText}>Choose from Gallery</Text>
-              <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+              <Text style={styles.pickerOptionText}>Choose from Gallery</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.photoPickerCancel}
-              onPress={() => setPhotoPickerVisible(false)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.photoPickerCancelText}>Cancel</Text>
+            <TouchableOpacity style={styles.pickerCancel} onPress={() => setPhotoPickerVisible(false)}>
+              <Text style={styles.pickerCancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
 
-      {/* Edit Profile Modal */}
-      <Modal
-        visible={editModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setEditModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Edit Profile</Text>
-            
-            <View style={styles.modalInputContainer}>
-              <Text style={styles.modalLabel}>Display Name</Text>
-              <TextInput
-                value={editName}
-                onChangeText={setEditName}
-                style={styles.modalInput}
-                placeholder="Enter your name"
-                placeholderTextColor="#94a3b8"
-              />
-            </View>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                onPress={() => setEditModalVisible(false)}
-                style={[styles.modalButton, styles.modalButtonCancel]}
-              >
-                <Text style={styles.modalButtonTextCancel}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleSaveProfile}
-                style={[styles.modalButton, styles.modalButtonSave]}
-              >
-                <Text style={styles.modalButtonText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Invite Friends Modal */}
-      <Modal
-        visible={showInviteModal}
-        transparent
-        animationType="none"
-        onRequestClose={closeInviteModal}
-      >
-        <View style={styles.inviteModalContainer}>
-          {/* Backdrop */}
-          <Animated.View
-            style={[
-              styles.inviteModalBackdrop,
-              { opacity: inviteModalBackdropOpacity }
-            ]}
-          >
-            <TouchableOpacity 
-              style={StyleSheet.absoluteFill}
-              activeOpacity={1}
-              onPress={closeInviteModal}
-            />
-          </Animated.View>
-
-          {/* Bottom Sheet */}
-          <Animated.View
-            style={[
-              styles.inviteModalSheet,
-              {
-                transform: [{ translateY: inviteModalTranslateY }],
-                height: INVITE_MODAL_HEIGHT,
-              },
-            ]}
-          >
-            {/* Drag Handle */}
-            <View style={styles.inviteModalDragHandle} {...inviteModalPanResponder.panHandlers}>
-              <View style={styles.inviteModalDragBar} />
-            </View>
-
-            {/* Close Button */}
-            <TouchableOpacity 
-              style={styles.inviteModalCloseButton}
-              onPress={closeInviteModal}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="close" size={18} color="#64748b" />
-            </TouchableOpacity>
-
-            {/* Scrollable Content */}
-            <ScrollView
-              style={styles.inviteModalContent}
-              contentContainerStyle={styles.inviteModalContentContainer}
-              showsVerticalScrollIndicator={false}
-            >
-              {/* Image/Banner Area */}
-              <View style={styles.inviteModalImagePlaceholder}>
-                <Ionicons name="gift" size={64} color="#FAC638" />
-              </View>
-
-              {/* Main Heading */}
-              <Text style={styles.inviteModalTitle}>
-                Invite Friend to TimeCapsule and earn 5 Premium Capsules!
-              </Text>
-
-              {/* Subtext */}
-              <Text style={styles.inviteModalSubtext}>
-                When your friend drops their first Capsule, both of you receive 5 Premium Capsules.
-              </Text>
-
-              {/* Form Section */}
-              <View style={styles.inviteModalForm}>
-                <Text style={styles.inviteModalFormLabel}>Friend's Username or Email</Text>
-                <View style={styles.inviteModalInputContainer}>
-                  <Ionicons name="person-add-outline" size={20} color="#94a3b8" style={styles.inviteModalInputIcon} />
-                  <TextInput
-                    style={styles.inviteModalInput}
-                    placeholder="Enter friend's username or email"
-                    placeholderTextColor="#94a3b8"
-                    value={inviteIdentifier}
-                    onChangeText={setInviteIdentifier}
-                    keyboardType="default"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </View>
-                <Text style={styles.inviteModalInputHint}>
-                  Enter either a username (e.g., johndoe) or email address
-                </Text>
-
-                {/* Benefits Section */}
-                <View style={styles.inviteModalBenefits}>
-                  <View style={styles.inviteModalBenefitItem}>
-                    <View style={styles.inviteModalBenefitIcon}>
-                      <Ionicons name="checkmark-circle" size={24} color="#06D6A0" />
-                    </View>
-                    <Text style={styles.inviteModalBenefitText}>
-                      Get 5 Premium Capsules instantly
-                    </Text>
-                  </View>
-                  <View style={styles.inviteModalBenefitItem}>
-                    <View style={styles.inviteModalBenefitIcon}>
-                      <Ionicons name="checkmark-circle" size={24} color="#06D6A0" />
-                    </View>
-                    <Text style={styles.inviteModalBenefitText}>
-                      Help your friend save memories
-                    </Text>
-                  </View>
-                  <View style={styles.inviteModalBenefitItem}>
-                    <View style={styles.inviteModalBenefitIcon}>
-                      <Ionicons name="checkmark-circle" size={24} color="#06D6A0" />
-                    </View>
-                    <Text style={styles.inviteModalBenefitText}>
-                      Build your TimeCapsule community
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Invite Action Button */}
-                <TouchableOpacity 
-                  style={styles.inviteModalActionButton}
-                  onPress={handleSendInvite}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="paper-plane" size={20} color="white" style={styles.inviteModalActionButtonIcon} />
-                  <Text style={styles.inviteModalActionButtonText}>Send Invitation</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </Animated.View>
-        </View>
-      </Modal>
-
+      {/* Capsule Detail */}
+      <CapsuleDetailModal
+        visible={!!selectedCapsule}
+        capsule={selectedCapsule}
+        capsules={capsulesList}
+        onClose={() => setSelectedCapsule(null)}
+      />
     </View>
   );
 };
@@ -741,605 +313,328 @@ const ProfileScreen = ({ onNavigate, onLogout }: ProfileScreenProps) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: '#fafaf8',
   },
+
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 16,
-    backgroundColor: '#f8f8f5',
-  },
-  backButton: {
-    padding: 4,
-    width: 32,
-    alignItems: 'flex-start',
-  },
-  headerSpacer: {
-    width: 32,
+    paddingTop: 58,
+    paddingBottom: 12,
+    paddingHorizontal: 20,
+    backgroundColor: '#fafaf8',
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FAC638',
-    flex: 1,
-    textAlign: 'center',
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#1e293b',
+    letterSpacing: -0.5,
   },
-  content: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 16,
-    paddingBottom: 120, // Extra space for bottom tab bar + logout button
-  },
-  profileCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 32,
+
+  // Hero
+  heroSection: {
     alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    paddingTop: 8,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
   },
-  avatarContainer: {
+
+  // Avatar
+  avatarWrapper: {
     position: 'relative',
-    marginBottom: 16,
+    marginBottom: 14,
   },
-  avatar: {
+  avatarRing: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#FAC638',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#FAC638',
+    padding: 3,
+    backgroundColor: '#fff',
   },
   avatarImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: '100%',
+    height: '100%',
+    borderRadius: 47,
   },
-  avatarEditBadge: {
+  avatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 47,
+    backgroundColor: '#FFF8E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 50,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraBadge: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    bottom: 2,
+    right: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#FAC638',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    borderWidth: 2,
+    borderColor: '#fafaf8',
   },
-  avatarUploadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  userName: {
-    fontSize: 24,
+
+  // Name
+  displayName: {
+    fontSize: 22,
     fontWeight: '700',
     color: '#1e293b',
-    marginBottom: 12,
-    textAlign: 'center',
+    letterSpacing: -0.3,
   },
-  // User info row (horizontal, centered)
-  userInfoRow: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    minHeight: 50,
-    gap: 8,
-  },
-  userInfoWrapper: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  userInfoText: {
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  infoLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#94a3b8',
-  },
-  infoValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  infoDivider: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: '#cbd5e1',
-  },
-  chevronContainer: {
-    paddingLeft: 4,
-  },
-  // My Capsules Preview Styles
-  capsulesPreviewCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  capsulesPreviewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  capsulesPreviewTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  capsulesPreviewContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-  },
-  capsulePreviewItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  capsulePreviewIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#f8f9fa',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  capsulePreviewValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  capsulePreviewLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#64748b',
-  },
-  capsulePreviewDivider: {
-    width: 1,
-    height: 60,
-    backgroundColor: '#e2e8f0',
-    marginHorizontal: 16,
-  },
-  capsulesEmptyState: {
-    alignItems: 'center',
-    paddingVertical: 12,
-    marginTop: 8,
-  },
-  capsulesEmptyText: {
+  username: {
     fontSize: 14,
     color: '#94a3b8',
-    fontStyle: 'italic',
+    marginTop: 2,
+    marginBottom: 18,
   },
-  statsContainer: {
+
+  // Stats
+  statsRow: {
     flexDirection: 'row',
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    justifyContent: 'space-around',
+    gap: 10,
+  },
+  statPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fff',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  statItem: {
-    alignItems: 'center',
-    gap: 4,
-    position: 'relative',
-    flex: 1,
-    paddingVertical: 4,
-  },
-  statTapIndicator: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
   statValue: {
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1e293b',
   },
   statLabel: {
     fontSize: 12,
     color: '#94a3b8',
-    textAlign: 'center',
+    fontWeight: '500',
   },
-  menuContainer: {
-    backgroundColor: 'white',
+
+  // Section
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  sectionAction: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FAC638',
+  },
+
+  // Cards Grid
+  cardsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  card: {
+    width: CARD_WIDTH,
+    backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 8,
-    marginBottom: 16,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
   },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
+  cardImageContainer: {
+    width: '100%',
+    aspectRatio: 1,
+    position: 'relative',
   },
-  menuIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
+  cardImage: {
+    width: '100%',
+    height: '100%',
   },
-  menuLabel: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    gap: 8,
-    borderWidth: 2,
-    borderColor: '#FF6B6B',
-  },
-  logoutText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FF6B6B',
-  },
-  bottomSpacer: {
-    height: 100, // Extra space for bottom tab bar
-  },
-  // Photo Picker Modal
-  photoPickerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  photoPickerSheet: {
-    backgroundColor: 'white',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 8,
-    paddingBottom: 34,
-    paddingHorizontal: 20,
-  },
-  photoPickerHandle: {
-    width: 40,
-    height: 5,
-    backgroundColor: '#e2e8f0',
-    borderRadius: 3,
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  photoPickerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  photoPickerOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  photoPickerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'white',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  photoPickerOptionText: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  photoPickerCancel: {
-    alignItems: 'center',
-    paddingVertical: 16,
-    marginTop: 8,
-  },
-  photoPickerCancelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#94a3b8',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 24,
-    width: '85%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 20,
-  },
-  modalInputContainer: {
-    marginBottom: 20,
-  },
-  modalLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#64748b',
-    marginBottom: 8,
-  },
-  modalInput: {
-    backgroundColor: '#f8f8f5',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#1e293b',
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  modalButton: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  modalButtonCancel: {
-    backgroundColor: '#f1f5f9',
-  },
-  modalButtonSave: {
-    backgroundColor: '#FAC638',
-  },
-  modalButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: 'white',
-  },
-  modalButtonTextCancel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  // Invite Friends Button
-  inviteFriendsButton: {
-    backgroundColor: '#06D6A0',
-    marginHorizontal: 16,
-    marginVertical: 12,
-    padding: 18,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    shadowColor: '#06D6A0',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  inviteFriendsIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  cardImagePlaceholder: {
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  inviteFriendsText: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '700',
-    color: 'white',
-  },
-  // Invite Modal Styles
-  inviteModalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  inviteModalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  inviteModalSheet: {
-    backgroundColor: 'white',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    overflow: 'hidden',
-  },
-  inviteModalDragHandle: {
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  inviteModalDragBar: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#e2e8f0',
-    borderRadius: 2,
-  },
-  inviteModalCloseButton: {
+  cardLockBadge: {
     position: 'absolute',
-    top: 16,
-    right: 16,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f1f5f9',
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10,
   },
-  inviteModalContent: {
-    flex: 1,
-  },
-  inviteModalContentContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  inviteModalImagePlaceholder: {
-    height: 200,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 16,
+  cardPublicBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(6,214,160,0.8)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 24,
   },
-  inviteModalTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#1e293b',
-    textAlign: 'center',
-    lineHeight: 32,
-    marginBottom: 12,
+  cardInfo: {
+    padding: 10,
   },
-  inviteModalSubtext: {
-    fontSize: 15,
-    color: '#64748b',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 32,
-  },
-  inviteModalForm: {
-    gap: 16,
-  },
-  inviteModalFormLabel: {
+  cardTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#475569',
-    marginBottom: 8,
-  },
-  inviteModalInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  inviteModalInputIcon: {
-    marginRight: 12,
-  },
-  inviteModalInput: {
-    flex: 1,
-    paddingVertical: 16,
-    fontSize: 16,
     color: '#1e293b',
+    marginBottom: 3,
   },
-  inviteModalInputHint: {
-    fontSize: 13,
+  cardTime: {
+    fontSize: 12,
     color: '#94a3b8',
-    marginTop: -8,
   },
-  inviteModalBenefits: {
-    gap: 16,
-    marginTop: 24,
-    marginBottom: 8,
-  },
-  inviteModalBenefitItem: {
-    flexDirection: 'row',
+
+  // Loading
+  loadingBox: {
+    paddingVertical: 60,
     alignItems: 'center',
-    gap: 12,
   },
-  inviteModalBenefitIcon: {
-    width: 32,
-    height: 32,
+
+  // Empty
+  emptyBox: {
+    marginHorizontal: 20,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
   },
-  inviteModalBenefitText: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  inviteModalActionButton: {
-    flexDirection: 'row',
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#FFF8E1',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FAC638',
-    paddingVertical: 18,
-    borderRadius: 16,
-    marginTop: 32,
-    gap: 8,
-    shadowColor: '#FAC638',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    marginBottom: 16,
   },
-  inviteModalActionButtonIcon: {
-    marginRight: 4,
-  },
-  inviteModalActionButtonText: {
+  emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: 'white',
+    color: '#1e293b',
+    marginBottom: 6,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#94a3b8',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  createButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FAC638',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  createButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+
+  // Photo Picker
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  pickerSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 12,
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+  },
+  pickerHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#e0e0e0',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1e293b',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  pickerOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 14,
+  },
+  pickerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerOptionText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1e293b',
+  },
+  pickerCancel: {
+    alignItems: 'center',
+    paddingVertical: 14,
+    marginTop: 8,
+    borderTopWidth: 0.5,
+    borderTopColor: '#e2e8f0',
+  },
+  pickerCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#94a3b8',
   },
 });
 

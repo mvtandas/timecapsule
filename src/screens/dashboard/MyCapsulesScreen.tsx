@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, RefreshControl, Modal, Animated, Dimensions, PanResponder, Platform, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, RefreshControl, Modal, Animated, Dimensions, PanResponder, Platform, Image, Share } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import MapView, { Marker } from 'react-native-maps';
 import { CapsuleService } from '../../services/capsuleService';
+import CapsuleDetailModal from '../../components/CapsuleDetailModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -101,7 +102,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack }: MyCapsulesScreenProps) => {
 
   const handleCapsuleTap = (capsule: any) => {
     setSelectedCapsule(capsule);
-    openDetailModal();
+    setShowDetailModal(true);
   };
 
   const openDetailModal = () => {
@@ -327,9 +328,16 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack }: MyCapsulesScreenProps) => {
         )}
       </ScrollView>
 
-      {/* Capsule Detail Modal */}
-      <Modal
+      <CapsuleDetailModal
         visible={showDetailModal}
+        capsule={selectedCapsule}
+        capsules={capsules}
+        onClose={() => setShowDetailModal(false)}
+      />
+
+      {/* OLD MODAL - disabled */}
+      {false && <Modal
+        visible={false}
         transparent
         animationType="none"
         onRequestClose={closeDetailModal}
@@ -387,11 +395,22 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack }: MyCapsulesScreenProps) => {
               {/* Media Section */}
               <View style={styles.detailModalMediaSection}>
                 {(() => {
-                  // Get the first media item from content_refs
-                  const contentRefs = selectedCapsule?.content_refs;
-                  const hasMedia = contentRefs && contentRefs.length > 0;
-                  
-                  if (!hasMedia) {
+                  // Prefer media_url, fallback to content_refs
+                  let mediaUrl = (selectedCapsule as any)?.media_url || null;
+                  let mediaType = (selectedCapsule as any)?.media_type || null;
+
+                  if (!mediaUrl) {
+                    const contentRefs = selectedCapsule?.content_refs;
+                    if (contentRefs && Array.isArray(contentRefs) && contentRefs.length > 0) {
+                      const firstMedia = contentRefs[0];
+                      mediaUrl = typeof firstMedia === 'string' && firstMedia.startsWith('http')
+                        ? firstMedia
+                        : firstMedia?.url || firstMedia?.file_url || null;
+                      mediaType = typeof firstMedia === 'object' ? firstMedia?.content_type || firstMedia?.type : null;
+                    }
+                  }
+
+                  if (!mediaUrl) {
                     return (
                       <View style={styles.detailModalMediaPlaceholder}>
                         <Ionicons name="image-outline" size={48} color="#cbd5e1" />
@@ -399,11 +418,6 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack }: MyCapsulesScreenProps) => {
                       </View>
                     );
                   }
-
-                  // Get first media item - can be string URL or object with file_url
-                  const firstMedia = contentRefs[0];
-                  const mediaUrl = typeof firstMedia === 'string' ? firstMedia : firstMedia?.file_url || firstMedia?.uri;
-                  const mediaType = typeof firstMedia === 'object' ? firstMedia?.content_type || firstMedia?.type : null;
                   
                   // Determine if it's a video
                   const isVideo = mediaType === 'video' || 
@@ -620,7 +634,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack }: MyCapsulesScreenProps) => {
             <View style={styles.detailModalFooter}>
               <TouchableOpacity
                 style={styles.detailModalShareButton}
-                onPress={() => Alert.alert('Share', 'Share functionality coming soon!')}
+                onPress={() => Share.share({ message: 'Check out this time capsule on TimeCapsule!' })}
                 activeOpacity={0.8}
               >
                 <Ionicons name="share-social" size={20} color="#1e293b" style={styles.detailModalShareIcon} />
@@ -629,7 +643,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack }: MyCapsulesScreenProps) => {
       </View>
           </Animated.View>
         </View>
-      </Modal>
+      </Modal>}
 
     </View>
   );
