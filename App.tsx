@@ -293,12 +293,12 @@ export default function App() {
           {currentScreen === 'Welcome' && <WelcomeScreen onNavigate={navigate} onGoBack={goBack} />}
           {currentScreen === 'Login' && <LoginScreen onNavigate={navigate} onLogin={handleLogin} onGoBack={goBack} />}
           {currentScreen === 'Signup' && <SignupScreen onNavigate={navigate} onSignup={handleLogin} onGoBack={goBack} />}
-          {currentScreen === 'Dashboard' && <DashboardScreen onNavigate={navigate} onLogout={handleLogout} onGoBack={goBack} />}
-          {currentScreen === 'Friends' && <FriendsScreen onNavigate={navigate} onGoBack={goBack} />}
+          {currentScreen === 'Dashboard' && <DashboardScreen onNavigate={navigate} />}
+          {currentScreen === 'Friends' && <FriendsScreen onNavigate={navigate} />}
           {currentScreen === 'MyCapsules' && <MyCapsulesScreen onNavigate={navigate} onLogout={handleLogout} onGoBack={goBack} />}
           {currentScreen === 'Create' && <CreateCapsuleScreen onNavigate={navigate} onGoBack={goBack} />}
-          {currentScreen === 'Explore' && <ExploreScreen onNavigate={navigate} onGoBack={goBack} />}
-          {currentScreen === 'Profile' && <ProfileScreen onNavigate={navigate} onLogout={handleLogout} onGoBack={goBack} />}
+          {currentScreen === 'Explore' && <ExploreScreen onNavigate={navigate} />}
+          {currentScreen === 'Profile' && <ProfileScreen onNavigate={navigate} onLogout={handleLogout} />}
           {currentScreen === 'FriendProfile' && navigationData?.friend && (
             <FriendProfileScreen onNavigate={navigate} friend={navigationData.friend} onGoBack={goBack} />
           )}

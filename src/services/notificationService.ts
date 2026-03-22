@@ -46,10 +46,12 @@ export class NotificationAppService {
   }
 
   static async markAsRead(notificationId: string): Promise<void> {
-    await supabase
-      .from('notifications')
-      .update({ is_read: true } as any)
-      .eq('id', notificationId);
+    try {
+      await supabase
+        .from('notifications')
+        .update({ is_read: true } as any)
+        .eq('id', notificationId);
+    } catch (e) { if (__DEV__) console.error(e); }
   }
 
   static async markAllAsRead(): Promise<void> {

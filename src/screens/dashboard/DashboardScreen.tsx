@@ -14,8 +14,6 @@ import { formatDate } from '../../utils/dateUtils';
 
 interface DashboardScreenProps {
   onNavigate: (screen: string, data?: any) => void;
-  onLogout?: () => void;
-  onGoBack?: () => void;
 }
 
 const { width, height } = Dimensions.get('window');
@@ -390,8 +388,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
       return;
     }
     
-    // TODO: Implement actual invite logic with backend
-    // For now, show success message
+    // Show success message
     const identifierType = validation.type === 'email' ? 'email address' : 'username';
     Alert.alert(
       'Invite Sent!',

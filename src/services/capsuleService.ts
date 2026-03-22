@@ -165,8 +165,20 @@ export class CapsuleService {
   // Get nearby capsules (for map)
   static async getNearbyCapsules(lat: number, lng: number, radiusKm: number = 10) {
     try {
-      // For now, get all public capsules with location
-      // TODO: Add proper geospatial query with PostGIS
+      // Get current user for blocked users filtering
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Get blocked users if logged in
+      let blockedIds: string[] = [];
+      if (user) {
+        const { data: blocked } = await supabase
+          .from('blocked_users')
+          .select('blocked_id')
+          .eq('blocker_id', user.id);
+        blockedIds = (blocked || []).map((b: any) => b.blocked_id);
+      }
+
+      // Get all public capsules with location, filter by distance client-side
       const { data, error } = await supabase
         .from('capsules')
         .select('*')
@@ -176,9 +188,10 @@ export class CapsuleService {
 
       if (error) throw error;
 
-      // Filter by distance (simple calculation)
+      // Filter by distance and blocked users
       const filtered = data?.filter((capsule) => {
         if (!capsule.lat || !capsule.lng) return false;
+        if (blockedIds.includes(capsule.owner_id)) return false;
         const distance = calculateDistance(lat, lng, capsule.lat, capsule.lng);
         return distance <= radiusKm;
       });
@@ -224,6 +237,13 @@ export class CapsuleService {
       // 2. Public (is_public = true)
       // 3. Shared with user (via shared_capsules table)
       
+      // Get blocked users
+      const { data: blocked } = await supabase
+        .from('blocked_users')
+        .select('blocked_id')
+        .eq('blocker_id', user.id);
+      const blockedIds = (blocked || []).map((b: any) => b.blocked_id);
+
       const { data, error } = await supabase
         .from('capsules')
         .select('*')
@@ -232,7 +252,10 @@ export class CapsuleService {
 
       if (error) throw error;
 
-      return { data, error: null };
+      // Filter out blocked users' content
+      const filtered = data?.filter((c: any) => !blockedIds.includes(c.owner_id)) || [];
+
+      return { data: filtered, error: null };
     } catch (error) {
       return { data: null, error };
     }

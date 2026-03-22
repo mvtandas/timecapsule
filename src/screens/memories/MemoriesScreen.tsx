@@ -186,6 +186,7 @@ const styles = StyleSheet.create({
   },
   memoryImage: {
     width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#f1f5f9',
   },
   memoryOverlay: {
     ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end', padding: 16,

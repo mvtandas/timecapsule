@@ -193,7 +193,21 @@ export class NotificationService {
   static async sendNotification(
     notification: NotificationData
   ): Promise<string | null> {
-    return this.scheduleNotification(notification, null);
+    try {
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: notification.title,
+          body: notification.body,
+          data: notification.data,
+          sound: notification.sound || 'default',
+        },
+        trigger: null,
+      });
+      return id;
+    } catch (error) {
+      if (__DEV__) console.error('Error sending notification:', error);
+      return null;
+    }
   }
 
   // Handle notification response

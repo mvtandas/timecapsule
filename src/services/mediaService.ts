@@ -34,12 +34,15 @@ export class MediaService {
       const filePath = `${userId}/${fileName}`;
 
       // Determine content type
-      const contentType = isVideo 
-        ? `video/${fileExtension}` 
+      const contentType = isVideo
+        ? `video/${fileExtension}`
         : `image/${fileExtension}`;
 
-      // Read file using fetch (works in React Native without deprecated warnings)
-      const response = await fetch(uri);
+      // Read file using fetch with timeout (works in React Native without deprecated warnings)
+      const controller = new AbortController();
+      const fetchTimeout = setTimeout(() => controller.abort(), 30000);
+      const response = await fetch(uri, { signal: controller.signal });
+      clearTimeout(fetchTimeout);
       const blob = await response.blob();
       
       // Convert blob to base64 using FileReader

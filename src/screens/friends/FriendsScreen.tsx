@@ -10,7 +10,6 @@ import { StreakService, Streak } from '../../services/streakService';
 
 interface FriendsScreenProps {
   onNavigate: (screen: string, data?: any) => void;
-  onGoBack?: () => void;
 }
 
 interface FriendWithActivity {

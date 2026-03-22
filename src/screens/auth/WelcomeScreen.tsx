@@ -22,7 +22,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onNavigate }) => {
     <View style={styles.container}>
       {/* Header with background image */}
       <ImageBackground
-        source={{ uri: 'https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800' }}
+        source={require('../../../assets/welcome-bg.jpg')}
         style={styles.headerImage}
         imageStyle={styles.imageStyle}
       >

@@ -70,25 +70,31 @@ export class StreakService {
       const hoursDiff = last ? (now.getTime() - last.getTime()) / 3600000 : 999;
 
       let newStreak = (existing as any).current_streak;
-      if (hoursDiff >= 24 && hoursDiff < 48) {
+      if (hoursDiff < 24) {
+        // Same day - don't increment, just update timestamp
+      } else if (hoursDiff < 48) {
+        // Next day - increment streak
         newStreak += 1;
-      } else if (hoursDiff >= 48) {
+      } else {
+        // More than 48 hours - reset streak
         newStreak = 1;
       }
 
       const longest = Math.max(newStreak, (existing as any).longest_streak);
 
-      await supabase.from('streaks')
+      const { error } = await supabase.from('streaks')
         .update({ current_streak: newStreak, longest_streak: longest, last_capsule_at: now.toISOString(), updated_at: now.toISOString() } as any)
         .eq('id', (existing as any).id);
+      if (error && __DEV__) console.error('Streak update error:', error);
     } else {
-      await supabase.from('streaks').insert({
+      const { error } = await supabase.from('streaks').insert({
         user_id: id1,
         friend_id: id2,
         current_streak: 1,
         longest_streak: 1,
         last_capsule_at: now.toISOString(),
       } as any);
+      if (error && __DEV__) console.error('Streak insert error:', error);
     }
   }
 }

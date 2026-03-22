@@ -294,23 +294,46 @@ export class AuthService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Delete user's data in order (respecting foreign keys)
-      await supabase.from('comments').delete().eq('user_id', user.id);
-      await supabase.from('likes').delete().eq('user_id', user.id);
-      await supabase.from('notifications').delete().eq('user_id', user.id);
-      await supabase.from('notifications').delete().eq('from_user_id', user.id);
-      await supabase.from('friend_requests').delete().or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
-      await supabase.from('shared_capsules').delete().eq('user_id', user.id);
-      await supabase.from('capsule_contents').delete().in('capsule_id',
-        (await supabase.from('capsules').select('id').eq('owner_id', user.id)).data?.map((c: any) => c.id) || []
-      );
-      await supabase.from('capsules').delete().eq('owner_id', user.id);
-      await supabase.from('profiles').delete().eq('id', user.id);
+      const errors: string[] = [];
+      const safeDelete = async (table: string, filter: () => any) => {
+        try {
+          const { error } = await filter();
+          if (error) errors.push(`${table}: ${error.message}`);
+        } catch (e: any) {
+          errors.push(`${table}: ${e.message}`);
+        }
+      };
 
-      // Sign out
+      // Delete user's data in order (respecting foreign keys)
+      await safeDelete('comments', () => supabase.from('comments').delete().eq('user_id', user.id));
+      await safeDelete('likes', () => supabase.from('likes').delete().eq('user_id', user.id));
+      await safeDelete('reports', () => supabase.from('reports').delete().eq('reporter_id', user.id));
+      await safeDelete('blocked_users', () => supabase.from('blocked_users').delete().or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`));
+      await safeDelete('notifications', () => supabase.from('notifications').delete().eq('user_id', user.id));
+      await safeDelete('notifications_from', () => supabase.from('notifications').delete().eq('from_user_id', user.id));
+      await safeDelete('friend_requests', () => supabase.from('friend_requests').delete().or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`));
+      await safeDelete('streaks', () => supabase.from('streaks').delete().or(`user_id.eq.${user.id},friend_id.eq.${user.id}`));
+      await safeDelete('capsule_collaborators', () => supabase.from('capsule_collaborators').delete().eq('user_id', user.id));
+      await safeDelete('shared_capsules', () => supabase.from('shared_capsules').delete().eq('user_id', user.id));
+
+      // Get user's capsule IDs for content cleanup
+      const { data: userCapsules } = await supabase.from('capsules').select('id').eq('owner_id', user.id);
+      const capsuleIds = (userCapsules || []).map((c: any) => c.id);
+      if (capsuleIds.length > 0) {
+        await safeDelete('capsule_contents', () => supabase.from('capsule_contents').delete().in('capsule_id', capsuleIds));
+      }
+
+      await safeDelete('capsules', () => supabase.from('capsules').delete().eq('owner_id', user.id));
+      await safeDelete('profiles', () => supabase.from('profiles').delete().eq('id', user.id));
+
+      if (errors.length > 0 && __DEV__) {
+        console.error('Account deletion partial errors:', errors);
+      }
+
+      // Sign out regardless of partial errors
       await supabase.auth.signOut();
 
-      return { error: null };
+      return { error: errors.length > 0 ? new Error(`Partial cleanup: ${errors.join(', ')}`) : null };
     } catch (error) {
       return { error };
     }

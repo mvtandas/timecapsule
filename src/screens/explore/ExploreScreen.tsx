@@ -16,7 +16,6 @@ const EXPLORE_FILTERS: ExploreFilter[] = ['All', 'Unlocked', 'Locked', 'Travel',
 
 interface ExploreScreenProps {
   onNavigate: (screen: string) => void;
-  onGoBack?: () => void;
 }
 
 const RADIUS_KM = 50; // 50km radius to view capsules
@@ -71,15 +70,17 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
       );
 
       if (!error && data) {
-        const capsulesWithDistance = data.map((capsule: any) => ({
-          ...capsule,
-          distance: calculateDistance(
-            currentLocation.coords.latitude,
-            currentLocation.coords.longitude,
-            capsule.lat,
-            capsule.lng
-          ),
-        })).sort((a, b) => a.distance - b.distance);
+        const capsulesWithDistance = data
+          .filter((capsule: any) => capsule.lat != null && capsule.lng != null)
+          .map((capsule: any) => ({
+            ...capsule,
+            distance: calculateDistance(
+              currentLocation.coords.latitude,
+              currentLocation.coords.longitude,
+              capsule.lat,
+              capsule.lng
+            ),
+          })).sort((a: any, b: any) => a.distance - b.distance);
 
         setNearbyCapsules(capsulesWithDistance);
       }

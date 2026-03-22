@@ -42,6 +42,11 @@ const CommentSheet: React.FC<CommentSheetProps> = ({ capsuleId, visible, onClose
   const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
   const flatListRef = useRef<FlatList>(null);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    return () => { isMounted.current = false; };
+  }, []);
 
   useEffect(() => {
     if (visible) {
@@ -68,9 +73,11 @@ const CommentSheet: React.FC<CommentSheetProps> = ({ capsuleId, visible, onClose
   const loadComments = async () => {
     setLoading(true);
     const { data } = await CommentService.getComments(capsuleId);
-    setComments(data);
-    setLoading(false);
-    setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
+    if (isMounted.current) {
+      setComments(data);
+      setLoading(false);
+      setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
+    }
   };
 
   const handleSend = async () => {
@@ -189,7 +196,9 @@ const CommentSheet: React.FC<CommentSheetProps> = ({ capsuleId, visible, onClose
           .select('id, username, display_name, avatar_url')
           .ilike('username', `${query}%`)
           .limit(5);
-        setMentionResults((data as any[]) || []);
+        if (isMounted.current) {
+          setMentionResults((data as any[]) || []);
+        }
       }, 300);
     } else {
       setMentionQuery(null);

@@ -173,6 +173,11 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
   };
 
   const handleSaveCapsule = async () => {
+    if (saving) return;
+    if (!capsuleData.title.trim()) {
+      Alert.alert('Error', 'Please enter a title');
+      return;
+    }
     try {
       setSaving(true);
 
@@ -227,7 +232,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
               mediaType = uploadResult.type as 'image' | 'video';
             }
           } else {
-            console.warn('Media upload failed for item, skipping');
+            if (__DEV__) console.warn('Media upload failed for item, skipping');
           }
         }
       }
@@ -266,19 +271,15 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
             // Check if notification permission is already granted
             const hasPermission = await NotificationService.checkPermissions();
             if (hasPermission) {
-              NotificationService.scheduleCapsuleOpeningNotification(
+              await NotificationService.scheduleCapsuleOpeningNotification(
                 data.id,
                 capsuleData.title,
                 openDate
-              ).catch((e) => {
-                if (__DEV__) console.error('Failed to schedule notification:', e);
-              });
-              NotificationService.scheduleCapsulesOpeningSoon(
+              ).catch(() => {});
+              await NotificationService.scheduleCapsulesOpeningSoon(
                 capsuleData.title,
                 openDate
-              ).catch((e) => {
-                if (__DEV__) console.error('Failed to schedule opening soon notification:', e);
-              });
+              ).catch(() => {});
               Alert.alert('Success!', 'Your time capsule has been created!', [
                 { text: 'OK', onPress: () => onNavigate('Dashboard') },
               ]);
@@ -308,19 +309,15 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
                       try {
                         const { status } = await Notifications.requestPermissionsAsync();
                         if (status === 'granted') {
-                          NotificationService.scheduleCapsuleOpeningNotification(
+                          await NotificationService.scheduleCapsuleOpeningNotification(
                             data.id,
                             capsuleData.title,
                             openDate
-                          ).catch((e) => {
-                            if (__DEV__) console.error('Failed to schedule notification:', e);
-                          });
-                          NotificationService.scheduleCapsulesOpeningSoon(
+                          ).catch(() => {});
+                          await NotificationService.scheduleCapsulesOpeningSoon(
                             capsuleData.title,
                             openDate
-                          ).catch((e) => {
-                            if (__DEV__) console.error('Failed to schedule opening soon notification:', e);
-                          });
+                          ).catch(() => {});
                         }
                       } catch (e) {
                         if (__DEV__) console.error('Notification permission error:', e);
@@ -833,7 +830,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps)
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
-      keyboardVerticalOffset={0}
+      keyboardVerticalOffset={90}
     >
       {/* Header */}
       <View style={styles.header}>

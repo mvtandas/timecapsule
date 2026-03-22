@@ -51,11 +51,11 @@ export class ReactionService {
 
     if (existing) {
       if ((existing as any).reaction === reaction) {
-        // Remove reaction
-        await supabase.from('likes').delete().eq('id', (existing as any).id);
+        const { error } = await supabase.from('likes').delete().eq('id', (existing as any).id);
+        if (error) return { error };
       } else {
-        // Change reaction
-        await supabase.from('likes').update({ reaction } as any).eq('id', (existing as any).id);
+        const { error } = await supabase.from('likes').update({ reaction } as any).eq('id', (existing as any).id);
+        if (error) return { error };
       }
     } else {
       // Add reaction

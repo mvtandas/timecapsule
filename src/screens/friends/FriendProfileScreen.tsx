@@ -532,6 +532,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 47,
+    backgroundColor: '#f1f5f9',
   },
   avatarPlaceholder: {
     width: '100%',
@@ -647,6 +648,7 @@ const styles = StyleSheet.create({
   cardImage: {
     width: '100%',
     height: '100%',
+    backgroundColor: '#f1f5f9',
   },
   cardImagePlaceholder: {
     width: '100%',

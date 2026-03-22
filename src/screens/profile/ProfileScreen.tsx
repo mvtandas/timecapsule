@@ -30,7 +30,6 @@ const CARD_WIDTH = (width - 48 - 12) / 2; // 2 columns
 interface ProfileScreenProps {
   onNavigate: (screen: string, data?: any) => void;
   onLogout: () => void;
-  onGoBack?: () => void;
 }
 
 const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
@@ -76,7 +75,7 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
           .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
         setFriendsCount(fd?.length || 0);
       }
-    } catch (e) { console.warn('loadStats:', e); } finally {
+    } catch (e) { if (__DEV__) console.warn('loadStats:', e); } finally {
       setLoading(false);
     }
   };
@@ -375,6 +374,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 47,
+    backgroundColor: '#f1f5f9',
   },
   avatarPlaceholder: {
     width: '100%',
@@ -530,6 +530,7 @@ const styles = StyleSheet.create({
   cardImage: {
     width: '100%',
     height: '100%',
+    backgroundColor: '#f1f5f9',
   },
   cardImagePlaceholder: {
     width: '100%',

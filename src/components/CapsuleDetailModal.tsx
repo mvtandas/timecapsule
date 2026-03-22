@@ -532,6 +532,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     width,
     height,
+    backgroundColor: '#f1f5f9',
   },
 
   // Gradients
@@ -608,6 +609,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
+    backgroundColor: '#f1f5f9',
   },
   ownerName: {
     fontSize: 14,
