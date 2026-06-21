@@ -5,6 +5,8 @@ export interface User {
   username: string | null;
   phone_number?: string | null;
   avatar_url: string | null;
+  bio?: string | null;
+  location?: string | null;
   created_at: string;
 }
 

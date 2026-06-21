@@ -6,7 +6,6 @@ import {
   StyleSheet,
   FlatList,
   Image,
-  ActivityIndicator,
   RefreshControl,
   Alert,
   ScrollView,
@@ -14,6 +13,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { NotificationAppService, AppNotification } from '../../services/notificationService';
 import { timeAgo } from '../../utils/dateUtils';
+import { SkeletonList } from '../../components/common/Skeleton';
+import ScreenHeader from '../../components/common/ScreenHeader';
+import { COLORS, SPACING, RADIUS, font } from '../../constants/theme';
+import { useT } from '../../i18n';
 
 interface NotificationsScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -25,6 +28,7 @@ type NotifFilter = 'All' | 'Likes' | 'Comments' | 'Friends';
 const NOTIF_FILTERS: NotifFilter[] = ['All', 'Likes', 'Comments', 'Friends'];
 
 const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps) => {
+  const t = useT();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -50,8 +54,10 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
     const { data } = await NotificationAppService.getNotifications();
     setNotifications(data);
     setLoading(false);
-    // Mark all as read
+    // Mark all as read on the server, then reflect it locally so the unread
+    // accent stays consistent with the backend (no stale "unread" dots).
     await NotificationAppService.markAllAsRead();
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
   };
 
   const onRefresh = async () => {
@@ -60,6 +66,7 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
     setNotifications(data);
     setRefreshing(false);
     await NotificationAppService.markAllAsRead();
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
   };
 
   const handleDeleteNotification = async (id: string) => {
@@ -71,12 +78,12 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
 
   const handleClearAll = () => {
     Alert.alert(
-      'Clear All Notifications',
-      'Are you sure you want to delete all notifications?',
+      t('notifications.clearAllTitle'),
+      t('notifications.clearAllMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Clear All',
+          text: t('notifications.clearAll'),
           style: 'destructive',
           onPress: async () => {
             const { error } = await NotificationAppService.clearAllNotifications();
@@ -91,12 +98,12 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
 
   const getIcon = (type: string): { name: string; color: string } => {
     switch (type) {
-      case 'like': return { name: 'heart', color: '#FF375F' };
-      case 'comment': return { name: 'chatbubble', color: '#FAC638' };
-      case 'friend_request': return { name: 'person-add', color: '#06D6A0' };
-      case 'friend_accepted': return { name: 'people', color: '#06D6A0' };
-      case 'capsule_opened': return { name: 'lock-open', color: '#4ECDC4' };
-      default: return { name: 'notifications', color: '#94a3b8' };
+      case 'like': return { name: 'heart', color: COLORS.ember };
+      case 'comment': return { name: 'chatbubble', color: COLORS.gold };
+      case 'friend_request': return { name: 'person-add', color: COLORS.moss };
+      case 'friend_accepted': return { name: 'people', color: COLORS.moss };
+      case 'capsule_opened': return { name: 'lock-open', color: COLORS.blue };
+      default: return { name: 'notifications', color: COLORS.text3 };
     }
   };
 
@@ -115,20 +122,16 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onGoBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color="#1e293b" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
-        {notifications.length > 0 ? (
+      <ScreenHeader
+        title={t('notifications.title')}
+        onBack={onGoBack}
+        borderBottom
+        right={notifications.length > 0 ? (
           <TouchableOpacity onPress={handleClearAll} style={styles.clearAllBtn}>
-            <Text style={styles.clearAllText}>Clear All</Text>
+            <Text style={styles.clearAllText}>{t('notifications.clearAll')}</Text>
           </TouchableOpacity>
-        ) : (
-          <View style={styles.backBtn} />
-        )}
-      </View>
+        ) : undefined}
+      />
 
       {/* Filter Chips */}
       <ScrollView
@@ -144,29 +147,31 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
             onPress={() => setActiveFilter(filter)}
           >
             <Text style={[styles.filterChipText, activeFilter === filter && styles.filterChipTextActive]}>
-              {filter}
+              {t('notifications.filter' + filter)}
             </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FAC638" />
-        </View>
+        <SkeletonList count={7} avatar="circle" />
       ) : (
         <FlatList
           data={filteredNotifications}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={filteredNotifications.length === 0 ? styles.emptyContainer : undefined}
+          contentContainerStyle={filteredNotifications.length === 0 ? styles.emptyContainer : styles.listContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FAC638" />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.ember} />
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="notifications-outline" size={56} color="#cbd5e1" />
-              <Text style={styles.emptyTitle}>No Notifications</Text>
-              <Text style={styles.emptyText}>You're all caught up!</Text>
+              <Ionicons name="notifications-outline" size={56} color={COLORS.text3} />
+              <Text style={styles.emptyTitle}>{t('notifications.emptyTitle')}</Text>
+              <Text style={styles.emptyText}>{t('notifications.emptyText')}</Text>
+              <TouchableOpacity style={styles.emptyCta} onPress={() => onNavigate('Discover')} activeOpacity={0.85}>
+                <Ionicons name="compass-outline" size={18} color={COLORS.white} />
+                <Text style={styles.emptyCtaText}>{t('tabs.discover')}</Text>
+              </TouchableOpacity>
             </View>
           }
           renderItem={({ item }) => {
@@ -192,12 +197,14 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
                 <View style={styles.notifContent}>
                   <Text style={styles.notifText}>
                     <Text style={styles.notifBold}>
-                      {item.from_profile?.display_name || item.from_profile?.username || 'Someone'}
+                      {item.from_profile?.display_name || item.from_profile?.username || t('notifications.someone')}
                     </Text>
                     {' '}{item.message}
                   </Text>
                   <Text style={styles.notifTime}>{timeAgo(item.created_at)}</Text>
                 </View>
+
+                {!item.is_read && <View style={styles.unreadDot} />}
 
                 {/* Delete button */}
                 <TouchableOpacity
@@ -205,7 +212,7 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
                   onPress={() => handleDeleteNotification(item.id)}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Ionicons name="trash-outline" size={18} color="#FF6B6B" />
+                  <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
                 </TouchableOpacity>
               </TouchableOpacity>
             );
@@ -219,42 +226,21 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f5',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 56,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#f8f8f5',
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#e2e8f0',
-  },
-  backBtn: {
-    width: 40,
-    alignItems: 'center',
+    backgroundColor: COLORS.bg,
   },
   clearAllBtn: {
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
   clearAllText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FF6B6B',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
+    ...font('bodyBold'),
+    color: COLORS.danger,
   },
   filterChipsContainer: {
     maxHeight: 48,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.bg,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: COLORS.border,
   },
   filterChipsContent: {
     paddingHorizontal: 16,
@@ -266,44 +252,59 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.card,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border,
   },
   filterChipActive: {
-    backgroundColor: '#FAC638',
-    borderColor: '#FAC638',
+    backgroundColor: COLORS.ember,
+    borderColor: COLORS.ember,
   },
   filterChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748b',
+    ...font('label'),
+    color: COLORS.text2,
   },
   filterChipTextActive: {
-    color: '#ffffff',
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    color: COLORS.white,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  listContent: { paddingBottom: 124 }, // clear the floating glass tab bar
   empty: {
     alignItems: 'center',
     gap: 8,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
+    ...font('subtitle'),
+    color: COLORS.text,
   },
   emptyText: {
+    ...font('body'),
+    color: COLORS.text3,
+  },
+  emptyCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.ember,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.pill,
+    marginTop: SPACING.xl,
+  },
+  emptyCtaText: {
+    ...font('labelBold'),
     fontSize: 14,
-    color: '#94a3b8',
+    color: COLORS.white,
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.ember,
   },
   notifRow: {
     flexDirection: 'row',
@@ -312,10 +313,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: COLORS.border,
   },
   notifUnread: {
-    backgroundColor: '#FFF8E1',
+    backgroundColor: COLORS.emberSoft,
   },
   notifLeft: {},
   notifAvatar: {
@@ -334,23 +335,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   notifText: {
+    ...font('body'),
     fontSize: 14,
-    color: '#1e293b',
+    color: COLORS.text,
     lineHeight: 19,
   },
   notifBold: {
     fontWeight: '700',
+    color: COLORS.text,
   },
   notifTime: {
-    fontSize: 12,
-    color: '#94a3b8',
+    ...font('caption'),
+    color: COLORS.text3,
     marginTop: 3,
   },
   deleteBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FFF0F0',
+    backgroundColor: COLORS.bg3,
     alignItems: 'center',
     justifyContent: 'center',
   },

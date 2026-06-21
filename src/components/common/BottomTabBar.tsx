@@ -1,87 +1,146 @@
 import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { MaterialTopTabBarProps } from '@react-navigation/material-top-tabs';
+import { COLORS, GRADIENTS, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
+import GlassView from './GlassView';
+import { useT } from '../../i18n';
 
-interface BottomTabBarProps {
-  activeTab: string;
-  onNavigate: (screen: string, data?: any, replace?: boolean) => void;
-}
+/**
+ * Voorcap floating "Liquid Glass" tab bar (Home · Discover · Create+ · Activity ·
+ * Profile). A detached, rounded, translucent capsule that hovers over content —
+ * deliberately unlike the flat edge-to-edge Instagram bar. Create is a raised
+ * ember gem that opens the create flow (a screen in the parent stack).
+ */
 
-const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onNavigate }) => {
+type Slot = {
+  route?: string; // tab route name; undefined => Create button
+  labelKey: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  activeIcon?: keyof typeof Ionicons.glyphMap;
+};
+
+const SLOTS: Slot[] = [
+  { route: 'Home', labelKey: 'tabs.home', icon: 'home-outline', activeIcon: 'home' },
+  { route: 'Discover', labelKey: 'tabs.discover', icon: 'compass-outline', activeIcon: 'compass' },
+  { labelKey: '', icon: 'add' }, // Create
+  { route: 'Activity', labelKey: 'tabs.activity', icon: 'heart-outline', activeIcon: 'heart' },
+  { route: 'Profile', labelKey: 'tabs.profile', icon: 'person-outline', activeIcon: 'person' },
+];
+
+const BottomTabBar: React.FC<MaterialTopTabBarProps> = ({ state, navigation }) => {
+  const t = useT();
   const insets = useSafeAreaInsets();
-  
-  const tabs = [
-    { id: 'Friends', label: 'Friends', icon: 'people' as const },
-    { id: 'Dashboard', label: 'Map', icon: 'map' as const },
-    { id: 'Notifications', label: 'Notifications', icon: 'notifications' as const },
-    { id: 'Profile', label: 'Profile', icon: 'person' as const },
-  ];
+  const activeRoute = state.routes[state.index]?.name;
+
+  const openCreate = () => {
+    navigation.getParent()?.navigate('Create' as never);
+  };
 
   return (
-    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-      <View style={styles.tabRow}>
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <TouchableOpacity
-              key={tab.id}
-              style={styles.tab}
-              onPress={() => onNavigate(tab.id, undefined, true)}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={tab.icon}
-                size={24}
-                color={isActive ? '#FAC638' : '#94a3b8'}
-              />
-              <Text style={[styles.label, isActive && styles.activeLabel]}>
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+    <View
+      pointerEvents="box-none"
+      style={[styles.wrap, { bottom: insets.bottom > 0 ? insets.bottom : SPACING.md }]}
+    >
+      <GlassView radius={30} style={styles.capsule} sheen>
+        <View style={styles.row}>
+          {SLOTS.map((slot, i) => {
+            if (!slot.route) {
+              // Center slot is a spacer — the raised Create gem overlays it.
+              return <View key={`spacer-${i}`} style={styles.tab} />;
+            }
+            const isActive = activeRoute === slot.route;
+            return (
+              <TouchableOpacity
+                key={slot.route}
+                style={styles.tab}
+                onPress={() => navigation.navigate(slot.route as never)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isActive }}
+                accessibilityLabel={t(slot.labelKey)}
+              >
+                <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
+                  <Ionicons
+                    name={(isActive && slot.activeIcon) || slot.icon}
+                    size={22}
+                    color={isActive ? COLORS.ember : COLORS.text3}
+                  />
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </GlassView>
+
+      {/* Raised ember gem — a squircle, distinct from the IG white-circle "+" */}
+      <View pointerEvents="box-none" style={styles.createLayer}>
+        <TouchableOpacity
+          onPress={openCreate}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.createCap')}
+        >
+          <LinearGradient
+            colors={GRADIENTS.ember as readonly [string, string]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.createBtn, SHADOWS.glow(COLORS.ember)]}
+          >
+            <Ionicons name="add" size={28} color="#fff" />
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
     </View>
   );
 };
 
+const BAR_H = 60;
+
 const styles = StyleSheet.create({
-  container: {
+  wrap: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    paddingTop: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 10,
-    zIndex: 1000,
+    left: SPACING.lg,
+    right: SPACING.lg,
   },
-  tabRow: {
+  capsule: {
+    height: BAR_H,
+    ...SHADOWS.lg,
+  },
+  row: {
     flexDirection: 'row',
-    height: 52,
+    height: BAR_H,
+    alignItems: 'center',
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  label: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94a3b8',
-    marginTop: 4,
+  iconWrap: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+    borderRadius: RADIUS.pill,
   },
-  activeLabel: {
-    color: '#FAC638',
+  iconWrapActive: {
+    backgroundColor: COLORS.emberSoft,
+  },
+  // Overlays the center spacer, raised so the gem pokes above the capsule.
+  createLayer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  createBtn: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -16,
   },
 });
 
 export default BottomTabBar;
-

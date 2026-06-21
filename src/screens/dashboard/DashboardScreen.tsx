@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput, Dimensions, Platform, Animated, PanResponder, Modal, Image, KeyboardAvoidingView, Share, RefreshControl } from 'react-native';
+import React, { useState, useRef, useCallback } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput, Dimensions, Platform, Animated, PanResponder, Modal, Image, KeyboardAvoidingView, Share } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, Callout } from 'react-native-maps';
+import MapView, { Marker, Callout, PROVIDER_GOOGLE } from 'react-native-maps';
+import { DARK_MAP_STYLE } from '../../constants/mapStyle';
 import * as Location from 'expo-location';
 import { BlurView } from 'expo-blur';
 import { CapsuleService } from '../../services/capsuleService';
@@ -11,6 +13,9 @@ import { calculateDistance } from '../../utils/geoUtils';
 import { formatDistance } from '../../utils/geoUtils';
 import { getMediaUrl } from '../../utils/mediaUtils';
 import { formatDate } from '../../utils/dateUtils';
+import { COLORS, font } from '../../constants/theme';
+import { capColor } from '../../constants/capTypes';
+import { useT } from '../../i18n';
 
 interface DashboardScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -19,6 +24,7 @@ interface DashboardScreenProps {
 const { width, height } = Dimensions.get('window');
 
 const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
+  const t = useT();
   const [searchQuery, setSearchQuery] = useState('');
   const [userLocation, setUserLocation] = useState({
     latitude: 40.9887,
@@ -29,7 +35,6 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
   const [activeTab, setActiveTab] = useState<'top' | 'recent'>('recent');
   const [capsules, setCapsules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [selectedCapsule, setSelectedCapsule] = useState<any>(null);
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [lastTappedCapsule, setLastTappedCapsule] = useState<string | null>(null);
@@ -59,10 +64,29 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
   
   const bottomSheetHeight = useRef(new Animated.Value(SNAP_POINTS.COLLAPSED)).current;
   const [currentSnapPoint, setCurrentSnapPoint] = useState(SNAP_POINTS.COLLAPSED);
+  // Track the inner list scroll position so a downward drag at the top collapses
+  // the sheet (instead of the old pull-to-refresh, which trapped the user).
+  const scrollYRef = useRef(0);
+  const hasLoadedRef = useRef(false);
 
-  useEffect(() => {
-    loadCapsules();
-  }, []);
+  // Animate the sheet to a given snap point.
+  const snapTo = (target: number) => {
+    setCurrentSnapPoint(target);
+    Animated.spring(bottomSheetHeight, {
+      toValue: target,
+      useNativeDriver: false,
+      tension: 80,
+      friction: 20,
+      overshootClamping: false,
+    }).start();
+  };
+
+  // Reload caps when Home regains focus (replaces the old pull-to-refresh).
+  useFocusEffect(
+    useCallback(() => {
+      loadCapsules();
+    }, [])
+  );
 
   // Helper function to find nearest snap point
   const findNearestSnapPoint = (currentHeight: number, velocity: number) => {
@@ -137,19 +161,26 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
       onPanResponderRelease: (_, gestureState) => {
         // Flatten offset to get actual value
         bottomSheetHeight.flattenOffset();
-        
+
         const currentHeight = (bottomSheetHeight as any)._value;
         const velocity = gestureState.vy; // Negative = up, Positive = down
-        
-        // Find nearest snap point based on position and velocity
-        const targetHeight = findNearestSnapPoint(currentHeight, velocity);
-        
+
+        // A near-stationary press is a TAP on the handle, not a drag.
+        // Tap toggles: if collapsed -> open to medium, otherwise -> collapse.
+        // This guarantees the user can always bring an expanded sheet back down.
+        const isTap = Math.abs(gestureState.dx) < 6 && Math.abs(gestureState.dy) < 6;
+        const collapseMidpoint = (SNAP_POINTS.COLLAPSED + SNAP_POINTS.MEDIUM) / 2;
+
+        const targetHeight = isTap
+          ? (currentHeight <= collapseMidpoint ? SNAP_POINTS.MEDIUM : SNAP_POINTS.COLLAPSED)
+          : findNearestSnapPoint(currentHeight, velocity);
+
         setCurrentSnapPoint(targetHeight);
-        
+
         // Animate to snap point with natural spring physics
         Animated.spring(bottomSheetHeight, {
           toValue: targetHeight,
-          velocity: -velocity * 500, // Convert gesture velocity to animation velocity
+          velocity: isTap ? 0 : -velocity * 500, // Convert gesture velocity to animation velocity
           useNativeDriver: false,
           tension: 80,
           friction: 20,
@@ -159,9 +190,46 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
     })
   ).current;
 
-  const loadCapsules = async () => {
+  // Gesture handler for the LIST area: when the list is at its top and the user
+  // drags DOWN, capture the gesture (before the ScrollView) and drag the sheet
+  // down to collapse it. This is what lets the user swipe the caps down to get
+  // back to the map — replacing the old pull-to-refresh that trapped them.
+  const contentPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponderCapture: (_, g) => {
+        const draggingDown = g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx);
+        const atTop = scrollYRef.current <= 0;
+        const h = (bottomSheetHeight as any)._value;
+        return draggingDown && atTop && h > SNAP_POINTS.COLLAPSED + 1;
+      },
+      onPanResponderGrant: () => {
+        bottomSheetHeight.stopAnimation((value) => {
+          bottomSheetHeight.setOffset(value);
+          bottomSheetHeight.setValue(0);
+        });
+      },
+      onPanResponderMove: (_, g) => {
+        const newValue = -g.dy; // dragging down => negative => shrink the sheet
+        const potentialHeight = (bottomSheetHeight as any)._offset + newValue;
+        if (potentialHeight < SNAP_POINTS.COLLAPSED) {
+          bottomSheetHeight.setValue((potentialHeight - SNAP_POINTS.COLLAPSED) * 0.3);
+        } else {
+          bottomSheetHeight.setValue(newValue);
+        }
+      },
+      onPanResponderRelease: (_, g) => {
+        bottomSheetHeight.flattenOffset();
+        const currentHeight = (bottomSheetHeight as any)._value;
+        snapTo(findNearestSnapPoint(currentHeight, g.vy));
+      },
+    })
+  ).current;
+
+  const loadCapsules = async (showSpinner = false) => {
     try {
-      setLoading(true);
+      // Spinner on first load and on explicit refresh (tab tap); focus-reloads stay silent.
+      if (!hasLoadedRef.current || showSpinner) setLoading(true);
       // Fetch all accessible capsules (owned + public + shared)
       const { data, error } = await CapsuleService.getAllAccessibleCapsules();
       if (error) {
@@ -175,18 +243,13 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
           displayLng: capsule.lng || (userLocation.longitude + (Math.cos(index) * 0.005)),
         }));
         setCapsules(capsulesWithCoordinates);
+        hasLoadedRef.current = true;
       }
     } catch (error) {
       if (__DEV__) console.error('Error:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadCapsules();
-    setRefreshing(false);
   };
 
   const handleSearch = (query: string) => {
@@ -210,25 +273,30 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
   };
 
   const formatTimeUntilOpen = (openDate: string | null): string => {
-    if (!openDate) return 'No open date set';
-    
+    if (!openDate) return t('dashboard.noOpenDate');
+
     const now = new Date();
     const openDateObj = new Date(openDate);
     const diff = openDateObj.getTime() - now.getTime();
-    
-    if (diff <= 0) return 'Opened';
-    
+
+    if (diff <= 0) return t('dashboard.opened');
+
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
+
     if (days > 0) {
-      return `Opens in ${days} ${days === 1 ? 'day' : 'days'}, ${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+      const dayLabel = days === 1 ? t('dashboard.dayOne') : t('dashboard.dayOther');
+      const hourLabel = hours === 1 ? t('dashboard.hourOne') : t('dashboard.hourOther');
+      return t('dashboard.opensInDaysHours', { days, dayLabel, hours, hourLabel });
     }
     if (hours > 0) {
-      return `Opens in ${hours} ${hours === 1 ? 'hour' : 'hours'}, ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+      const hourLabel = hours === 1 ? t('dashboard.hourOne') : t('dashboard.hourOther');
+      const minuteLabel = minutes === 1 ? t('dashboard.minuteOne') : t('dashboard.minuteOther');
+      return t('dashboard.opensInHoursMinutes', { hours, hourLabel, minutes, minuteLabel });
     }
-    return `Opens in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+    const minuteLabel = minutes === 1 ? t('dashboard.minuteOne') : t('dashboard.minuteOther');
+    return t('dashboard.opensInMinutes', { minutes, minuteLabel });
   };
 
   const handleCapsuleMarkerPress = (capsule: any) => {
@@ -359,22 +427,22 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
     const trimmed = identifier.trim();
     
     if (!trimmed) {
-      return { isValid: false, type: null, error: 'Please enter a username or email address' };
+      return { isValid: false, type: null, error: t('dashboard.errorEnterIdentifier') };
     }
-    
+
     // Check if it's an email (contains @)
     if (trimmed.includes('@')) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(trimmed)) {
-        return { isValid: false, type: 'email', error: 'Please enter a valid email address' };
+        return { isValid: false, type: 'email', error: t('dashboard.errorInvalidEmail') };
       }
       return { isValid: true, type: 'email' };
     }
-    
+
     // Otherwise treat as username
     const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
     if (!usernameRegex.test(trimmed)) {
-      return { isValid: false, type: 'username', error: 'Username must be 3-20 characters (letters, numbers, underscores only)' };
+      return { isValid: false, type: 'username', error: t('dashboard.errorInvalidUsername') };
     }
     
     return { isValid: true, type: 'username' };
@@ -384,18 +452,18 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
     const validation = validateInviteIdentifier(inviteIdentifier);
     
     if (!validation.isValid) {
-      Alert.alert('Invalid Input', validation.error || 'Please check your input');
+      Alert.alert(t('dashboard.invalidInputTitle'), validation.error || t('dashboard.checkInput'));
       return;
     }
-    
+
     // Show success message
-    const identifierType = validation.type === 'email' ? 'email address' : 'username';
+    const identifierType = validation.type === 'email' ? t('dashboard.emailAddress') : t('dashboard.username');
     Alert.alert(
-      'Invite Sent!',
-      `Invitation sent to ${identifierType}: ${inviteIdentifier.trim()}`,
+      t('dashboard.inviteSentTitle'),
+      t('dashboard.inviteSentMessage', { type: identifierType, identifier: inviteIdentifier.trim() }),
       [
-        { 
-          text: 'OK', 
+        {
+          text: t('dashboard.ok'),
           onPress: () => {
             setInviteIdentifier('');
             closeInviteModal();
@@ -453,9 +521,9 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
       
       if (status !== 'granted') {
         Alert.alert(
-          'Location Permission',
-          'Location permission is required to center the map on your location. Please enable it in your device settings.',
-          [{ text: 'OK' }]
+          t('dashboard.locationPermissionTitle'),
+          t('dashboard.locationPermissionMessage'),
+          [{ text: t('dashboard.ok') }]
         );
         return;
       }
@@ -482,9 +550,9 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
     } catch (error) {
       if (__DEV__) console.error('Error getting location:', error);
       Alert.alert(
-        'Error',
-        'Unable to get your current location. Please try again.',
-        [{ text: 'OK' }]
+        t('dashboard.errorTitle'),
+        t('dashboard.locationErrorMessage'),
+        [{ text: t('dashboard.ok') }]
       );
     }
   };
@@ -495,6 +563,8 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
       <View style={styles.mapContainer}>
         <MapView
           ref={mapRef}
+          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+          customMapStyle={DARK_MAP_STYLE}
           style={styles.map}
           region={userLocation}
           showsUserLocation={true}
@@ -527,9 +597,9 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                 flat={true}
             >
               <View style={styles.capsuleMarker}>
-                  <View style={styles.capsulePill}>
-                    <View style={styles.capsulePillTop} />
-                    <View style={styles.capsulePillBottom} />
+                  <View style={[styles.capsulePill, { borderColor: capColor(capsule.type) }]}>
+                    <View style={[styles.capsulePillTop, { backgroundColor: capColor(capsule.type) }]} />
+                    <View style={[styles.capsulePillBottom, { backgroundColor: capColor(capsule.type) }]} />
               </View>
                 </View>
                 <Callout tooltip onPress={() => handleCalloutPress(capsule)}>
@@ -538,8 +608,8 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                       {capsule.title}
                     </Text>
                     <View style={styles.infoButton}>
-                      <Ionicons name="information-circle" size={16} color="#FAC638" style={styles.infoIcon} />
-                      <Text style={styles.infoButtonText}>Tap for details</Text>
+                      <Ionicons name="information-circle" size={16} color={COLORS.ember} style={styles.infoIcon} />
+                      <Text style={styles.infoButtonText}>{t('dashboard.tapForDetails')}</Text>
                     </View>
                   </View>
                 </Callout>
@@ -568,7 +638,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
           onPress={handleCenterOnLocation}
           activeOpacity={0.7}
         >
-          <Ionicons name="navigate" size={24} color="#1e293b" />
+          <Ionicons name="navigate" size={24} color={COLORS.text} />
         </TouchableOpacity>
       </Animated.View>
 
@@ -581,16 +651,23 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
           },
         ]}
       >
-        {/* Drag Handle - Only draggable area */}
-        <View style={styles.dragHandleContainer} {...panResponder.panHandlers}>
+        {/* Drag Handle - drag to resize, tap to toggle collapsed/expanded */}
+        <View
+          style={styles.dragHandleContainer}
+          hitSlop={{ top: 8, bottom: 12, left: 40, right: 40 }}
+          accessibilityRole="adjustable"
+          accessibilityLabel={t('dashboard.sheetHandleA11y')}
+          {...panResponder.panHandlers}
+        >
           <View style={styles.dragHandle} />
-      </View>
+        </View>
 
-        {/* Keyboard Avoiding View */}
+        {/* Keyboard Avoiding View — also hosts the drag-to-collapse gesture */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          {...contentPanResponder.panHandlers}
         >
         {/* Scrollable Content Inside Bottom Sheet */}
         <ScrollView
@@ -603,27 +680,15 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
           bounces={true}
           overScrollMode="auto"
           keyboardShouldPersistTaps="handled"
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FAC638" />
-          }
+          onScroll={(e) => { scrollYRef.current = e.nativeEvent.contentOffset.y; }}
         >
-      {/* Create Capsule Button - Full Width */}
-      <TouchableOpacity 
-        style={styles.createCapsuleButton} 
-        onPress={handleCreateCapsule}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="add-circle" size={24} color="white" style={styles.createButtonIcon} />
-        <Text style={styles.createButtonText}>Create Capsule</Text>
-        </TouchableOpacity>
-
-      {/* Nearby Capsules Section */}
+      {/* Nearby Capsules Section (Create lives in the always-visible tab-bar "+") */}
       <View style={styles.nearbyCapsules}>
         {/* Header */}
         <View style={styles.nearbyHeader}>
-          <Text style={styles.nearbyTitle}>Nearby Capsules</Text>
+          <Text style={styles.nearbyTitle}>{t('dashboard.nearbyCaps')}</Text>
           <Text style={styles.nearbyCount}>
-            {capsules.filter(c => c.is_public).length} posts
+            {t('dashboard.postsCount', { count: capsules.filter(c => c.is_public).length })}
           </Text>
       </View>
 
@@ -631,18 +696,18 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
         <View style={styles.tabsContainer}>
           <TouchableOpacity
             style={[styles.tabButton, activeTab === 'top' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('top')}
+            onPress={() => { setActiveTab('top'); loadCapsules(true); }}
           >
             <Text style={[styles.tabText, activeTab === 'top' && styles.tabTextActive]}>
-              Top
+              {t('dashboard.tabTop')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tabButton, activeTab === 'recent' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('recent')}
+            onPress={() => { setActiveTab('recent'); loadCapsules(true); }}
           >
             <Text style={[styles.tabText, activeTab === 'recent' && styles.tabTextActive]}>
-              Recent
+              {t('dashboard.tabRecent')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -650,7 +715,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
         {/* Grid Layout - 3 columns */}
         {loading ? (
           <View style={styles.feedLoadingContainer}>
-            <ActivityIndicator size="large" color="#FAC638" />
+            <ActivityIndicator size="large" color={COLORS.ember} />
           </View>
         ) : capsules.length > 0 ? (
           <View style={styles.capsuleGrid}>
@@ -691,20 +756,20 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                       />
                     ) : (
                       <View style={[styles.gridImage, styles.gridImagePlaceholder]}>
-                        <Ionicons name="image-outline" size={32} color="#cbd5e1" />
+                        <Ionicons name="image-outline" size={32} color={COLORS.text3} />
         </View>
                     )}
                     
                     {/* Locked Overlay */}
                     {isCapsuleLocked(capsule.open_at) && (
                       <View style={styles.gridLockedOverlay}>
-                        <Ionicons name="lock-closed" size={16} color="white" />
+                        <Ionicons name="lock-closed" size={16} color={COLORS.white} />
                       </View>
                     )}
 
                     {/* Distance Badge */}
                     <View style={styles.distanceBadge}>
-                      <Ionicons name="location" size={10} color="white" />
+                      <Ionicons name="location" size={10} color={COLORS.white} />
                       <Text style={styles.distanceText}>{formatDistance(distance)}</Text>
                     </View>
             </TouchableOpacity>
@@ -713,18 +778,18 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
           </View>
         ) : (
           <View style={styles.feedEmptyState}>
-            <Ionicons name="time-outline" size={64} color="#FAC638" />
-            <Text style={styles.feedEmptyText}>No capsules yet</Text>
+            <Ionicons name="time-outline" size={64} color={COLORS.ember} />
+            <Text style={styles.feedEmptyText}>{t('dashboard.emptyTitle')}</Text>
             <Text style={styles.feedEmptySubtext}>
-              Create your first time capsule to see it on the map
+              {t('dashboard.emptySubtitle')}
             </Text>
             <TouchableOpacity
               style={styles.feedEmptyButton}
               onPress={handleCreateCapsule}
               activeOpacity={0.8}
             >
-              <Ionicons name="add-circle" size={20} color="white" />
-              <Text style={styles.feedEmptyButtonText}>Create Capsule</Text>
+              <Ionicons name="add-circle" size={20} color={COLORS.white} />
+              <Text style={styles.feedEmptyButtonText}>{t('dashboard.createCap')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -803,7 +868,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
               onPress={closeInviteModal}
               activeOpacity={0.7}
             >
-              <Ionicons name="close" size={18} color="#64748b" />
+              <Ionicons name="close" size={18} color={COLORS.text2} />
         </TouchableOpacity>
 
             {/* Scrollable Content */}
@@ -814,28 +879,28 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
             >
               {/* Image/Banner Area - Reserved for future asset */}
               <View style={styles.inviteModalImagePlaceholder}>
-                <Ionicons name="gift" size={64} color="#FAC638" />
+                <Ionicons name="gift" size={64} color={COLORS.ember} />
       </View>
 
               {/* Main Heading */}
               <Text style={styles.inviteModalTitle}>
-                Invite Friend to TimeCapsule and earn 5 Premium Capsules!
+                {t('dashboard.inviteTitle')}
               </Text>
 
               {/* Subtext */}
               <Text style={styles.inviteModalSubtext}>
-                When your friend drops their first Capsule, both of you receive 5 Premium Capsules.
+                {t('dashboard.inviteSubtitle')}
               </Text>
 
               {/* Form Section */}
               <View style={styles.inviteModalForm}>
-                <Text style={styles.inviteModalFormLabel}>Friend's Username or Email</Text>
+                <Text style={styles.inviteModalFormLabel}>{t('dashboard.inviteFormLabel')}</Text>
                 <View style={styles.inviteModalInputContainer}>
-                  <Ionicons name="person-add-outline" size={20} color="#94a3b8" style={styles.inviteModalInputIcon} />
+                  <Ionicons name="person-add-outline" size={20} color={COLORS.text3} style={styles.inviteModalInputIcon} />
                   <TextInput
                     style={styles.inviteModalInput}
-                    placeholder="Enter friend's username or email"
-                    placeholderTextColor="#94a3b8"
+                    placeholder={t('dashboard.invitePlaceholder')}
+                    placeholderTextColor={COLORS.text3}
                     value={inviteIdentifier}
                     onChangeText={setInviteIdentifier}
                     keyboardType="default"
@@ -844,33 +909,33 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                   />
                 </View>
                 <Text style={styles.inviteModalInputHint}>
-                  Enter either a username (e.g., johndoe) or email address
+                  {t('dashboard.inviteInputHint')}
                 </Text>
 
                 {/* Benefits Section */}
                 <View style={styles.inviteModalBenefits}>
                   <View style={styles.inviteModalBenefitItem}>
                     <View style={styles.inviteModalBenefitIcon}>
-                      <Ionicons name="checkmark-circle" size={24} color="#06D6A0" />
+                      <Ionicons name="checkmark-circle" size={24} color={COLORS.moss} />
                     </View>
                     <Text style={styles.inviteModalBenefitText}>
-                      Get 5 Premium Capsules instantly
+                      {t('dashboard.benefit1')}
                     </Text>
                   </View>
                   <View style={styles.inviteModalBenefitItem}>
                     <View style={styles.inviteModalBenefitIcon}>
-                      <Ionicons name="checkmark-circle" size={24} color="#06D6A0" />
+                      <Ionicons name="checkmark-circle" size={24} color={COLORS.moss} />
                     </View>
                     <Text style={styles.inviteModalBenefitText}>
-                      Help your friend save memories
+                      {t('dashboard.benefit2')}
                     </Text>
                   </View>
                   <View style={styles.inviteModalBenefitItem}>
                     <View style={styles.inviteModalBenefitIcon}>
-                      <Ionicons name="checkmark-circle" size={24} color="#06D6A0" />
+                      <Ionicons name="checkmark-circle" size={24} color={COLORS.moss} />
                     </View>
                     <Text style={styles.inviteModalBenefitText}>
-                      Build your TimeCapsule community
+                      {t('dashboard.benefit3')}
                     </Text>
                   </View>
                 </View>
@@ -881,8 +946,8 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                   onPress={handleSendInvite}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="paper-plane" size={20} color="white" style={styles.inviteModalActionButtonIcon} />
-                  <Text style={styles.inviteModalActionButtonText}>Send Invitation</Text>
+                  <Ionicons name="paper-plane" size={20} color={COLORS.white} style={styles.inviteModalActionButtonIcon} />
+                  <Text style={styles.inviteModalActionButtonText}>{t('dashboard.sendInvitation')}</Text>
         </TouchableOpacity>
       </View>
             </ScrollView>
@@ -897,7 +962,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.bg,
   },
   mapContainer: {
     ...StyleSheet.absoluteFillObject,
@@ -917,20 +982,22 @@ const styles = StyleSheet.create({
     zIndex: 500,
   },
   mapControl: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.card,
     borderRadius: 25,
     width: 50,
     height: 50,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.18,
     shadowRadius: 6,
     elevation: 5,
   },
   capsuleMarker: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.card,
     borderRadius: 20,
     width: 44,
     height: 44,
@@ -938,7 +1005,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.25,
     shadowRadius: 6,
     elevation: 4,
   },
@@ -948,15 +1015,15 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 2,
-    borderColor: '#FAC638',
+    borderColor: COLORS.ember,
   },
   capsulePillTop: {
     flex: 1,
-    backgroundColor: '#FF6B6B',
+    backgroundColor: COLORS.ember,
   },
   capsulePillBottom: {
     flex: 1,
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.emberDark,
   },
   calloutContainer: {
     width: 220,
@@ -964,21 +1031,21 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'white',
+    backgroundColor: COLORS.card,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 5,
   },
   calloutTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1e293b',
+    ...font('subtitle'),
+    color: COLORS.text,
     marginBottom: 12,
     textAlign: 'center',
-    lineHeight: 20,
     width: '100%',
   },
   infoButton: {
@@ -987,10 +1054,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: '#FAC63815',
+    backgroundColor: COLORS.emberSoft,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#FAC63840',
+    borderColor: COLORS.emberGlow,
     minWidth: 140,
   },
   infoIcon: {
@@ -998,422 +1065,10 @@ const styles = StyleSheet.create({
   },
   infoButtonText: {
     fontSize: 13,
-    color: '#FAC638',
+    color: COLORS.ember,
     fontWeight: '600',
-  },
-  detailModalContainer: {
-    flex: 1,
-  },
-  detailModalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  detailModalSheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 20,
-    zIndex: 1000,
-  },
-  detailModalDragHandle: {
-    alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    cursor: 'grab' as any,
-  },
-  detailModalDragBar: {
-    width: 40,
-    height: 5,
-    backgroundColor: '#cbd5e1',
-    borderRadius: 3,
-  },
-  detailModalCloseButton: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    zIndex: 1001,
-    padding: 8,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 20,
-  },
-  detailModalContentWrapper: {
-    flex: 1,
-    position: 'relative',
-    overflow: 'hidden',
-    marginTop: 0,
-  },
-  detailModalContent: {
-    flex: 1,
-  },
-  detailModalContentContainer: {
-    paddingBottom: 100, // Space for fixed button
-  },
-  detailModalBlurContainer: {
-    position: 'absolute',
-    top: 120, // Start below "Shared With" section (estimated height ~120px)
-    left: 0,
-    right: 0,
-    bottom: 100, // Don't cover the share button
-    zIndex: 999,
-  },
-  detailModalBlurView: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  detailModalLockedOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  detailModalLockedBadge: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(30, 41, 59, 0.95)',
-    paddingHorizontal: 48,
-    paddingVertical: 40,
-    borderRadius: 28,
-    borderWidth: 2.5,
-    borderColor: '#FAC638',
-    shadowColor: '#FAC638',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 15,
-    minWidth: 280,
-  },
-  detailModalLockedText: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#FAC638',
-    marginTop: 20,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-  },
-  detailModalLockedSubtext: {
-    fontSize: 15,
-    color: '#cbd5e1',
-    marginTop: 16,
-    textAlign: 'center',
-    lineHeight: 22,
-    maxWidth: 240,
-  },
-  detailModalMediaHeader: {
-    width: '100%',
-    marginBottom: 0,
-  },
-  detailModalMediaPreview: {
-    width: '100%',
-    height: 280,
-    backgroundColor: '#1e293b',
-    position: 'relative',
-  },
-  detailModalMediaLocked: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2d3748',
-  },
-  detailModalHeaderImage: {
-    width: '100%',
-    height: '100%',
-    opacity: 0.7,
-  },
-  detailModalTitle: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginTop: 24,
-    marginHorizontal: 24,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  detailModalDescription: {
-    fontSize: 15,
-    color: '#64748b',
-    lineHeight: 22,
-    marginHorizontal: 24,
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  detailModalCountdownContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginHorizontal: 16,
-    marginBottom: 24,
-    gap: 8,
-  },
-  detailModalCountdownCard: {
-    flex: 1,
-    backgroundColor: '#2d3748',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-  },
-  detailModalCountdownCardLast: {
-    backgroundColor: '#3b4a5f',
-  },
-  detailModalCountdownValue: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: 'white',
-    marginBottom: 4,
-  },
-  detailModalCountdownLabel: {
-    fontSize: 12,
-    color: '#94a3b8',
-    fontWeight: '500',
-    textTransform: 'capitalize',
-  },
-  detailModalInfoSection: {
-    marginHorizontal: 24,
-    marginBottom: 24,
-  },
-  detailModalInfoLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#64748b',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   // Shared With Section - At Top of Content (Always Visible)
-  detailModalSharedSection: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    marginBottom: 0,
-    zIndex: 1000,
-    position: 'relative',
-  },
-  detailModalSharedTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 12,
-  },
-  detailModalPublicBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#06D6A015',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
-  detailModalPublicText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#06D6A0',
-  },
-  detailModalSharedScrollContent: {
-    paddingRight: 20,
-  },
-  detailModalSharedUser: {
-    alignItems: 'center',
-    marginRight: 16,
-    width: 64,
-  },
-  detailModalSharedAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    marginBottom: 6,
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  detailModalSharedAvatarImage: {
-    width: '100%',
-    height: '100%',
-  },
-  detailModalSharedAvatarPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#e2e8f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  detailModalSharedBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: 'white',
-    borderRadius: 10,
-  },
-  detailModalSharedName: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#64748b',
-    textAlign: 'center',
-    marginBottom: 2,
-  },
-  detailModalSharedYouBadge: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#FAC638',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  detailModalInfoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 12,
-    gap: 12,
-  },
-  detailModalAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#e2e8f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  detailModalInfoText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  detailModalConditionRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    gap: 12,
-  },
-  detailModalConditionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'white',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  detailModalConditionContent: {
-    flex: 1,
-  },
-  detailModalConditionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  detailModalConditionSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-  },
-  detailModalMediaGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: 24,
-    marginBottom: 24,
-    gap: 8,
-  },
-  detailModalMediaGridItem: {
-    width: '48%',
-    height: 160,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#f1f5f9',
-  },
-  detailModalMediaGridImage: {
-    width: '100%',
-    height: '100%',
-  },
-  detailModalMediaGridVideo: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#1e293b',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  detailModalBottomPadding: {
-    height: 20,
-  },
-  detailModalFooter: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    zIndex: 1001,
-  },
-  detailModalShareButton: {
-    backgroundColor: '#FAC638',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#FAC638',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  detailModalShareIcon: {
-    marginRight: 8,
-  },
-  detailModalShareText: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  // Create Capsule Button (Full Width)
-  createCapsuleButton: {
-    backgroundColor: '#FAC638',
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 20,
-    paddingVertical: 16,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  createButtonIcon: {
-    marginRight: 8,
-  },
-  createButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: 'white',
-  },
   // Nearby Capsules Section
   nearbyCapsules: {
     paddingBottom: 100, // Extra space for bottom tab bar
@@ -1422,23 +1077,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: COLORS.border,
   },
   nearbyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
+    ...font('subtitle'),
+    color: COLORS.text,
     marginBottom: 4,
   },
   nearbyCount: {
     fontSize: 13,
-    color: '#64748b',
+    color: COLORS.text2,
   },
   // Tabs (Top / Recent)
   tabsContainer: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: COLORS.border,
   },
   tabButton: {
     flex: 1,
@@ -1449,15 +1103,15 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabButtonActive: {
-    borderBottomColor: '#1e293b',
+    borderBottomColor: COLORS.ember,
   },
   tabText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: COLORS.text2,
   },
   tabTextActive: {
-    color: '#1e293b',
+    color: COLORS.text,
   },
   // Grid Layout
   capsuleGrid: {
@@ -1470,7 +1124,7 @@ const styles = StyleSheet.create({
     height: width / 3,
     position: 'relative',
     borderWidth: 0.5,
-    borderColor: 'white',
+    borderColor: COLORS.bg,
   },
   gridImage: {
     width: '100%',
@@ -1478,7 +1132,7 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   gridImagePlaceholder: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: COLORS.bg3,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1518,21 +1172,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   feedEmptyText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#64748b',
+    ...font('subtitle'),
+    color: COLORS.text2,
     marginTop: 16,
     marginBottom: 8,
   },
   feedEmptySubtext: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: COLORS.text3,
     textAlign: 'center',
   },
   feedEmptyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.ember,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
@@ -1540,7 +1193,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   feedEmptyButtonText: {
-    color: 'white',
+    color: COLORS.white,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -1550,26 +1203,30 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    borderTopWidth: 1,
+    borderColor: COLORS.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 10,
     zIndex: 100,
   },
   dragHandleContainer: {
     alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 8,
+    justifyContent: 'center',
+    paddingTop: 14,
+    paddingBottom: 14,
+    minHeight: 44, // larger, easy-to-hit drag/tap target
   },
   dragHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#cbd5e1',
-    borderRadius: 2,
+    width: 44,
+    height: 5,
+    backgroundColor: COLORS.text2,
+    borderRadius: 3,
   },
   bottomSheetContent: {
     flex: 1,
@@ -1590,7 +1247,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     shadowColor: '#000',
@@ -1610,7 +1267,7 @@ const styles = StyleSheet.create({
   inviteModalDragBar: {
     width: 40,
     height: 5,
-    backgroundColor: '#cbd5e1',
+    backgroundColor: COLORS.text3,
     borderRadius: 3,
   },
   inviteModalCloseButton: {
@@ -1622,7 +1279,7 @@ const styles = StyleSheet.create({
     height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: COLORS.bg3,
     borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1630,7 +1287,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
+    borderColor: COLORS.border,
   },
   inviteModalContent: {
     flex: 1,
@@ -1643,26 +1300,24 @@ const styles = StyleSheet.create({
   inviteModalImagePlaceholder: {
     width: '100%',
     height: 200,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.bg3,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
     borderWidth: 2,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border,
     borderStyle: 'dashed',
   },
   inviteModalTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1e293b',
+    ...font('display'),
+    color: COLORS.text,
     marginBottom: 12,
     textAlign: 'center',
-    lineHeight: 32,
   },
   inviteModalSubtext: {
     fontSize: 16,
-    color: '#64748b',
+    color: COLORS.text2,
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 32,
@@ -1673,23 +1328,23 @@ const styles = StyleSheet.create({
   inviteModalFormLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text,
     marginBottom: 8,
   },
   inviteModalInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: COLORS.bg3,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border,
     marginBottom: 8,
   },
   inviteModalInputHint: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: COLORS.text3,
     marginBottom: 16,
     lineHeight: 16,
   },
@@ -1699,7 +1354,7 @@ const styles = StyleSheet.create({
   inviteModalInput: {
     flex: 1,
     fontSize: 16,
-    color: '#1e293b',
+    color: COLORS.text,
   },
   inviteModalBenefits: {
     marginBottom: 24,
@@ -1714,22 +1369,22 @@ const styles = StyleSheet.create({
   },
   inviteModalBenefitText: {
     fontSize: 15,
-    color: '#64748b',
+    color: COLORS.text2,
     flex: 1,
   },
   inviteModalActionButton: {
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.ember,
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FAC638',
+    shadowColor: COLORS.ember,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 10,
   },
   inviteModalActionButtonIcon: {
     marginRight: 8,
@@ -1737,7 +1392,7 @@ const styles = StyleSheet.create({
   inviteModalActionButtonText: {
     fontSize: 17,
     fontWeight: '700',
-    color: 'white',
+    color: COLORS.white,
   },
 });
 

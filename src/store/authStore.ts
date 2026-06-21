@@ -12,6 +12,24 @@ interface AuthStore extends AuthState {
   resetPassword: (email: string) => Promise<{ error: any }>;
 }
 
+/**
+ * Build a minimal User from the session alone — used as a fallback when
+ * getCurrentUser() can't load the profile (e.g. a transient network error) so a
+ * user with a valid session is never stranded back on the login screen.
+ */
+function sessionFallbackUser(session: any): User | null {
+  const su = session?.user;
+  if (!su) return null;
+  return {
+    id: su.id,
+    email: su.email ?? null,
+    display_name: su.user_metadata?.display_name ?? null,
+    username: su.user_metadata?.username ?? null,
+    avatar_url: null,
+    created_at: su.created_at ?? new Date().toISOString(),
+  } as User;
+}
+
 export const useAuthStore = create<AuthStore>((set, get) => ({
   user: null,
   session: null,
@@ -61,7 +79,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       if (session?.user) {
         // Get user with profile data
         const { user } = await AuthService.getCurrentUser();
-        set({ session, user: user as User | null, loading: false });
+        // Keep the user authenticated even if the profile fetch failed
+        // (transient network) — never strand a valid session on the login screen.
+        set({ session, user: (user as User) ?? get().user ?? sessionFallbackUser(session), loading: false });
       } else {
         set({ session: null, user: null, loading: false });
       }
@@ -112,17 +132,22 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 }));
 
-// Listen for auth changes
-AuthService.onAuthStateChange(async (event, session) => {
-  if (session?.user) {
-    // Get user with profile data
-    const { user } = await AuthService.getCurrentUser();
-    useAuthStore.setState({
-      session,
-      user: user as User | null,
-      loading: false
-    });
-  } else {
-    useAuthStore.setState({ session: null, user: null, loading: false });
-  }
+// Listen for auth changes.
+// IMPORTANT: calling supabase auth/data methods synchronously inside this
+// callback deadlocks the auth lock (the callback runs while the lock is held),
+// which freezes sign-in and the whole app. Defer the work with setTimeout(0)
+// so it runs outside the lock context. (Documented supabase-js pitfall.)
+AuthService.onAuthStateChange((event, session) => {
+  setTimeout(async () => {
+    if (session?.user) {
+      const { user } = await AuthService.getCurrentUser();
+      useAuthStore.setState({
+        session,
+        user: (user as User) ?? useAuthStore.getState().user ?? sessionFallbackUser(session),
+        loading: false,
+      });
+    } else {
+      useAuthStore.setState({ session: null, user: null, loading: false });
+    }
+  }, 0);
 });

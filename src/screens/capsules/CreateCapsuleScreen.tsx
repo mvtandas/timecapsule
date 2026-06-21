@@ -1,1561 +1,414 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  TouchableWithoutFeedback,
-  Keyboard,
-  Image,
-  Modal,
-  Dimensions,
+  View, Text, TouchableOpacity, TextInput, StyleSheet, Image, ActivityIndicator,
+  Alert, Platform, KeyboardAvoidingView, ScrollView, Dimensions,
 } from 'react-native';
+import { CameraView, type CameraType, type FlashMode, useCameraPermissions } from 'expo-camera';
+import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, Circle } from 'react-native-maps';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DatePickerModal from '../../components/DatePickerModal';
 import { CapsuleService } from '../../services/capsuleService';
 import { MediaService } from '../../services/mediaService';
 import { NotificationService } from '../../lib/notifications';
-import * as Notifications from 'expo-notifications';
-import { Friend } from '../../types';
+import { AchievementService } from '../../services/achievementService';
 import { supabase } from '../../lib/supabase';
-import { calculateDistance } from '../../utils/geoUtils';
+import { COLORS, font, RADIUS } from '../../constants/theme';
+import { useT } from '../../i18n';
+import { CAP_TYPE_LIST, getCapType, type CapTypeId } from '../../constants/capTypes';
+import CapTypeIcon from '../../components/common/CapTypeIcon';
 
-const { width, height } = Dimensions.get('window');
+const LAUNCH = CAP_TYPE_LIST.filter((c) => c.enabled);
+const { height } = Dimensions.get('window');
 
-interface CreateCapsuleScreenProps {
-  onNavigate: (screen: string) => void;
+interface Props {
+  onNavigate: (screen: string, data?: any) => void;
   onGoBack?: () => void;
 }
 
-const CreateCapsuleScreen = ({ onNavigate, onGoBack }: CreateCapsuleScreenProps) => {
-  const [step, setStep] = useState(1);
+type Captured = { uri: string; type: 'image' | 'video' };
+
+const CreateCapsuleScreen = ({ onNavigate, onGoBack }: Props) => {
+  const t = useT();
+  const insets = useSafeAreaInsets();
+  const [permission, requestPermission] = useCameraPermissions();
+  const camRef = useRef<CameraView>(null);
+
+  const [facing, setFacing] = useState<CameraType>('back');
+  const [flash, setFlash] = useState<FlashMode>('off');
+  const [mode, setMode] = useState<'camera' | 'compose'>('camera');
+  const [captured, setCaptured] = useState<Captured | null>(null);
+
+  const [caption, setCaption] = useState('');
+  const [capType, setCapType] = useState<CapTypeId>('public');
+  const [isPublic, setIsPublic] = useState(true);
+  const [openDate, setOpenDate] = useState<Date | null>(null);
+  const [loc, setLoc] = useState<{ lat: number; lng: number; address: string } | null>(null);
+  const [showDate, setShowDate] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showMapModal, setShowMapModal] = useState(false);
-  const [currentLocation, setCurrentLocation] = useState<any>(null);
-  const [tempMapLocation, setTempMapLocation] = useState<any>(null);
-  
-  const [capsuleData, setCapsuleData] = useState({
-    title: '',
-    message: '',
-    openDate: null as Date | null,
-    location: null as { lat: number; lng: number; address: string } | null,
-    media: [] as any[],
-    isPublic: true,
-    allowedUsers: [] as string[],
-    category: 'general' as string,
-  });
 
-  const CATEGORIES = [
-    { id: 'general', label: 'General', icon: '📦' },
-    { id: 'travel', label: 'Travel', icon: '✈️' },
-    { id: 'family', label: 'Family', icon: '👨‍👩‍👧‍👦' },
-    { id: 'friends', label: 'Friends', icon: '👫' },
-    { id: 'school', label: 'School', icon: '🎓' },
-    { id: 'work', label: 'Work', icon: '💼' },
-    { id: 'celebration', label: 'Celebration', icon: '🎉' },
-    { id: 'nature', label: 'Nature', icon: '🌴' },
-    { id: 'food', label: 'Food', icon: '🍕' },
-    { id: 'music', label: 'Music', icon: '🎸' },
-  ];
-
-  const [showMessageInput, setShowMessageInput] = useState(false);
-  const [newUsername, setNewUsername] = useState('');
-  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
-
-  // Friends loaded from Supabase
-  const [friends, setFriends] = useState<Friend[]>([]);
-  const [loadingFriends, setLoadingFriends] = useState(false);
+  const ct = getCapType(capType);
+  const accent = ct.color;
+  const grad = ct.gradient as readonly [string, string];
 
   useEffect(() => {
-    getCurrentLocation();
-    loadFriends();
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') return;
+        const l = await Location.getCurrentPositionAsync({});
+        const a = await Location.reverseGeocodeAsync({ latitude: l.coords.latitude, longitude: l.coords.longitude });
+        const addr = a[0] ? `${a[0].city || a[0].name || ''}${a[0].region ? ', ' + a[0].region : ''}`.trim() : t('capture.here');
+        setLoc({ lat: l.coords.latitude, lng: l.coords.longitude, address: addr || t('capture.here') });
+      } catch {
+        /* ignore */
+      }
+    })();
   }, []);
 
-  const loadFriends = async () => {
+  const selectType = (id: CapTypeId) => {
+    setCapType(id);
+    setIsPublic(id === 'public' || id === 'scroll' || id === 'trail');
+  };
+
+  const takePhoto = async () => {
     try {
-      setLoadingFriends(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Get accepted friend requests
-      const { data: friendRequests, error } = await supabase
-        .from('friend_requests')
-        .select('sender_id, receiver_id')
-        .eq('status', 'accepted')
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
-
-      if (error || !friendRequests || friendRequests.length === 0) {
-        setFriends([]);
-        return;
+      const p = await camRef.current?.takePictureAsync({ quality: 0.85 });
+      if (p?.uri) {
+        setCaptured({ uri: p.uri, type: 'image' });
+        setMode('compose');
       }
-
-      // Extract friend IDs
-      const friendIds = (friendRequests as any[]).map((req) =>
-        req.sender_id === user.id ? req.receiver_id : req.sender_id
-      );
-
-      // Get friend profiles
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, username, display_name, avatar_url')
-        .in('id', friendIds);
-
-      if (profiles) {
-        setFriends(
-          (profiles as any[]).map((p) => ({
-            id: p.id,
-            name: p.display_name || p.username || 'User',
-            username: p.username || '',
-            avatar_url: p.avatar_url || undefined,
-            friends_since: '',
-          }))
-        );
-      }
-    } catch (error) {
-      if (__DEV__) console.error('Error loading friends:', error);
-    } finally {
-      setLoadingFriends(false);
+    } catch (e) {
+      if (__DEV__) console.warn('takePicture', e);
     }
   };
 
-  const getCurrentLocation = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        return;
-      }
-
-      const location = await Location.getCurrentPositionAsync({});
-      setCurrentLocation(location);
-      
-      // Set default location to current location
-      const address = await Location.reverseGeocodeAsync({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      });
-
-      if (address[0]) {
-        setCapsuleData({
-          ...capsuleData,
-          location: {
-            lat: location.coords.latitude,
-            lng: location.coords.longitude,
-            address: `${address[0].city || ''}, ${address[0].region || ''}`,
-          },
-        });
-      }
-    } catch (error) {
-      if (__DEV__) console.error('Error getting location:', error);
-    }
-  };
-
-  const handleNext = async () => {
-    if (step === 1 && !capsuleData.title) {
-      Alert.alert('Error', 'Please enter a title');
+  const pickGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(t('createFlow.alert_permission_required'), t('createFlow.alert_allow_photos'));
       return;
     }
-    if (step < 3) {
-      Keyboard.dismiss();
-      setStep(step + 1);
-    } else {
-      await handleSaveCapsule();
+    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.All, quality: 0.85 });
+    if (!r.canceled && r.assets[0]) {
+      const a = r.assets[0];
+      setCaptured({ uri: a.uri, type: a.type === 'video' ? 'video' : 'image' });
+      setMode('compose');
     }
   };
 
-  const handleSaveCapsule = async () => {
-    if (saving) return;
-    if (!capsuleData.title.trim()) {
-      Alert.alert('Error', 'Please enter a title');
-      return;
-    }
+  const finishAndNotify = async () => {
+    onNavigate('Dashboard');
     try {
-      setSaving(true);
-
-      // Check if capsule location is within 5km of current location
-      if (currentLocation && capsuleData.location) {
-        const distance = calculateDistance(
-          currentLocation.coords.latitude,
-          currentLocation.coords.longitude,
-          capsuleData.location.lat,
-          capsuleData.location.lng
+      const fresh = await AchievementService.checkNewlyUnlocked();
+      if (fresh.length) {
+        setTimeout(
+          () => Alert.alert(t('createFlow.alert_achievement'), fresh.map((a) => `${a.name}  +${a.points} pts`).join('\n')),
+          500,
         );
-
-        if (distance > 5) {
-          Alert.alert(
-            'Location Too Far',
-            'You can only create capsules within 5km of your current location.'
-          );
-          setSaving(false);
-          return;
-        }
       }
+    } catch {
+      /* non-fatal */
+    }
+  };
 
-      // Get current user
+  const seal = async () => {
+    if (saving || !captured) return;
+    setSaving(true);
+    try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        Alert.alert('Error', 'You must be logged in to create a capsule.');
+        Alert.alert(t('createFlow.alert_error'), t('createFlow.alert_must_be_logged_in'));
         setSaving(false);
         return;
       }
-
-      // Generate temporary capsule ID for media upload
-      const tempCapsuleId = `temp_${Date.now()}`;
-
-      // Upload all media to Supabase Storage
+      const tempId = `temp_${Date.now()}`;
       let mediaUrl: string | null = null;
       let mediaType: 'image' | 'video' | 'none' = 'none';
-      const uploadedRefs: { url: string; type: string }[] = [];
-
-      if (capsuleData.media.length > 0) {
-        for (const mediaItem of capsuleData.media) {
-          const uploadResult = await MediaService.uploadMedia(
-            mediaItem.uri,
-            user.id,
-            tempCapsuleId
-          );
-
-          if (uploadResult) {
-            uploadedRefs.push({ url: uploadResult.url, type: uploadResult.type });
-            // Use first media as the main media_url
-            if (!mediaUrl) {
-              mediaUrl = uploadResult.url;
-              mediaType = uploadResult.type as 'image' | 'video';
-            }
-          } else {
-            if (__DEV__) console.warn('Media upload failed for item, skipping');
-          }
-        }
+      const refs: { url: string; type: string }[] = [];
+      const up = await MediaService.uploadMedia(captured.uri, user.id, tempId);
+      if (!up) {
+        // We always have captured media in the camera-first flow — a failed
+        // upload must NOT silently create a media-less "sealed moment".
+        Alert.alert(t('createFlow.alert_error'), t('createFlow.alert_create_failed'));
+        setSaving(false);
+        return;
       }
-
-      // Determine if capsule should be locked
-      const isLocked = capsuleData.openDate ? new Date(capsuleData.openDate) > new Date() : false;
+      refs.push({ url: up.url, type: up.type });
+      mediaUrl = up.url;
+      mediaType = up.type as 'image' | 'video';
+      const isLocked = openDate ? new Date(openDate) > new Date() : false;
+      const title = caption.trim() || loc?.address || t('capture.here');
 
       const { data, error } = await CapsuleService.createCapsule({
-        title: capsuleData.title,
-        description: capsuleData.message || null,
-        open_at: capsuleData.openDate?.toISOString() || null,
-        lat: capsuleData.location?.lat || null,
-        lng: capsuleData.location?.lng || null,
-        is_public: capsuleData.isPublic,
-        content_refs: uploadedRefs.length > 0 ? uploadedRefs : undefined,
+        title,
+        description: caption.trim() || null,
+        open_at: openDate?.toISOString() || null,
+        lat: loc?.lat || null,
+        lng: loc?.lng || null,
+        is_public: isPublic,
+        content_refs: refs.length ? refs : undefined,
         media_url: mediaUrl,
         media_type: mediaType,
         is_locked: isLocked,
-        category: capsuleData.category,
+        type: capType,
+        location_name: loc?.address || null,
+        is_anonymous: !isPublic,
       } as any);
 
       if (error) {
-        if (__DEV__) console.error('Error creating capsule:', error);
-        Alert.alert('Error', 'Failed to create capsule. Please try again.');
-        
-        // Clean up uploaded media if capsule creation failed
+        if (__DEV__) console.error('create error', error);
+        Alert.alert(t('createFlow.alert_error'), t('createFlow.alert_create_failed'));
         if (mediaUrl) {
-          const path = MediaService.extractPathFromUrl(mediaUrl);
-          if (path) await MediaService.deleteMedia(path);
+          const p = MediaService.extractPathFromUrl(mediaUrl);
+          if (p) await MediaService.deleteMedia(p);
         }
-      } else {
-        // Schedule notification for capsule opening if open_at date is set
-        if (capsuleData.openDate && data?.id) {
-          const openDate = new Date(capsuleData.openDate);
-          if (openDate > new Date()) {
-            // Check if notification permission is already granted
-            const hasPermission = await NotificationService.checkPermissions();
-            if (hasPermission) {
-              await NotificationService.scheduleCapsuleOpeningNotification(
-                data.id,
-                capsuleData.title,
-                openDate
-              ).catch(() => {});
-              await NotificationService.scheduleCapsulesOpeningSoon(
-                capsuleData.title,
-                openDate
-              ).catch(() => {});
-              Alert.alert('Success!', 'Your time capsule has been created!', [
-                { text: 'OK', onPress: () => onNavigate('Dashboard') },
-              ]);
-            } else {
-              // Ask user if they want notifications before requesting permission
-              const formattedDate = openDate.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              });
-              Alert.alert(
-                'Get Notified?',
-                `Would you like to be notified when this capsule opens? We'll send you a reminder on ${formattedDate}.`,
-                [
-                  {
-                    text: 'No Thanks',
-                    style: 'cancel',
-                    onPress: () => {
-                      Alert.alert('Success!', 'Your time capsule has been created!', [
-                        { text: 'OK', onPress: () => onNavigate('Dashboard') },
-                      ]);
-                    },
-                  },
-                  {
-                    text: 'Yes',
-                    onPress: async () => {
-                      try {
-                        const { status } = await Notifications.requestPermissionsAsync();
-                        if (status === 'granted') {
-                          await NotificationService.scheduleCapsuleOpeningNotification(
-                            data.id,
-                            capsuleData.title,
-                            openDate
-                          ).catch(() => {});
-                          await NotificationService.scheduleCapsulesOpeningSoon(
-                            capsuleData.title,
-                            openDate
-                          ).catch(() => {});
-                        }
-                      } catch (e) {
-                        if (__DEV__) console.error('Notification permission error:', e);
-                      }
-                      Alert.alert('Success!', 'Your time capsule has been created!', [
-                        { text: 'OK', onPress: () => onNavigate('Dashboard') },
-                      ]);
-                    },
-                  },
-                ]
-              );
-            }
-            return; // Don't show the default success alert below
-          }
-        }
-
-        Alert.alert('Success!', 'Your time capsule has been created!', [
-          { text: 'OK', onPress: () => onNavigate('Dashboard') },
-        ]);
+        setSaving(false);
+        return;
       }
-    } catch (error) {
-      if (__DEV__) console.error('Error:', error);
-      Alert.alert('Error', 'Something went wrong. Please try again.');
-    } finally {
+      if (openDate && data?.id && new Date(openDate) > new Date()) {
+        const has = await NotificationService.checkPermissions().catch(() => false);
+        if (has) {
+          await NotificationService.scheduleCapsuleOpeningNotification(data.id, title, new Date(openDate)).catch(() => {});
+        }
+      }
+      // Trail caps need stops added next — route to the stop editor.
+      if (capType === 'trail' && data?.id) {
+        setSaving(false);
+        // Reset compose state: this screen stays mounted (TrailStops is pushed
+        // on top), so clear the sealed draft to avoid a resurrected draft /
+        // duplicate creation when the user returns.
+        setCaptured(null);
+        setMode('camera');
+        setCaption('');
+        setOpenDate(null);
+        setCapType('public');
+        onNavigate('TrailStops', { capsuleId: data.id, trailTitle: title });
+        return;
+      }
+      finishAndNotify();
+    } catch (e) {
+      if (__DEV__) console.error('seal', e);
+      Alert.alert(t('createFlow.alert_error'), t('createFlow.alert_something_wrong'));
       setSaving(false);
     }
   };
 
-  const handleBack = () => {
-    Keyboard.dismiss();
-    if (step > 1) {
-      setStep(step - 1);
-    } else {
-      onGoBack && onGoBack();
-    }
-  };
+  const dateLabel = openDate
+    ? t('capture.opens_on', {
+        date: openDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' +
+          openDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
+      })
+    : t('capture.now');
 
-  const handlePickImage = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Please allow access to your photos');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.All,
-        allowsMultipleSelection: true,
-        quality: 0.7,
-      });
-
-      if (!result.canceled) {
-        setCapsuleData({
-          ...capsuleData,
-          media: [...capsuleData.media, ...result.assets],
-        });
-      }
-    } catch (error) {
-      if (__DEV__) console.error('Error picking image:', error);
-    }
-  };
-
-  const handleTakePhoto = async () => {
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Please allow access to your camera');
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.All,
-        quality: 0.7,
-        videoMaxDuration: 60,
-      });
-
-      if (!result.canceled) {
-        setCapsuleData({
-          ...capsuleData,
-          media: [...capsuleData.media, ...result.assets],
-        });
-      }
-    } catch (error) {
-      if (__DEV__) console.error('Error taking photo:', error);
-    }
-  };
-
-  const handleSelectLocation = () => {
-    if (!currentLocation) {
-      Alert.alert('Error', 'Current location not available');
-      return;
-    }
-    setTempMapLocation({
-      latitude: capsuleData.location?.lat || currentLocation.coords.latitude,
-      longitude: capsuleData.location?.lng || currentLocation.coords.longitude,
-    });
-    setShowMapModal(true);
-  };
-
-  const handleConfirmLocation = async () => {
-    if (tempMapLocation) {
-      const distance = calculateDistance(
-        currentLocation.coords.latitude,
-        currentLocation.coords.longitude,
-        tempMapLocation.latitude,
-        tempMapLocation.longitude
-      );
-
-      if (distance > 5) {
-        Alert.alert('Too Far', 'Please select a location within 5km of your current position');
-        return;
-      }
-
-      const address = await Location.reverseGeocodeAsync({
-        latitude: tempMapLocation.latitude,
-        longitude: tempMapLocation.longitude,
-      });
-
-      setCapsuleData({
-        ...capsuleData,
-        location: {
-          lat: tempMapLocation.latitude,
-          lng: tempMapLocation.longitude,
-          address: address[0] ? `${address[0].city || ''}, ${address[0].region || ''}` : 'Selected location',
-        },
-      });
-      setShowMapModal(false);
-    }
-  };
-
-  const renderStep = () => {
-    switch (step) {
-      case 1:
-        return (
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Title & Media</Text>
-              <Text style={styles.stepSubtitle}>
-                Name your capsule and add photos or videos
-              </Text>
-              <TextInput
-                style={styles.input}
-                value={capsuleData.title}
-                onChangeText={(text) => setCapsuleData({ ...capsuleData, title: text })}
-                placeholder="e.g., Summer Memories 2024"
-                placeholderTextColor="#94a3b8"
-                returnKeyType="done"
-                onSubmitEditing={() => Keyboard.dismiss()}
-              />
-
-              {/* Media Section */}
-              <Text style={[styles.stepSubtitle, { marginTop: 24, marginBottom: 12 }]}>Add Media</Text>
-
-              {capsuleData.media.length > 0 && (
-                <ScrollView horizontal style={styles.mediaPreview} showsHorizontalScrollIndicator={false}>
-                  {capsuleData.media.map((item, index) => (
-                    <View key={index} style={styles.mediaPreviewItem}>
-                      <Image source={{ uri: item.uri }} style={styles.mediaPreviewImage} />
-                      {(item.type === 'video' || item.uri?.includes('.mov') || item.uri?.includes('.mp4')) && (
-                        <View style={styles.videoOverlay}>
-                          <Ionicons name="play-circle" size={28} color="#fff" />
-                          {item.duration && (
-                            <Text style={styles.videoDuration}>{Math.round(item.duration / 1000)}s</Text>
-                          )}
-                        </View>
-                      )}
-                      <TouchableOpacity
-                        style={styles.mediaRemoveButton}
-                        onPress={() => {
-                          const newMedia = [...capsuleData.media];
-                          newMedia.splice(index, 1);
-                          setCapsuleData({ ...capsuleData, media: newMedia });
-                        }}
-                      >
-                        <Ionicons name="close-circle" size={24} color="#FF6B6B" />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </ScrollView>
-              )}
-
-              <View style={styles.mediaGrid}>
-                <TouchableOpacity style={styles.mediaButton} onPress={handleTakePhoto}>
-                  <Ionicons name="camera" size={28} color="#FAC638" />
-                  <Text style={styles.mediaButtonText}>Camera</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.mediaButton} onPress={handlePickImage}>
-                  <Ionicons name="images" size={28} color="#FAC638" />
-                  <Text style={styles.mediaButtonText}>Gallery</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </TouchableWithoutFeedback>
-        );
-
-      case 2:
-        return (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>When & Where</Text>
-            <Text style={styles.stepSubtitle}>Choose a date and location</Text>
-
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Ionicons name="calendar-outline" size={24} color="#FAC638" />
-              <Text style={styles.dateButtonText}>
-                {capsuleData.openDate
-                  ? `${capsuleData.openDate.toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })} at ${capsuleData.openDate.toLocaleTimeString('en-US', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}`
-                  : 'Select Date & Time'}
-              </Text>
-              <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
-            </TouchableOpacity>
-
-            <View style={styles.infoBox}>
-              <Ionicons name="information-circle" size={20} color="#FAC638" />
-              <Text style={styles.infoText}>
-                Your capsule will be locked until this date
-              </Text>
-            </View>
-
-            {/* Location Selection */}
-            <Text style={[styles.stepTitle, styles.sectionTitle]}>
-              Where is the Memory?
-            </Text>
-            <Text style={styles.stepSubtitle}>
-              Choose the location where this capsule should be accessible
-            </Text>
-
-            <TouchableOpacity
-              style={styles.locationButton}
-              onPress={handleSelectLocation}
-            >
-              <Ionicons name="location" size={24} color="#FAC638" />
-              <View style={styles.locationInfo}>
-                <Text style={styles.locationTitle}>
-                  {capsuleData.location?.address || 'Select Location'}
-                </Text>
-                <Text style={styles.locationSubtext}>
-                  Tap to choose on map (within 5km)
-                </Text>
-              </View>
-              <Ionicons name="map-outline" size={20} color="#94a3b8" />
-            </TouchableOpacity>
-          </View>
-        );
-
-      case 3:
-        return (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Review & Create</Text>
-            <Text style={styles.stepSubtitle}>Check your capsule and add optional details</Text>
-            <View style={styles.reviewContainer}>
-              <View style={styles.reviewItem}>
-                <Text style={styles.reviewLabel}>Title:</Text>
-                <Text style={styles.reviewValue}>{capsuleData.title || 'Not set'}</Text>
-              </View>
-              <View style={styles.reviewItem}>
-                <Text style={styles.reviewLabel}>Media:</Text>
-                <Text style={styles.reviewValue}>{capsuleData.media.length} items</Text>
-              </View>
-              <View style={styles.reviewItem}>
-                <Text style={styles.reviewLabel}>Open Date:</Text>
-                <Text style={styles.reviewValue}>
-                  {capsuleData.openDate
-                    ? `${capsuleData.openDate.toLocaleDateString()} ${capsuleData.openDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
-                    : 'Not set'}
-                </Text>
-              </View>
-              <View style={[styles.reviewItem, { borderBottomWidth: 0, marginBottom: 0, paddingBottom: 0 }]}>
-                <Text style={styles.reviewLabel}>Location:</Text>
-                <Text style={styles.reviewValue}>
-                  {capsuleData.location?.address || 'Current location'}
-                </Text>
-              </View>
-            </View>
-
-            {/* Optional: Category */}
-            <Text style={[styles.subsectionTitle, { marginTop: 24 }]}>Category</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {CATEGORIES.map(cat => (
-                  <TouchableOpacity
-                    key={cat.id}
-                    style={[
-                      styles.categoryChip,
-                      capsuleData.category === cat.id && styles.categoryChipActive,
-                    ]}
-                    onPress={() => setCapsuleData({ ...capsuleData, category: cat.id })}
-                  >
-                    <Text style={styles.categoryEmoji}>{cat.icon}</Text>
-                    <Text style={[
-                      styles.categoryLabel,
-                      capsuleData.category === cat.id && styles.categoryLabelActive,
-                    ]}>{cat.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
-
-            {/* Optional: Public/Private Toggle */}
-            <TouchableOpacity
-              style={styles.toggleContainer}
-              onPress={() => setCapsuleData({ ...capsuleData, isPublic: !capsuleData.isPublic })}
-              activeOpacity={0.7}
-            >
-              <View style={styles.toggleInfo}>
-                <Ionicons
-                  name={capsuleData.isPublic ? "globe-outline" : "lock-closed-outline"}
-                  size={24}
-                  color="#FAC638"
-                />
-                <View style={styles.toggleTextContainer}>
-                  <Text style={styles.toggleTitle}>
-                    {capsuleData.isPublic ? 'Public Capsule' : 'Private Capsule'}
-                  </Text>
-                  <Text style={styles.toggleSubtext}>
-                    {capsuleData.isPublic
-                      ? 'Anyone can open after unlock time'
-                      : 'Only selected people can open'}
-                  </Text>
-                </View>
-              </View>
-              <View style={[styles.switchToggle, capsuleData.isPublic && styles.switchToggleActive]}>
-                <View style={[styles.switchThumb, capsuleData.isPublic && styles.switchThumbActive]} />
-              </View>
-            </TouchableOpacity>
-
-            {/* Authorized Users List - Only show when private */}
-            {!capsuleData.isPublic && (
-              <>
-                {/* Username Input */}
-                <View style={styles.addContactContainer}>
-                  <View style={styles.usernameInputContainer}>
-                    <Ionicons name="at-outline" size={20} color="#94a3b8" style={styles.usernameIcon} />
-                    <TextInput
-                      style={styles.usernameInput}
-                      value={newUsername}
-                      onChangeText={setNewUsername}
-                      placeholder="Enter username"
-                      placeholderTextColor="#94a3b8"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </View>
-                  <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={() => {
-                      if (newUsername.trim()) {
-                        const username = newUsername.trim().toLowerCase();
-                        if (!capsuleData.allowedUsers.includes(username)) {
-                          setCapsuleData({
-                            ...capsuleData,
-                            allowedUsers: [...capsuleData.allowedUsers, username],
-                          });
-                        }
-                        setNewUsername('');
-                      }
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="add-circle" size={24} color="#FAC638" />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Friend Picker - Horizontal Scrollable */}
-                <View style={styles.friendPickerSection}>
-                  <Text style={styles.friendPickerTitle}>Quick Select Friends</Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.friendPickerScrollContent}
-                  >
-                    {friends.map((friend) => {
-                      const isSelected = selectedFriends.includes(friend.username);
-                      return (
-                        <TouchableOpacity
-                          key={friend.id}
-                          style={styles.friendPickerItem}
-                          onPress={() => {
-                            let newSelectedFriends: string[];
-                            let newAllowedUsers: string[];
-
-                            if (isSelected) {
-                              newSelectedFriends = selectedFriends.filter(u => u !== friend.username);
-                              newAllowedUsers = capsuleData.allowedUsers.filter(u => u !== friend.username);
-                            } else {
-                              newSelectedFriends = [...selectedFriends, friend.username];
-                              newAllowedUsers = capsuleData.allowedUsers.includes(friend.username)
-                                ? capsuleData.allowedUsers
-                                : [...capsuleData.allowedUsers, friend.username];
-                            }
-
-                            setSelectedFriends(newSelectedFriends);
-                            setCapsuleData({
-                              ...capsuleData,
-                              allowedUsers: newAllowedUsers,
-                            });
-                          }}
-                          activeOpacity={0.7}
-                        >
-                          <View style={[
-                            styles.friendPickerAvatar,
-                            isSelected && styles.friendPickerAvatarSelected
-                          ]}>
-                            {friend.avatar_url ? (
-                              <Image source={{ uri: friend.avatar_url }} style={styles.friendPickerAvatarImage} />
-                            ) : (
-                              <View style={styles.friendPickerAvatarPlaceholder}>
-                                <Ionicons name="person" size={32} color="#94a3b8" />
-                              </View>
-                            )}
-                            {isSelected && (
-                              <View style={styles.selectionCheckmark}>
-                                <Ionicons name="checkmark-circle" size={24} color="#FAC638" />
-                              </View>
-                            )}
-                          </View>
-                          <Text style={styles.friendPickerName} numberOfLines={1}>
-                            {friend.name.split(' ')[0]}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
-
-                {/* List of Authorized Users */}
-                {capsuleData.allowedUsers.length > 0 && (
-                  <View style={styles.authorizedUsersList}>
-                    <Text style={styles.authorizedUsersTitle}>
-                      Selected Users ({capsuleData.allowedUsers.length})
-                    </Text>
-                    {capsuleData.allowedUsers.map((username, index) => {
-                      const friend = friends.find(f => f.username === username);
-                      return (
-                        <View key={index} style={styles.userItem}>
-                          <View style={styles.userAvatar}>
-                            {friend?.avatar_url ? (
-                              <Image source={{ uri: friend.avatar_url }} style={styles.userAvatarImage} />
-                            ) : (
-                              <Ionicons name="person" size={20} color="#64748b" />
-                            )}
-                          </View>
-                          <View style={styles.userInfo}>
-                            <Text style={styles.userName}>
-                              {friend?.name || username}
-                            </Text>
-                            <Text style={styles.userUsername}>@{username}</Text>
-                          </View>
-                          <TouchableOpacity
-                            onPress={() => {
-                              const newUsers = capsuleData.allowedUsers.filter(u => u !== username);
-                              const newSelectedFriends = selectedFriends.filter(u => u !== username);
-                              setSelectedFriends(newSelectedFriends);
-                              setCapsuleData({ ...capsuleData, allowedUsers: newUsers });
-                            }}
-                            style={styles.removeButton}
-                          >
-                            <Ionicons name="close-circle" size={20} color="#FF6B6B" />
-                          </TouchableOpacity>
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
-              </>
-            )}
-
-            {/* Optional: Message (expandable) */}
-            <TouchableOpacity
-              style={styles.expandableHeader}
-              onPress={() => setShowMessageInput(!showMessageInput)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="chatbubble-outline" size={20} color="#FAC638" />
-              <Text style={styles.expandableHeaderText}>
-                {capsuleData.message ? 'Edit Message' : 'Add a Message (Optional)'}
-              </Text>
-              <Ionicons name={showMessageInput ? 'chevron-up' : 'chevron-down'} size={20} color="#94a3b8" />
-            </TouchableOpacity>
-            {showMessageInput && (
-              <TextInput
-                style={[styles.input, styles.textArea, { marginTop: 8 }]}
-                value={capsuleData.message}
-                onChangeText={(text) => setCapsuleData({ ...capsuleData, message: text })}
-                placeholder="Dear future me..."
-                placeholderTextColor="#94a3b8"
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            )}
-          </View>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-      keyboardVerticalOffset={90}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
+  // ── Permission gate ─────────────────────────────────────────
+  if (mode === 'camera' && permission && !permission.granted) {
+    return (
+      <View style={styles.permWrap}>
+        <Ionicons name="camera" size={56} color={COLORS.ember} />
+        <Text style={[font('title'), styles.permTitle]}>{t('capture.permission_title')}</Text>
+        <Text style={[font('body'), styles.permBody]}>{t('capture.permission_body')}</Text>
+        <TouchableOpacity style={styles.permBtn} onPress={requestPermission}>
+          <Text style={[font('labelBold'), { color: '#fff' }]}>{t('capture.grant')}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Create Capsule</Text>
-        <View style={styles.placeholder} />
+        <TouchableOpacity style={styles.permGallery} onPress={pickGallery}>
+          <Ionicons name="images-outline" size={18} color={COLORS.text2} />
+          <Text style={[font('label'), { color: COLORS.text2 }]}>{t('createFlow.gallery')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => onGoBack && onGoBack()} style={styles.permClose}>
+          <Ionicons name="close" size={26} color={COLORS.text2} />
+        </TouchableOpacity>
       </View>
+    );
+  }
 
-      {/* Progress Indicator */}
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
-          {[1, 2, 3].map((i) => (
-            <View
-              key={i}
-              style={[
-                styles.progressDot,
-                i <= step && styles.progressDotActive,
-                i === step && styles.progressDotCurrent,
-              ]}
-            />
-          ))}
-        </View>
-        <Text style={styles.progressText}>Step {step} of 3</Text>
-      </View>
-
-      {/* Content */}
-      <ScrollView 
-        style={styles.content} 
-        contentContainerStyle={styles.contentContainer}
-        keyboardShouldPersistTaps="handled"
-        scrollEventThrottle={16}
-        decelerationRate="normal"
-        bounces={true}
-        overScrollMode="auto"
-        showsVerticalScrollIndicator={true}
-      >
-        {renderStep()}
-      </ScrollView>
-
-      {/* Next Button */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          onPress={handleNext}
-          style={[styles.nextButton, saving && styles.nextButtonDisabled]}
-          disabled={saving}
-        >
-          {saving ? (
-            <>
-              <ActivityIndicator size="small" color="white" />
-              <Text style={styles.nextButtonText}>Creating...</Text>
-            </>
+  // ── Compose ─────────────────────────────────────────────────
+  if (mode === 'compose' && captured) {
+    return (
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
+        <View style={styles.flex}>
+          {captured.type === 'video' ? (
+            <Video source={{ uri: captured.uri }} style={StyleSheet.absoluteFill} resizeMode={ResizeMode.COVER} shouldPlay isLooping isMuted />
           ) : (
-            <>
-              <Text style={styles.nextButtonText}>
-                {step === 3 ? 'Create Capsule' : 'Continue'}
-              </Text>
-              <Ionicons name="arrow-forward" size={20} color="white" />
-            </>
+            <Image source={{ uri: captured.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           )}
+          <LinearGradient colors={['rgba(0,0,0,0.55)', 'transparent', 'rgba(0,0,0,0.75)']} locations={[0, 0.4, 1]} style={StyleSheet.absoluteFill} />
+
+          {/* Top bar */}
+          <View style={[styles.composeTop, { paddingTop: insets.top + 8 }]}>
+            <TouchableOpacity style={styles.roundBtn} onPress={() => { setCaptured(null); setMode('camera'); }}>
+              <Ionicons name="arrow-back" size={22} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.retakePill} onPress={() => { setCaptured(null); setMode('camera'); }}>
+              <Ionicons name="camera-reverse-outline" size={16} color="#fff" />
+              <Text style={[font('label'), { color: '#fff' }]}>{t('capture.retake')}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Type selector + always-on explanation of the selected type */}
+          <View style={[styles.typeBlock, { top: insets.top + 52 }]} pointerEvents="box-none">
+            <View style={styles.typeStripRow}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.typeStripContent}>
+                {LAUNCH.map((tp) => {
+                  const active = capType === tp.id;
+                  return (
+                    <TouchableOpacity
+                      key={tp.id}
+                      onPress={() => selectType(tp.id)}
+                      style={[styles.typeChip, active && { backgroundColor: tp.color, borderColor: tp.color }]}
+                      activeOpacity={0.85}
+                    >
+                      <CapTypeIcon size={16} color={active ? '#fff' : tp.color} />
+                      <Text style={[font('labelBold'), { color: '#fff' }]}>{tp.name}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              {/* right-edge fade — signals there are more types to scroll through */}
+              <LinearGradient
+                pointerEvents="none"
+                colors={['transparent', 'rgba(0,0,0,0.6)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.typeFade}
+              />
+            </View>
+            <View style={styles.typeDescWrap}>
+              <CapTypeIcon size={15} color={accent} />
+              <Text style={[font('caption'), styles.typeDescText]} numberOfLines={2}>
+                {t('createFlow.desc_' + capType)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Caption + bottom controls */}
+          <View style={[styles.composeBottom, { paddingBottom: insets.bottom + 14 }]}>
+            <TextInput
+              style={styles.caption}
+              value={caption}
+              onChangeText={setCaption}
+              placeholder={t('capture.caption_placeholder')}
+              placeholderTextColor="rgba(255,255,255,0.6)"
+              multiline
+              maxLength={280}
+            />
+
+            <View style={styles.metaRow}>
+              <TouchableOpacity style={styles.metaPill} onPress={() => setShowDate(true)} activeOpacity={0.8}>
+                <Ionicons name={openDate ? 'lock-closed' : 'time-outline'} size={15} color="#fff" />
+                <Text style={[font('caption'), styles.metaText]} numberOfLines={1}>{dateLabel}</Text>
+              </TouchableOpacity>
+              <View style={styles.metaPill}>
+                <Ionicons name="location" size={15} color="#fff" />
+                <Text style={[font('caption'), styles.metaText]} numberOfLines={1}>{loc?.address || t('capture.here')}</Text>
+              </View>
+              <TouchableOpacity style={styles.metaPill} onPress={() => setIsPublic((v) => !v)} activeOpacity={0.8}>
+                <Ionicons name={isPublic ? 'globe-outline' : 'lock-closed'} size={15} color="#fff" />
+                <Text style={[font('caption'), styles.metaText]}>{isPublic ? t('capture.visibility_public') : t('capture.visibility_private')}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity onPress={seal} disabled={saving} activeOpacity={0.9} style={styles.sealWrap}>
+              <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.sealBtn}>
+                {saving ? (
+                  <>
+                    <ActivityIndicator color="#fff" size="small" />
+                    <Text style={[font('labelBold'), styles.sealText]}>{t('capture.sealing')}</Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="lock-closed" size={18} color="#fff" />
+                    <Text style={[font('labelBold'), styles.sealText]}>{t('capture.seal')}</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          <DatePickerModal
+            visible={showDate}
+            onClose={() => setShowDate(false)}
+            onSelectDate={(d) => setOpenDate(d)}
+            minimumDate={new Date()}
+          />
+        </View>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  // ── Camera ──────────────────────────────────────────────────
+  return (
+    <View style={styles.flex}>
+      <CameraView ref={camRef} style={StyleSheet.absoluteFill} facing={facing} flash={flash} />
+      {/* Top controls */}
+      <View style={[styles.camTop, { paddingTop: insets.top + 8 }]}>
+        <TouchableOpacity style={styles.roundBtn} onPress={() => onGoBack && onGoBack()} accessibilityRole="button" accessibilityLabel={t('a11y.close')}>
+          <Ionicons name="close" size={26} color="#fff" />
         </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <TouchableOpacity style={styles.roundBtn} onPress={() => setFlash((f) => (f === 'off' ? 'on' : 'off'))} accessibilityRole="button" accessibilityLabel={t('a11y.flash')}>
+            <Ionicons name={flash === 'off' ? 'flash-off' : 'flash'} size={22} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.roundBtn} onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))} accessibilityRole="button" accessibilityLabel={t('a11y.flipCamera')}>
+            <Ionicons name="camera-reverse" size={22} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-
-      {/* Date Picker Modal */}
-      <DatePickerModal
-        visible={showDatePicker}
-        onClose={() => setShowDatePicker(false)}
-        onSelectDate={(date) => {
-          setCapsuleData({ ...capsuleData, openDate: date });
-        }}
-        minimumDate={new Date()}
-      />
-
-      {/* Map Location Picker Modal */}
-      <Modal visible={showMapModal} animationType="slide">
-        <View style={styles.mapModalContainer}>
-          <View style={styles.mapHeader}>
-            <TouchableOpacity onPress={() => setShowMapModal(false)} style={styles.mapCloseButton}>
-              <Ionicons name="close" size={28} color="#333" />
-            </TouchableOpacity>
-            <Text style={styles.mapTitle}>Select Location</Text>
-            <TouchableOpacity onPress={handleConfirmLocation} style={styles.mapConfirmButton}>
-              <Ionicons name="checkmark" size={28} color="#FAC638" />
-            </TouchableOpacity>
-          </View>
-
-          {currentLocation && (
-            <MapView
-              style={styles.map}
-              initialRegion={{
-                latitude: currentLocation.coords.latitude,
-                longitude: currentLocation.coords.longitude,
-                latitudeDelta: 0.05,
-                longitudeDelta: 0.05,
-              }}
-              onPress={(e) => setTempMapLocation(e.nativeEvent.coordinate)}
-            >
-              {/* Current Location */}
-              <Marker
-                coordinate={{
-                  latitude: currentLocation.coords.latitude,
-                  longitude: currentLocation.coords.longitude,
-                }}
-                title="You are here"
-                pinColor="blue"
-              />
-
-              {/* 5km Radius Circle */}
-              <Circle
-                center={{
-                  latitude: currentLocation.coords.latitude,
-                  longitude: currentLocation.coords.longitude,
-                }}
-                radius={5000}
-                strokeColor="rgba(250, 198, 56, 0.5)"
-                fillColor="rgba(250, 198, 56, 0.1)"
-                strokeWidth={2}
-              />
-
-              {/* Selected Location */}
-              {tempMapLocation && (
-                <Marker
-                  coordinate={tempMapLocation}
-                  title="Capsule Location"
-                  pinColor="red"
-                />
-              )}
-            </MapView>
-          )}
-
-          <View style={styles.mapInfo}>
-            <Ionicons name="information-circle" size={20} color="#FAC638" />
-            <Text style={styles.mapInfoText}>
-              Tap anywhere within the yellow circle (5km radius)
-            </Text>
-          </View>
-        </View>
-      </Modal>
-    </KeyboardAvoidingView>
+      {/* Bottom capture row */}
+      <View style={[styles.camBottom, { paddingBottom: insets.bottom + 24 }]}>
+        <TouchableOpacity style={styles.galleryBtn} onPress={pickGallery} accessibilityRole="button" accessibilityLabel={t('a11y.gallery')}>
+          <Ionicons name="images" size={26} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={takePhoto} activeOpacity={0.8} style={styles.shutterOuter} accessibilityRole="button" accessibilityLabel={t('a11y.takePhoto')}>
+          <View style={styles.shutterInner} />
+        </TouchableOpacity>
+        <View style={{ width: 52 }} />
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f8f5',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  placeholder: {
-    width: 40,
-  },
-  progressContainer: {
-    padding: 20,
-    backgroundColor: 'white',
-  },
-  progressBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  progressDot: {
-    width: 60,
-    height: 4,
-    backgroundColor: '#e2e8f0',
-    borderRadius: 2,
-  },
-  progressDotActive: {
-    backgroundColor: '#FFD166',
-  },
-  progressDotCurrent: {
-    backgroundColor: '#FAC638',
-  },
-  progressText: {
-    textAlign: 'center',
-    fontSize: 14,
-    color: '#64748b',
-    marginTop: 8,
-  },
-  content: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  stepContent: {
-    flex: 1,
-  },
-  stepTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 8,
-  },
-  sectionTitle: {
-    marginTop: 32,
-    marginBottom: 8,
-  },
-  stepSubtitle: {
-    fontSize: 16,
-    color: '#64748b',
-    marginBottom: 32,
-  },
-  subsectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 16,
-  },
-  input: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#1e293b',
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-  },
-  textArea: {
-    height: 160,
-    textAlignVertical: 'top',
-  },
-  dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 2,
-    borderColor: '#FAC638',
-    gap: 12,
-    marginBottom: 16,
-  },
-  dateButtonText: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(250, 198, 56, 0.1)',
-    borderRadius: 12,
-    padding: 16,
-    gap: 12,
-    marginBottom: 16,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#64748b',
-  },
-  locationButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-    gap: 12,
-  },
-  locationInfo: {
-    flex: 1,
-  },
-  locationTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  locationSubtext: {
-    fontSize: 12,
-    color: '#94a3b8',
-  },
-  // Access Control Styles
-  accessControlSection: {
-    marginTop: 32,
-  },
-  toggleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  toggleInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12,
-  },
-  toggleTextContainer: {
-    flex: 1,
-  },
-  toggleTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 2,
-  },
-  toggleSubtext: {
-    fontSize: 13,
-    color: '#64748b',
-  },
-  switchToggle: {
-    width: 50,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#cbd5e1',
-    padding: 2,
-    justifyContent: 'center',
-  },
-  switchToggleActive: {
-    backgroundColor: '#FAC638',
-  },
-  switchThumb: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  switchThumbActive: {
-    alignSelf: 'flex-end',
-  },
-  addContactContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-  },
-  usernameInputContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  usernameIcon: {
-    marginRight: 12,
-  },
-  usernameInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1e293b',
-  },
-  addButton: {
-    width: 50,
-    height: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FAC63820',
-    borderRadius: 12,
-  },
-  // Friend Picker Styles
-  friendPickerSection: {
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  friendPickerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 12,
-  },
-  friendPickerScrollContent: {
-    paddingRight: 20,
-  },
-  friendPickerItem: {
-    alignItems: 'center',
-    marginRight: 16,
-    width: 72,
-  },
-  friendPickerAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    marginBottom: 8,
-    borderWidth: 3,
-    borderColor: '#e2e8f0',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  friendPickerAvatarSelected: {
-    borderColor: '#FAC638',
-    borderWidth: 3,
-  },
-  friendPickerAvatarImage: {
-    width: '100%',
-    height: '100%',
-  },
-  friendPickerAvatarPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#e2e8f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selectionCheckmark: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: 'white',
-    borderRadius: 12,
-  },
-  friendPickerName: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#64748b',
-    textAlign: 'center',
-  },
-  authorizedUsersList: {
-    gap: 12,
-    marginTop: 16,
-  },
-  authorizedUsersTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 8,
-  },
-  userItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 12,
-    gap: 12,
-  },
-  userAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#e2e8f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  userAvatarImage: {
-    width: '100%',
-    height: '100%',
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 2,
-  },
-  userUsername: {
-    fontSize: 13,
-    color: '#64748b',
-  },
-  removeButton: {
-    padding: 4,
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: 32,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-    borderStyle: 'dashed',
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: '#94a3b8',
-    textAlign: 'center',
-    marginTop: 12,
-    lineHeight: 20,
-    paddingHorizontal: 16,
-  },
-  presetsContainer: {
-    marginTop: 8,
-  },
-  presetsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#64748b',
-    marginBottom: 12,
-  },
-  presetGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  presetButton: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  presetText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  mediaPreview: {
-    marginBottom: 16,
-  },
-  mediaPreviewItem: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  mediaPreviewImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-  },
-  mediaRemoveButton: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: 'white',
-    borderRadius: 12,
-  },
-  mediaGrid: {
-    gap: 16,
-  },
-  mediaButton: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 24,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-    borderStyle: 'dashed',
-  },
-  mediaButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#475569',
-    marginTop: 8,
-  },
-  reviewContainer: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-  },
-  reviewItem: {
-    paddingBottom: 16,
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  reviewLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#64748b',
-    marginBottom: 4,
-  },
-  reviewValue: {
-    fontSize: 16,
-    color: '#1e293b',
-  },
-  footer: {
-    padding: 20,
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-  },
-  nextButton: {
-    backgroundColor: '#FAC638',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  nextButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: 'white',
-  },
-  nextButtonDisabled: {
-    opacity: 0.6,
-  },
-  mapModalContainer: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
-  mapHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  mapCloseButton: {
-    padding: 8,
-  },
-  mapTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  mapConfirmButton: {
-    padding: 8,
-  },
-  map: {
-    flex: 1,
-  },
-  mapInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(250, 198, 56, 0.1)',
-    padding: 16,
-    gap: 12,
-  },
-  mapInfoText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#64748b',
-  },
-  videoOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-  },
-  videoDuration: {
-    fontSize: 11,
-    color: '#fff',
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  voiceHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#FFF8E1',
-    padding: 12,
-    borderRadius: 12,
-    marginTop: 12,
-  },
-  voiceHintText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#92400e',
-    lineHeight: 18,
-  },
-  expandableHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 16,
-    gap: 10,
-  },
-  expandableHeaderText: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-  },
-  categoryChipActive: {
-    backgroundColor: '#FFF8E1',
-    borderColor: '#FAC638',
-  },
-  categoryEmoji: {
-    fontSize: 16,
-  },
-  categoryLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  categoryLabelActive: {
-    color: '#1e293b',
-  },
+  flex: { flex: 1, backgroundColor: '#000' },
+
+  // permission
+  permWrap: { flex: 1, backgroundColor: COLORS.bg, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
+  permTitle: { color: COLORS.text, marginTop: 6 },
+  permBody: { color: COLORS.text2, textAlign: 'center', marginBottom: 8 },
+  permBtn: { backgroundColor: COLORS.ember, paddingHorizontal: 28, paddingVertical: 14, borderRadius: RADIUS.pill },
+  permGallery: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  permClose: { position: 'absolute', top: 56, left: 20 },
+
+  // camera
+  camTop: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, zIndex: 5 },
+  roundBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
+  camBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 36 },
+  galleryBtn: { width: 52, height: 52, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
+  shutterOuter: { width: 78, height: 78, borderRadius: 39, borderWidth: 5, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  shutterInner: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#fff' },
+
+  // compose
+  composeTop: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, zIndex: 5 },
+  retakePill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: RADIUS.pill },
+  typeBlock: { position: 'absolute', left: 0, right: 0, zIndex: 4 },
+  typeStripRow: { position: 'relative' },
+  typeStripContent: { paddingHorizontal: 16, paddingRight: 44, gap: 8, alignItems: 'center' },
+  typeFade: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 48 },
+  typeDescWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginLeft: 16, marginTop: 9, maxWidth: '88%', backgroundColor: 'rgba(0,0,0,0.42)', paddingHorizontal: 11, paddingVertical: 6, borderRadius: RADIUS.pill },
+  typeDescText: { color: 'rgba(255,255,255,0.92)', flexShrink: 1 },
+  typeChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.4)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
+  composeBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, gap: 12 },
+  caption: { ...font('subtitle'), color: '#fff', maxHeight: height * 0.25, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 4 },
+  metaRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  metaPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 11, paddingVertical: 8, borderRadius: RADIUS.pill, maxWidth: 160 },
+  metaText: { color: '#fff' },
+  sealWrap: { borderRadius: RADIUS.pill, overflow: 'hidden', marginTop: 2 },
+  sealBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16, borderRadius: RADIUS.pill },
+  sealText: { color: '#fff', fontSize: 16 },
 });
 
 export default CreateCapsuleScreen;

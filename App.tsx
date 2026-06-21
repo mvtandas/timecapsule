@@ -1,10 +1,21 @@
 import 'react-native-url-polyfill/auto';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, StyleSheet, Animated, Dimensions } from 'react-native';
+import * as Linking from 'expo-linking';
+import { View, ActivityIndicator, StyleSheet, Dimensions } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { NavigationContainer, DefaultTheme, createNavigationContainerRef } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFonts, Fraunces_600SemiBold, Fraunces_700Bold } from '@expo-google-fonts/fraunces';
+import { DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
+
 import { useAuthStore } from './src/store/authStore';
+import { useLanguage } from './src/i18n';
+import { COLORS } from './src/constants/theme';
+
+import LanguageSelectScreen from './src/screens/auth/LanguageSelectScreen';
 import OnboardingScreen from './src/screens/auth/OnboardingScreen';
 import WelcomeScreen from './src/screens/auth/WelcomeScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
@@ -19,253 +30,263 @@ import FriendsScreen from './src/screens/friends/FriendsScreen';
 import AccountSettingsScreen from './src/screens/profile/AccountSettingsScreen';
 import NotificationsScreen from './src/screens/notifications/NotificationsScreen';
 import MemoriesScreen from './src/screens/memories/MemoriesScreen';
+import SavedScreen from './src/screens/saved/SavedScreen';
+import AchievementsScreen from './src/screens/achievements/AchievementsScreen';
+import SearchScreen from './src/screens/search/SearchScreen';
+import CapScreen from './src/screens/cap/CapScreen';
+import TrailStopsScreen from './src/screens/trails/TrailStopsScreen';
 import BottomTabBar from './src/components/common/BottomTabBar';
-import { Friend } from './src/types';
 
-type Screen = 'Welcome' | 'Login' | 'Signup' | 'Dashboard' | 'MyCapsules' | 'Create' | 'Explore' | 'Profile' | 'Friends' | 'FriendProfile' | 'AccountSettings';
+const RootStack = createNativeStackNavigator();
+const Tabs = createMaterialTopTabNavigator();
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// Legacy screen names used by screens' onNavigate(...) calls -> route names.
+const TAB_ROUTES = new Set(['Home', 'Discover', 'Activity', 'Profile']);
+const ALIAS: Record<string, string> = {
+  Dashboard: 'Home',
+  Explore: 'Discover',
+  Notifications: 'Activity',
+};
+
+/**
+ * Builds the legacy { onNavigate, onGoBack } API on top of React Navigation so
+ * existing screens keep working unchanged during the migration.
+ */
+function makeNav(navigation: any) {
+  const onNavigate = (screen: string, data?: any) => {
+    const target = ALIAS[screen] || screen;
+    if (TAB_ROUTES.has(target)) {
+      navigation.navigate('MainTabs', { screen: target, params: data });
+    } else {
+      navigation.navigate(target, data);
+    }
+  };
+  const onGoBack = () => {
+    if (navigation.canGoBack && navigation.canGoBack()) navigation.goBack();
+    else navigation.navigate('MainTabs', { screen: 'Home' });
+  };
+  return { onNavigate, onGoBack };
+}
+
+function MainTabs() {
+  const signOut = useAuthStore((s) => s.signOut);
+  return (
+    <Tabs.Navigator
+      tabBarPosition="bottom"
+      initialLayout={{ width: Dimensions.get('window').width }}
+      screenOptions={{ swipeEnabled: true, lazy: true, lazyPreloadDistance: 1 }}
+      sceneContainerStyle={{ backgroundColor: COLORS.bg }}
+      tabBar={(props) => <BottomTabBar {...props} />}
+    >
+      <Tabs.Screen name="Home">
+        {({ navigation }) => <DashboardScreen {...makeNav(navigation)} />}
+      </Tabs.Screen>
+      <Tabs.Screen name="Discover">
+        {({ navigation }) => <ExploreScreen {...makeNav(navigation)} />}
+      </Tabs.Screen>
+      <Tabs.Screen name="Activity">
+        {({ navigation }) => <NotificationsScreen {...makeNav(navigation)} />}
+      </Tabs.Screen>
+      <Tabs.Screen name="Profile">
+        {({ navigation }) => <ProfileScreen {...makeNav(navigation)} onLogout={signOut} />}
+      </Tabs.Screen>
+    </Tabs.Navigator>
+  );
+}
+
+function AuthStack() {
+  return (
+    <RootStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.bg } }}>
+      <RootStack.Screen name="Welcome">
+        {({ navigation }) => <WelcomeScreen {...makeNav(navigation)} />}
+      </RootStack.Screen>
+      <RootStack.Screen name="Login">
+        {({ navigation }) => <LoginScreen {...makeNav(navigation)} onLogin={() => {}} />}
+      </RootStack.Screen>
+      <RootStack.Screen name="Signup">
+        {({ navigation }) => (
+          <SignupScreen {...makeNav(navigation)} onSignup={() => navigation.navigate('Login' as never)} />
+        )}
+      </RootStack.Screen>
+    </RootStack.Navigator>
+  );
+}
+
+function AppStack() {
+  const signOut = useAuthStore((s) => s.signOut);
+  return (
+    <RootStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.bg } }}>
+      <RootStack.Screen name="MainTabs" component={MainTabs} />
+      <RootStack.Screen name="Create" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}>
+        {({ navigation }) => <CreateCapsuleScreen {...makeNav(navigation)} />}
+      </RootStack.Screen>
+      <RootStack.Screen name="MyCapsules">
+        {({ navigation }) => <MyCapsulesScreen {...makeNav(navigation)} onLogout={signOut} />}
+      </RootStack.Screen>
+      <RootStack.Screen name="Memories">
+        {({ navigation }) => <MemoriesScreen {...makeNav(navigation)} />}
+      </RootStack.Screen>
+      <RootStack.Screen name="AccountSettings">
+        {({ navigation }) => <AccountSettingsScreen {...makeNav(navigation)} onLogout={signOut} />}
+      </RootStack.Screen>
+      <RootStack.Screen name="FriendProfile">
+        {({ navigation, route }) => (
+          <FriendProfileScreen {...makeNav(navigation)} friend={(route.params as any)?.friend} />
+        )}
+      </RootStack.Screen>
+      <RootStack.Screen name="Friends">
+        {({ navigation }) => <FriendsScreen {...makeNav(navigation)} />}
+      </RootStack.Screen>
+      <RootStack.Screen name="Saved">
+        {({ navigation }) => <SavedScreen {...makeNav(navigation)} />}
+      </RootStack.Screen>
+      <RootStack.Screen name="Achievements">
+        {({ navigation }) => <AchievementsScreen {...makeNav(navigation)} />}
+      </RootStack.Screen>
+      <RootStack.Screen name="Search">
+        {({ navigation }) => <SearchScreen {...makeNav(navigation)} />}
+      </RootStack.Screen>
+      <RootStack.Screen name="Cap">
+        {({ navigation, route }) => (
+          <CapScreen capId={(route.params as any)?.capId} {...makeNav(navigation)} />
+        )}
+      </RootStack.Screen>
+      <RootStack.Screen name="TrailStops">
+        {({ navigation, route }) => (
+          <TrailStopsScreen
+            capsuleId={(route.params as any)?.capsuleId}
+            trailTitle={(route.params as any)?.trailTitle}
+            {...makeNav(navigation)}
+          />
+        )}
+      </RootStack.Screen>
+    </RootStack.Navigator>
+  );
+}
+
+// Deep links (voorcap://cap/<id>, https://voorcap.com/cap/<id>, exp://…/--/cap/<id>)
+// are handled MANUALLY via this ref rather than React Navigation's `linking`
+// prop: the Cap route lives in the authed AppStack, so a cold-start link would
+// otherwise race auth resolution and be dropped. We capture the cap id and
+// navigate once auth + navigation are both ready — which also makes the link
+// survive a login.
+const navigationRef = createNavigationContainerRef();
+
+function capIdFromUrl(url?: string | null): string | null {
+  if (!url) return null;
+  const m = url.match(/cap\/([0-9a-fA-F-]{8,})/);
+  return m ? m[1] : null;
+}
+
+// React Navigation's built-in linking handles the WARM case (app running). The
+// manual handler below is the safety net for COLD starts, where the Cap route
+// (authed AppStack only) isn't mounted yet when the URL first resolves.
+const linking = {
+  prefixes: [Linking.createURL('/'), 'voorcap://', 'https://voorcap.com'],
+  config: { screens: { Cap: 'cap/:capId' } },
+};
+
+const navTheme = {
+  ...DefaultTheme,
+  dark: true,
+  colors: {
+    ...DefaultTheme.colors,
+    background: COLORS.bg,
+    card: COLORS.bg2,
+    text: COLORS.text,
+    border: COLORS.border,
+    primary: COLORS.ember,
+    notification: COLORS.ember,
+  },
+};
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<string>('Welcome');
-  const [previousScreen, setPreviousScreen] = useState<string>('Welcome');
-  const [navigationData, setNavigationData] = useState<any>(null);
-  const [navigationHistory, setNavigationHistory] = useState<Array<{screen: string, data?: any}>>([{screen: 'Welcome'}]);
+  const { user, refreshSession } = useAuthStore();
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
-  const { user, loading, refreshSession, signOut } = useAuthStore();
-
-  // Animation values
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const [needLang, setNeedLang] = useState<boolean | null>(null);
+  const [pendingCap, setPendingCap] = useState<string | null>(null);
+  const [navReady, setNavReady] = useState(false);
+  const [fontsLoaded] = useFonts({
+    Fraunces_600SemiBold,
+    Fraunces_700Bold,
+    DMSans_400Regular,
+    DMSans_500Medium,
+    DMSans_600SemiBold,
+    DMSans_700Bold,
+  });
 
   useEffect(() => {
-    // Check for existing session on app load
     refreshSession();
+    useLanguage.getState().init();
+  }, []);
+
+  // Capture incoming cap deep links (initial URL + while running).
+  useEffect(() => {
+    Linking.getInitialURL()
+      .then((u) => { const id = capIdFromUrl(u); if (id) setPendingCap(id); })
+      .catch(() => {});
+    const sub = Linking.addEventListener('url', ({ url }) => {
+      const id = capIdFromUrl(url);
+      if (id) setPendingCap(id);
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Once authenticated and the navigator is ready, open the pending cap.
+  useEffect(() => {
+    if (
+      pendingCap && user && navReady && navigationRef.isReady() &&
+      navigationRef.getCurrentRoute()?.name !== 'Cap' // built-in linking may have already handled it
+    ) {
+      (navigationRef.navigate as any)('Cap', { capId: pendingCap });
+      setPendingCap(null);
+    }
+  }, [pendingCap, user, navReady]);
+
+  useEffect(() => {
+    AsyncStorage.getItem('@timecapsule_onboarded')
+      .then((v) => setShowOnboarding(v === null))
+      .catch(() => setShowOnboarding(false));
   }, []);
 
   useEffect(() => {
-    const checkOnboarding = async () => {
-      try {
-        const value = await AsyncStorage.getItem('@timecapsule_onboarded');
-        setShowOnboarding(value === null);
-      } catch {
-        setShowOnboarding(false);
-      }
-    };
-    checkOnboarding();
+    // Show the language picker on first launch (before onboarding) until the
+    // user has explicitly chosen a language.
+    AsyncStorage.getItem('@voorcap_lang')
+      .then((v) => setNeedLang(v === null))
+      .catch(() => setNeedLang(false));
   }, []);
 
   const handleOnboardingComplete = async () => {
     try {
       await AsyncStorage.setItem('@timecapsule_onboarded', 'true');
     } catch {
-      // ignore storage error
+      // ignore
     }
     setShowOnboarding(false);
   };
 
-  const navigate = (screen: string, data?: any, replace: boolean = false) => {
-    if (screen === currentScreen && !replace) return;
-    
-    // Store navigation data if provided
-    if (data) {
-      setNavigationData(data);
-    }
-    
-    // Determine animation direction
-    const isForward = shouldAnimateForward(currentScreen, screen);
-    
-    setPreviousScreen(currentScreen);
-    
-    // Update navigation history
-    if (replace) {
-      // Replace current screen in history (for tab switching)
-      setNavigationHistory(prev => {
-        const newHistory = [...prev];
-        newHistory[newHistory.length - 1] = { screen, data };
-        return newHistory;
-      });
-    } else {
-      // Add to navigation history (for forward navigation)
-      setNavigationHistory(prev => [...prev, { screen, data }]);
-    }
-    
-    // Animate out current screen
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: isForward ? -SCREEN_WIDTH : SCREEN_WIDTH,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      // Switch screen
-      setCurrentScreen(screen);
-      
-      // Reset position for new screen (off-screen in opposite direction)
-      slideAnim.setValue(isForward ? SCREEN_WIDTH : -SCREEN_WIDTH);
-      fadeAnim.setValue(0);
-      
-      // Animate in new screen
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    });
-  };
-
-  const goBack = () => {
-    if (navigationHistory.length <= 1) {
-      // Already at the first screen, can't go back
-      return;
-    }
-    
-    // Remove current screen from history
-    const newHistory = [...navigationHistory];
-    newHistory.pop();
-    setNavigationHistory(newHistory);
-    
-    // Get previous screen
-    const previous = newHistory[newHistory.length - 1];
-    
-    // Navigate to previous screen
-    const isForward = false; // Going back is always backward animation
-    
-    if (previous.data) {
-      setNavigationData(previous.data);
-    }
-    
-    setPreviousScreen(currentScreen);
-    
-    // Animate out current screen
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: SCREEN_WIDTH, // Always slide right (backward)
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      // Switch screen
-      setCurrentScreen(previous.screen);
-      
-      // Reset position for previous screen (from left)
-      slideAnim.setValue(-SCREEN_WIDTH);
-      fadeAnim.setValue(0);
-      
-      // Animate in previous screen
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    });
-  };
-
-  // Determine if navigation is forward (right-to-left) or backward (left-to-right)
-  const shouldAnimateForward = (from: string, to: string): boolean => {
-    // Bottom tab navigation (horizontal swipe between Friends, Dashboard, Profile)
-    const tabOrder = ['Friends', 'Dashboard', 'Profile'];
-    const fromIndex = tabOrder.indexOf(from);
-    const toIndex = tabOrder.indexOf(to);
-    
-    if (fromIndex !== -1 && toIndex !== -1) {
-      return toIndex > fromIndex; // Right if moving to higher index, left if lower
-    }
-    
-    // Navigation from tab screens to other screens
-    if (from === 'Dashboard' && to === 'FriendProfile') return true;
-    if (from === 'Friends' && to === 'FriendProfile') return true;
-    
-    // Profile navigation from Dashboard should animate forward (right-to-left)
-    if (from === 'Dashboard' && to === 'Profile') return true;
-    // Going back to Dashboard from Profile should animate backward (left-to-right)
-    if (from === 'Profile' && to === 'Dashboard') return false;
-    
-    // AccountSettings navigation from Profile should animate forward
-    if (from === 'Profile' && to === 'AccountSettings') return true;
-    // Going back to Profile from AccountSettings should animate backward
-    if (from === 'AccountSettings' && to === 'Profile') return false;
-    
-    // MyCapsules navigation from Profile should animate forward
-    if (from === 'Profile' && to === 'MyCapsules') return true;
-    // Going back to Profile from MyCapsules should animate backward
-    if (from === 'MyCapsules' && to === 'Profile') return false;
-    
-    // Going back to Dashboard from other screens (backward)
-    if (to === 'Dashboard' && (from === 'MyCapsules' || from === 'Create' || from === 'Explore')) return false;
-    
-    // Forward navigation from Dashboard to other main screens
-    if (from === 'Dashboard' && (to === 'Create' || to === 'MyCapsules' || to === 'Explore')) return true;
-    
-    // Auth flow navigation
-    if (from === 'Welcome' && (to === 'Login' || to === 'Signup')) return true;
-    if ((from === 'Login' || from === 'Signup') && to === 'Welcome') return false;
-    if ((from === 'Login' || from === 'Signup') && to === 'Dashboard') return true;
-    
-    return true; // Default to forward
-  };
-
-  useEffect(() => {
-    // If user is authenticated, go to Dashboard with animation
-    if (user && currentScreen === 'Welcome') {
-      navigate('Dashboard');
-      // Clear history and start fresh from Dashboard
-      setNavigationHistory([{screen: 'Dashboard'}]);
-    }
-    // If user logs out, go to Welcome (handled in handleLogout)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, currentScreen]);
-
-  const handleLogin = () => {
-    navigate('Dashboard');
-    // Clear history and start fresh from Dashboard
-    setNavigationHistory([{screen: 'Dashboard'}]);
-  };
-
-  const handleLogout = async () => {
-    await signOut();
-    // No animation for logout, just reset
-    slideAnim.setValue(0);
-    fadeAnim.setValue(1);
-    setCurrentScreen('Welcome');
-    // Reset navigation history
-    setNavigationHistory([{screen: 'Welcome'}]);
-  };
-
-  // Show loading screen while checking auth or onboarding state
-  if ((loading && !user && currentScreen === 'Welcome') || showOnboarding === null) {
+  // Gate only on fonts + onboarding state — never block the whole app on the
+  // network-dependent auth `loading` flag (a slow/stale session check would
+  // otherwise hang on a spinner forever). Once ready, render AuthStack until a
+  // session resolves a user, then AppStack.
+  if (!fontsLoaded || showOnboarding === null || needLang === null) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FAC638" />
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color={COLORS.ember} />
       </View>
     );
   }
 
-  // Show onboarding on first launch
+  if (needLang) {
+    return (
+      <SafeAreaProvider>
+        <LanguageSelectScreen onDone={() => setNeedLang(false)} />
+        <StatusBar style="light" />
+      </SafeAreaProvider>
+    );
+  }
+
   if (showOnboarding) {
     return (
       <SafeAreaProvider>
@@ -275,60 +296,20 @@ export default function App() {
     );
   }
 
-  // Check if current screen should show bottom tabs
-  const shouldShowBottomTabs = ['Dashboard', 'Friends', 'Notifications', 'Profile'].includes(currentScreen);
-
   return (
     <SafeAreaProvider>
-      <View style={styles.container}>
-        <Animated.View 
-          style={[
-            styles.screenContainer,
-            {
-              transform: [{ translateX: slideAnim }],
-              opacity: fadeAnim,
-            },
-          ]}
-        >
-          {currentScreen === 'Welcome' && <WelcomeScreen onNavigate={navigate} onGoBack={goBack} />}
-          {currentScreen === 'Login' && <LoginScreen onNavigate={navigate} onLogin={handleLogin} onGoBack={goBack} />}
-          {currentScreen === 'Signup' && <SignupScreen onNavigate={navigate} onSignup={handleLogin} onGoBack={goBack} />}
-          {currentScreen === 'Dashboard' && <DashboardScreen onNavigate={navigate} />}
-          {currentScreen === 'Friends' && <FriendsScreen onNavigate={navigate} />}
-          {currentScreen === 'MyCapsules' && <MyCapsulesScreen onNavigate={navigate} onLogout={handleLogout} onGoBack={goBack} />}
-          {currentScreen === 'Create' && <CreateCapsuleScreen onNavigate={navigate} onGoBack={goBack} />}
-          {currentScreen === 'Explore' && <ExploreScreen onNavigate={navigate} />}
-          {currentScreen === 'Profile' && <ProfileScreen onNavigate={navigate} onLogout={handleLogout} />}
-          {currentScreen === 'FriendProfile' && navigationData?.friend && (
-            <FriendProfileScreen onNavigate={navigate} friend={navigationData.friend} onGoBack={goBack} />
-          )}
-          {currentScreen === 'AccountSettings' && <AccountSettingsScreen onNavigate={navigate} onGoBack={goBack} onLogout={handleLogout} />}
-          {currentScreen === 'Notifications' && <NotificationsScreen onNavigate={navigate} onGoBack={goBack} />}
-          {currentScreen === 'Memories' && <MemoriesScreen onNavigate={navigate} onGoBack={goBack} />}
-        </Animated.View>
-        
-        {/* Bottom Tab Bar - Fixed at bottom, outside scroll context */}
-        {shouldShowBottomTabs && user && (
-          <BottomTabBar activeTab={currentScreen} onNavigate={navigate} />
-        )}
-        
-        <StatusBar style="auto" />
-      </View>
+      <NavigationContainer ref={navigationRef} theme={navTheme} linking={linking} onReady={() => setNavReady(true)}>
+        {user ? <AppStack /> : <AuthStack />}
+      </NavigationContainer>
+      <StatusBar style="light" />
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  loading: {
     flex: 1,
-    backgroundColor: '#f8f8f5',
-  },
-  screenContainer: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.bg,
     alignItems: 'center',
     justifyContent: 'center',
   },

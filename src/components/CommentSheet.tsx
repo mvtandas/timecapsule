@@ -20,6 +20,8 @@ import { ReportService, REPORT_REASONS } from '../services/reportService';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabase';
 import { timeAgo } from '../utils/dateUtils';
+import { COLORS, font } from '../constants/theme';
+import { useT } from '../i18n';
 
 const { height } = Dimensions.get('window');
 const SHEET_HEIGHT = height * 0.55;
@@ -32,6 +34,7 @@ interface CommentSheetProps {
 }
 
 const CommentSheet: React.FC<CommentSheetProps> = ({ capsuleId, visible, onClose, onCountChange }) => {
+  const t = useT();
   const { user } = useAuthStore();
   const [comments, setComments] = useState<CommentWithProfile[]>([]);
   const [text, setText] = useState('');
@@ -96,10 +99,10 @@ const CommentSheet: React.FC<CommentSheetProps> = ({ capsuleId, visible, onClose
   };
 
   const handleDelete = (comment: CommentWithProfile) => {
-    Alert.alert('Delete Comment', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('comments.delete_title'), t('comments.delete_message'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           const { error } = await CommentService.deleteComment(comment.id);
@@ -115,21 +118,21 @@ const CommentSheet: React.FC<CommentSheetProps> = ({ capsuleId, visible, onClose
 
   const handleReportComment = (comment: CommentWithProfile) => {
     Alert.alert(
-      'Report Comment',
-      'Select a reason:',
+      t('comments.report_title'),
+      t('comments.report_message'),
       [
         ...REPORT_REASONS.map((reason) => ({
           text: reason,
           onPress: async () => {
             const { error } = await ReportService.reportContent('comment', comment.id, reason);
             if (error) {
-              Alert.alert('Error', 'Failed to submit report. Please try again.');
+              Alert.alert(t('comments.error_title'), t('comments.report_error_message'));
             } else {
-              Alert.alert('Reported', 'Thank you for your report. We will review it shortly.');
+              Alert.alert(t('comments.report_success_title'), t('comments.report_success_message'));
             }
           },
         })),
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
       ]
     );
   };
@@ -138,34 +141,34 @@ const CommentSheet: React.FC<CommentSheetProps> = ({ capsuleId, visible, onClose
     const isOwn = user?.id === comment.user_id;
 
     if (isOwn) {
-      Alert.alert('Comment', undefined, [
+      Alert.alert(t('comments.action_sheet_title'), undefined, [
         {
-          text: 'Copy',
+          text: t('comments.action_copy'),
           onPress: () => {
             // Could use Clipboard.setStringAsync but keeping simple
           },
         },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => handleDelete(comment),
         },
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
       ]);
     } else {
-      Alert.alert('Comment', undefined, [
+      Alert.alert(t('comments.action_sheet_title'), undefined, [
         {
-          text: 'Copy',
+          text: t('comments.action_copy'),
           onPress: () => {
             // Could use Clipboard.setStringAsync but keeping simple
           },
         },
         {
-          text: 'Report Comment',
+          text: t('comments.action_report'),
           style: 'destructive',
           onPress: () => handleReportComment(comment),
         },
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
       ]);
     }
   };
@@ -174,7 +177,7 @@ const CommentSheet: React.FC<CommentSheetProps> = ({ capsuleId, visible, onClose
     const parts = content.split(/(@\w+)/g);
     return parts.map((part, i) => {
       if (part.match(/^@\w+$/)) {
-        return <Text key={i} style={{ color: '#FAC638', fontWeight: '600' }}>{part}</Text>;
+        return <Text key={i} style={{ color: COLORS.ember, fontWeight: '600' }}>{part}</Text>;
       }
       return part;
     });
@@ -228,10 +231,12 @@ const CommentSheet: React.FC<CommentSheetProps> = ({ capsuleId, visible, onClose
           <View style={styles.header}>
             <View style={styles.handleBar} />
             <Text style={styles.headerTitle}>
-              Comments{comments.length > 0 ? ` (${comments.length})` : ''}
+              {comments.length > 0
+                ? t('comments.title_with_count', { count: comments.length })
+                : t('comments.title')}
             </Text>
             <TouchableOpacity onPress={onClose} style={styles.headerClose}>
-              <Ionicons name="close" size={22} color="#aaa" />
+              <Ionicons name="close" size={22} color={COLORS.text2} />
             </TouchableOpacity>
           </View>
 
@@ -244,8 +249,8 @@ const CommentSheet: React.FC<CommentSheetProps> = ({ capsuleId, visible, onClose
             contentContainerStyle={comments.length === 0 ? styles.emptyContainer : undefined}
             ListEmptyComponent={
               <View style={styles.empty}>
-                <Text style={styles.emptyText}>{loading ? 'Loading...' : 'No comments yet'}</Text>
-                <Text style={styles.emptySubtext}>Be the first to comment</Text>
+                <Text style={styles.emptyText}>{loading ? t('comments.loading') : t('comments.empty_title')}</Text>
+                <Text style={styles.emptySubtext}>{t('comments.empty_subtitle')}</Text>
               </View>
             }
             renderItem={({ item }) => {
@@ -261,13 +266,13 @@ const CommentSheet: React.FC<CommentSheetProps> = ({ capsuleId, visible, onClose
                     {item.profiles?.avatar_url ? (
                       <Image source={{ uri: item.profiles.avatar_url }} style={styles.commentAvatarImg} />
                     ) : (
-                      <Ionicons name="person" size={14} color="#888" />
+                      <Ionicons name="person" size={14} color={COLORS.text2} />
                     )}
                   </View>
                   <View style={styles.commentContent}>
                     <Text style={styles.commentText}>
                       <Text style={styles.commentUsername}>
-                        {item.profiles?.username || item.profiles?.display_name || 'user'}
+                        {item.profiles?.username || item.profiles?.display_name || t('comments.unknown_user')}
                       </Text>
                       {'  '}{renderCommentContent(item.content)}
                     </Text>
@@ -275,7 +280,7 @@ const CommentSheet: React.FC<CommentSheetProps> = ({ capsuleId, visible, onClose
                       <Text style={styles.commentTime}>{timeAgo(item.created_at)}</Text>
                       {isOwn && (
                         <TouchableOpacity onPress={() => handleDelete(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                          <Ionicons name="trash-outline" size={14} color="#555" />
+                          <Ionicons name="trash-outline" size={14} color={COLORS.text3} />
                         </TouchableOpacity>
                       )}
                     </View>
@@ -298,7 +303,7 @@ const CommentSheet: React.FC<CommentSheetProps> = ({ capsuleId, visible, onClose
                     {u.avatar_url ? (
                       <Image source={{ uri: u.avatar_url }} style={styles.mentionAvatarImg} />
                     ) : (
-                      <Ionicons name="person" size={12} color="#888" />
+                      <Ionicons name="person" size={12} color={COLORS.text2} />
                     )}
                   </View>
                   <Text style={styles.mentionUsername}>@{u.username}</Text>
@@ -312,8 +317,8 @@ const CommentSheet: React.FC<CommentSheetProps> = ({ capsuleId, visible, onClose
           <View style={styles.inputBar}>
             <TextInput
               style={styles.input}
-              placeholder="Add a comment..."
-              placeholderTextColor="#666"
+              placeholder={t('comments.input_placeholder')}
+              placeholderTextColor={COLORS.text3}
               value={text}
               onChangeText={handleTextChange}
               multiline
@@ -325,7 +330,7 @@ const CommentSheet: React.FC<CommentSheetProps> = ({ capsuleId, visible, onClose
               style={styles.sendBtn}
             >
               <Text style={[styles.sendText, (!text.trim() || sending) && { opacity: 0.4 }]}>
-                Post
+                {t('comments.post')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -342,6 +347,7 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     flex: 1,
+    backgroundColor: COLORS.overlay,
   },
   sheet: {
     position: 'absolute',
@@ -349,7 +355,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: SHEET_HEIGHT,
-    backgroundColor: '#1c1c1e',
+    backgroundColor: COLORS.card,
     borderTopLeftRadius: 14,
     borderTopRightRadius: 14,
   },
@@ -358,19 +364,19 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 12,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#333',
+    borderBottomColor: COLORS.border,
   },
   handleBar: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#555',
+    backgroundColor: COLORS.text3,
     marginBottom: 10,
   },
   headerTitle: {
+    ...font('subtitle'),
     fontSize: 15,
-    fontWeight: '700',
-    color: '#fff',
+    color: COLORS.text,
   },
   headerClose: {
     position: 'absolute',
@@ -391,13 +397,13 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   emptyText: {
+    ...font('bodyBold'),
     fontSize: 15,
-    color: '#888',
-    fontWeight: '600',
+    color: COLORS.text2,
   },
   emptySubtext: {
-    fontSize: 13,
-    color: '#555',
+    ...font('body'),
+    color: COLORS.text3,
     marginTop: 4,
   },
   commentRow: {
@@ -409,7 +415,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#333',
+    backgroundColor: COLORS.bg3,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -423,12 +429,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   commentText: {
+    ...font('body'),
     fontSize: 14,
-    color: '#fff',
+    color: COLORS.text,
     lineHeight: 19,
   },
   commentUsername: {
     fontWeight: '700',
+    color: COLORS.text,
   },
   commentMeta: {
     flexDirection: 'row',
@@ -437,13 +445,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   commentTime: {
-    fontSize: 12,
-    color: '#666',
+    ...font('caption'),
+    color: COLORS.text3,
   },
   mentionList: {
     borderTopWidth: 0.5,
-    borderTopColor: '#333',
-    backgroundColor: '#2c2c2e',
+    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.bg2,
   },
   mentionItem: {
     flexDirection: 'row',
@@ -456,7 +464,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#444',
+    backgroundColor: COLORS.bg3,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -467,13 +475,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   mentionUsername: {
+    ...font('bodyBold'),
     fontSize: 14,
-    fontWeight: '700',
-    color: '#fff',
+    color: COLORS.text,
   },
   mentionName: {
-    fontSize: 13,
-    color: '#888',
+    ...font('body'),
+    color: COLORS.text2,
     flex: 1,
   },
   inputBar: {
@@ -482,26 +490,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderTopWidth: 0.5,
-    borderTopColor: '#333',
+    borderTopColor: COLORS.border,
     paddingBottom: 34,
   },
   input: {
     flex: 1,
-    backgroundColor: '#2c2c2e',
+    backgroundColor: COLORS.bg3,
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
     fontSize: 14,
-    color: '#fff',
+    color: COLORS.text,
     maxHeight: 80,
   },
   sendBtn: {
     marginLeft: 10,
   },
   sendText: {
+    ...font('bodyBold'),
     fontSize: 15,
-    fontWeight: '700',
-    color: '#FAC638',
+    color: COLORS.ember,
   },
 });
 

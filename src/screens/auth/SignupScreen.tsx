@@ -1,7 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../store/authStore';
+import { COLORS, font, SHADOWS } from '../../constants/theme';
+import { VoorcapMark } from '../../components/common/VoorcapLogo';
+import { useT } from '../../i18n';
 
 interface SignupScreenProps {
   onNavigate: (screen: 'Welcome' | 'Login' | 'Signup') => void;
@@ -10,6 +14,8 @@ interface SignupScreenProps {
 }
 
 const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoBack }) => {
+  const t = useT();
+  const insets = useSafeAreaInsets();
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -18,6 +24,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ displayName?: string; username?: string; email?: string; password?: string; confirmPassword?: string }>({});
   const { signUp } = useAuthStore();
 
   // Refs for keyboard navigation
@@ -30,46 +37,37 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
   const validateUsername = (username: string): { valid: boolean; message?: string } => {
     // Check length
     if (username.length < 3 || username.length > 20) {
-      return { valid: false, message: 'Username must be between 3 and 20 characters' };
+      return { valid: false, message: t('auth.username_len_msg') };
     }
-    
+
     // Check allowed characters (letters, numbers, underscores, periods)
     const usernameRegex = /^[a-zA-Z0-9_.]+$/;
     if (!usernameRegex.test(username)) {
-      return { valid: false, message: 'Username can only contain letters, numbers, underscores, and periods' };
+      return { valid: false, message: t('auth.username_chars_msg') };
     }
-    
+
     // Check if it starts with a letter or number
     if (!/^[a-zA-Z0-9]/.test(username)) {
-      return { valid: false, message: 'Username must start with a letter or number' };
+      return { valid: false, message: t('auth.username_start_msg') };
     }
-    
+
     return { valid: true };
   };
 
   const handleSignUp = async () => {
-    // Validation
-    if (!displayName || !username || !email || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
-
-    // Validate username format
-    const usernameValidation = validateUsername(username);
-    if (!usernameValidation.valid) {
-      Alert.alert('Invalid Username', usernameValidation.message);
-      return;
-    }
-
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return;
-    }
+    // Inline field validation
+    const fe: { displayName?: string; username?: string; email?: string; password?: string; confirmPassword?: string } = {};
+    if (!displayName.trim()) fe.displayName = t('auth.required_field');
+    if (!username.trim()) fe.username = t('auth.required_field');
+    else { const u = validateUsername(username); if (!u.valid) fe.username = u.message; }
+    if (!email.trim()) fe.email = t('auth.required_field');
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fe.email = t('auth.invalid_email');
+    if (!password) fe.password = t('auth.required_field');
+    else if (password.length < 6) fe.password = t('auth.password_short_msg');
+    if (!confirmPassword) fe.confirmPassword = t('auth.required_field');
+    else if (password !== confirmPassword) fe.confirmPassword = t('auth.password_mismatch_msg');
+    if (Object.keys(fe).length) { setErrors(fe); return; }
+    setErrors({});
 
     setLoading(true);
     
@@ -81,17 +79,17 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
       // Check for username uniqueness error
       const errorMessage = error.message || '';
       if (errorMessage.toLowerCase().includes('username') && errorMessage.toLowerCase().includes('already')) {
-        Alert.alert('Username Taken', 'This username is already in use. Please choose a different one.');
+        Alert.alert(t('auth.username_taken_title'), t('auth.username_taken_msg'));
       } else {
-        Alert.alert('Error', errorMessage || 'Failed to create account. Please try again.');
+        Alert.alert(t('auth.error_title'), errorMessage || t('auth.signup_failed_msg'));
       }
     } else {
       Alert.alert(
-        'Success!', 
-        'Your account has been created!\n\nNote: You can login immediately without email confirmation.',
+        t('auth.signup_success_title'),
+        t('auth.signup_success_msg'),
         [
           {
-            text: 'OK',
+            text: t('common.ok'),
             onPress: onSignup
           }
         ]
@@ -109,13 +107,13 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
       style={styles.container}
     >
       {/* Back Button */}
-      <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-        <MaterialIcons name="arrow-back" size={24} color="#111827" />
+      <TouchableOpacity style={[styles.backButton, { top: insets.top + 4 }]} onPress={handleBack}>
+        <MaterialIcons name="arrow-back" size={24} color={COLORS.text} />
       </TouchableOpacity>
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 36 }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         showsVerticalScrollIndicator={false}
@@ -123,24 +121,24 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.iconContainer}>
-            <MaterialIcons name="person-add" size={64} color="#FAC638" />
+            <VoorcapMark size={52} />
           </View>
-          <Text style={styles.title}>Create Account</Text>
+          <Text style={[styles.title, font('display')]}>{t('auth.createAccount')}</Text>
           <Text style={styles.subtitle}>
-            Join us to start capturing your memories
+            {t('auth.signUpSub')}
           </Text>
         </View>
 
         {/* Form */}
         <View style={styles.formContainer}>
-          <View style={styles.inputContainer}>
-            <MaterialIcons name="person" size={24} color="#6b7280" style={styles.inputIcon} />
+          <View style={[styles.inputContainer, !!errors.displayName && styles.inputError]}>
+            <MaterialIcons name="person" size={24} color={COLORS.text3} style={styles.inputIcon} />
             <TextInput
               ref={displayNameRef}
               value={displayName}
-              onChangeText={setDisplayName}
-              placeholder="Full Name"
-              placeholderTextColor="#9ca3af"
+              onChangeText={(v) => { setDisplayName(v); if (errors.displayName) setErrors((e) => ({ ...e, displayName: undefined })); }}
+              placeholder={t('auth.fullName')}
+              placeholderTextColor={COLORS.text3}
               autoCapitalize="words"
               autoCorrect={false}
               spellCheck={false}
@@ -153,15 +151,16 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
               editable={!loading}
             />
           </View>
+          {!!errors.displayName && <Text style={styles.fieldError}>{errors.displayName}</Text>}
 
-          <View style={styles.inputContainer}>
-            <MaterialIcons name="alternate-email" size={24} color="#6b7280" style={styles.inputIcon} />
+          <View style={[styles.inputContainer, !!errors.username && styles.inputError]}>
+            <MaterialIcons name="alternate-email" size={24} color={COLORS.text3} style={styles.inputIcon} />
             <TextInput
               ref={usernameRef}
               value={username}
-              onChangeText={setUsername}
-              placeholder="Username (3-20 characters)"
-              placeholderTextColor="#9ca3af"
+              onChangeText={(v) => { setUsername(v); if (errors.username) setErrors((e) => ({ ...e, username: undefined })); }}
+              placeholder={t('auth.usernameHint')}
+              placeholderTextColor={COLORS.text3}
               autoCapitalize="none"
               autoCorrect={false}
               spellCheck={false}
@@ -174,15 +173,16 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
               editable={!loading}
             />
           </View>
+          {!!errors.username && <Text style={styles.fieldError}>{errors.username}</Text>}
 
-          <View style={styles.inputContainer}>
-            <MaterialIcons name="email" size={24} color="#6b7280" style={styles.inputIcon} />
+          <View style={[styles.inputContainer, !!errors.email && styles.inputError]}>
+            <MaterialIcons name="email" size={24} color={COLORS.text3} style={styles.inputIcon} />
             <TextInput
               ref={emailRef}
               value={email}
-              onChangeText={setEmail}
-              placeholder="Email Address"
-              placeholderTextColor="#9ca3af"
+              onChangeText={(v) => { setEmail(v); if (errors.email) setErrors((e) => ({ ...e, email: undefined })); }}
+              placeholder={t('auth.emailAddress')}
+              placeholderTextColor={COLORS.text3}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -196,15 +196,16 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
               editable={!loading}
             />
           </View>
+          {!!errors.email && <Text style={styles.fieldError}>{errors.email}</Text>}
 
-          <View style={styles.inputContainer}>
-            <MaterialIcons name="lock" size={24} color="#6b7280" style={styles.inputIcon} />
+          <View style={[styles.inputContainer, !!errors.password && styles.inputError]}>
+            <MaterialIcons name="lock" size={24} color={COLORS.text3} style={styles.inputIcon} />
             <TextInput
               ref={passwordRef}
               value={password}
-              onChangeText={setPassword}
-              placeholder="Password (min. 6 characters)"
-              placeholderTextColor="#9ca3af"
+              onChangeText={(v) => { setPassword(v); if (errors.password) setErrors((e) => ({ ...e, password: undefined })); }}
+              placeholder={t('auth.passwordHint')}
+              placeholderTextColor={COLORS.text3}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
               autoCorrect={false}
@@ -218,27 +219,31 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
               style={styles.input}
               editable={!loading}
             />
-            <TouchableOpacity 
-              onPress={() => setShowPassword(!showPassword)} 
+            <TouchableOpacity
+              onPress={() => setShowPassword(!showPassword)}
               style={styles.eyeIcon}
               activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel={t('auth.togglePassword')}
             >
-              <MaterialIcons 
-                name={showPassword ? "visibility" : "visibility-off"} 
-                size={24} 
-                color="#6b7280" 
+              <MaterialIcons
+                name={showPassword ? "visibility" : "visibility-off"}
+                size={24}
+                color={COLORS.text3}
               />
             </TouchableOpacity>
           </View>
+          {!!errors.password && <Text style={styles.fieldError}>{errors.password}</Text>}
 
-          <View style={styles.inputContainer}>
-            <MaterialIcons name="lock" size={24} color="#6b7280" style={styles.inputIcon} />
+          <View style={[styles.inputContainer, !!errors.confirmPassword && styles.inputError]}>
+            <MaterialIcons name="lock" size={24} color={COLORS.text3} style={styles.inputIcon} />
             <TextInput
               ref={confirmPasswordRef}
               value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              placeholder="Confirm Password"
-              placeholderTextColor="#9ca3af"
+              onChangeText={(v) => { setConfirmPassword(v); if (errors.confirmPassword) setErrors((e) => ({ ...e, confirmPassword: undefined })); }}
+              placeholder={t('auth.confirmPasswordPlaceholder')}
+              placeholderTextColor={COLORS.text3}
               secureTextEntry={!showConfirmPassword}
               autoCapitalize="none"
               autoCorrect={false}
@@ -251,18 +256,22 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
               style={styles.input}
               editable={!loading}
             />
-            <TouchableOpacity 
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)} 
+            <TouchableOpacity
+              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
               style={styles.eyeIcon}
               activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel={t('auth.togglePassword')}
             >
-              <MaterialIcons 
-                name={showConfirmPassword ? "visibility" : "visibility-off"} 
-                size={24} 
-                color="#6b7280" 
+              <MaterialIcons
+                name={showConfirmPassword ? "visibility" : "visibility-off"}
+                size={24}
+                color={COLORS.text3}
               />
             </TouchableOpacity>
           </View>
+          {!!errors.confirmPassword && <Text style={styles.fieldError}>{errors.confirmPassword}</Text>}
 
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
@@ -271,16 +280,16 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
             activeOpacity={0.8}
           >
             {loading ? (
-              <Text style={styles.buttonText}>Creating Account...</Text>
+              <Text style={styles.buttonText}>{t('auth.creatingAccount')}</Text>
             ) : (
-              <Text style={styles.buttonText}>Sign Up</Text>
+              <Text style={styles.buttonText}>{t('auth.signUp')}</Text>
             )}
           </TouchableOpacity>
 
           <Text style={styles.termsText}>
-            By signing up, you agree to our{'\n'}
-            <Text style={styles.termsLink} onPress={() => Alert.alert('Terms of Service', 'By using TimeCapsule, you agree to use the app responsibly. You must be at least 13 years old. Do not post harmful, illegal, or inappropriate content. We may remove content or suspend accounts that violate these terms. Your data is stored securely on our servers. We reserve the right to update these terms at any time.')}>Terms of Service</Text> and{' '}
-            <Text style={styles.termsLink} onPress={() => Alert.alert('Privacy Policy', 'TimeCapsule collects your email, username, profile photo, and location data to provide the app service. Your capsule content (photos, videos, messages) is stored on secure servers. We do not sell your data to third parties. You can delete your account and all associated data at any time from Settings. We use location data only to place and discover capsules on the map. For questions, contact support@timecapsule.app')}>Privacy Policy</Text>
+            {t('auth.termsPrefix')}{'\n'}
+            <Text style={styles.termsLink} onPress={() => Alert.alert(t('auth.termsOfService'), 'By using Voorcap, you agree to use the app responsibly. You must be at least 13 years old. Do not post harmful, illegal, or inappropriate content. We may remove content or suspend accounts that violate these terms. Your data is stored securely on our servers. We reserve the right to update these terms at any time.')}>{t('auth.termsOfService')}</Text> {t('auth.termsAnd')}{' '}
+            <Text style={styles.termsLink} onPress={() => Alert.alert(t('auth.privacyPolicy'), 'Voorcap collects your email, username, profile photo, and location data to provide the app service. Your cap content (photos, videos, messages) is stored on secure servers. We do not sell your data to third parties. You can delete your account and all associated data at any time from Settings. We use location data only to place and discover caps on the map. For questions, contact support@voorcap.app')}>{t('auth.privacyPolicy')}</Text>
           </Text>
         </View>
 
@@ -288,14 +297,14 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
         <View style={styles.footer}>
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
+            <Text style={styles.dividerText}>{t('common.or')}</Text>
             <View style={styles.dividerLine} />
           </View>
 
           <TouchableOpacity onPress={() => onNavigate('Login')}>
             <Text style={styles.footerText}>
-              Already have an account?{' '}
-              <Text style={styles.footerLink}>Sign In</Text>
+              {t('auth.haveAccount')}
+              <Text style={styles.footerLink}>{t('auth.signIn')}</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -307,31 +316,27 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.bg,
   },
   scrollView: {
     flex: 1,
   },
   backButton: {
     position: 'absolute',
-    top: 50,
     left: 20,
     zIndex: 10,
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.bg3,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...SHADOWS.sm,
   },
   content: {
     paddingHorizontal: 24,
-    paddingTop: 80,
     paddingBottom: 40,
   },
   header: {
@@ -342,20 +347,19 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(250, 198, 56, 0.1)',
+    backgroundColor: COLORS.emberSoft,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#111827',
+    color: COLORS.text,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6b7280',
+    color: COLORS.text2,
     textAlign: 'center',
   },
   formContainer: {
@@ -365,13 +369,23 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: COLORS.bg3,
     borderRadius: 16,
     paddingHorizontal: 16,
     marginBottom: 16,
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
+    borderWidth: 1,
+    borderColor: COLORS.border,
     minHeight: 56,
+  },
+  inputError: {
+    borderColor: COLORS.danger,
+  },
+  fieldError: {
+    color: COLORS.danger,
+    fontSize: 12,
+    marginTop: -10,
+    marginBottom: 10,
+    marginLeft: 6,
   },
   inputIcon: {
     marginRight: 12,
@@ -380,7 +394,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 56,
     fontSize: 16,
-    color: '#111827',
+    color: COLORS.text,
   },
   eyeIcon: {
     padding: 8,
@@ -388,35 +402,31 @@ const styles = StyleSheet.create({
   button: {
     width: '100%',
     height: 56,
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.ember,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 8,
     marginBottom: 16,
-    shadowColor: '#FAC638',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...SHADOWS.glow(COLORS.ember),
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
-    color: 'white',
+    color: COLORS.white,
     fontSize: 18,
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },
   termsText: {
     fontSize: 12,
-    color: '#6b7280',
+    color: COLORS.text2,
     textAlign: 'center',
     lineHeight: 18,
   },
   termsLink: {
-    color: '#FAC638',
+    color: COLORS.ember,
     fontWeight: '600',
   },
   footer: {
@@ -431,19 +441,19 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: COLORS.border,
   },
   dividerText: {
     marginHorizontal: 16,
     fontSize: 14,
-    color: '#9ca3af',
+    color: COLORS.text3,
   },
   footerText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: COLORS.text2,
   },
   footerLink: {
-    color: '#FAC638',
+    color: COLORS.ember,
     fontWeight: 'bold',
   },
 });

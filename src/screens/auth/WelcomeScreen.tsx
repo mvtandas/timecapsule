@@ -1,6 +1,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ImageBackground, StyleSheet, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { COLORS, font, SHADOWS } from '../../constants/theme';
+import { VoorcapWordmark } from '../../components/common/VoorcapLogo';
+import { useT } from '../../i18n';
 
 const { height } = Dimensions.get('window');
 
@@ -10,6 +13,7 @@ interface WelcomeScreenProps {
 }
 
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onNavigate }) => {
+  const t = useT();
   const handleGetStarted = () => {
     onNavigate('Signup');
   };
@@ -27,13 +31,16 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onNavigate }) => {
         imageStyle={styles.imageStyle}
       >
         <LinearGradient
-          colors={['transparent', 'rgba(35, 30, 15, 0.7)', 'rgba(35, 30, 15, 0.95)']}
+          colors={['transparent', 'rgba(11, 14, 19, 0.75)', 'rgba(11, 14, 19, 0.98)']}
           style={styles.gradient}
         >
           <View style={styles.headerContent}>
-            <Text style={styles.title}>Capture Moments,{'\n'}Share Memories</Text>
+            <View style={styles.wordmark}>
+              <VoorcapWordmark size={26} color={COLORS.text} />
+            </View>
+            <Text style={[styles.title, font('display')]}>{t('welcome.tagline')}</Text>
             <Text style={styles.subtitle}>
-              Create digital capsules with memories, messages, and content linked to specific times and locations.
+              {t('welcome.blurb')}
             </Text>
           </View>
         </LinearGradient>
@@ -46,7 +53,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onNavigate }) => {
           onPress={handleGetStarted}
           activeOpacity={0.8}
         >
-          <Text style={styles.primaryButtonText}>Get Started</Text>
+          <Text style={styles.primaryButtonText}>{t('welcome.getStarted')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -54,7 +61,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onNavigate }) => {
           onPress={handleLogin}
           activeOpacity={0.8}
         >
-          <Text style={styles.secondaryButtonText}>Log In</Text>
+          <Text style={styles.secondaryButtonText}>{t('welcome.logIn')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -64,7 +71,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onNavigate }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.bg,
   },
   headerImage: {
     flex: 1,
@@ -81,17 +88,20 @@ const styles = StyleSheet.create({
   headerContent: {
     paddingHorizontal: 24,
   },
+  wordmark: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#ffffff',
+    fontSize: 34,
+    color: COLORS.text,
     textAlign: 'center',
     marginBottom: 16,
     lineHeight: 40,
   },
   subtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: COLORS.text2,
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -100,23 +110,19 @@ const styles = StyleSheet.create({
     paddingTop: 32,
     paddingBottom: 50,
     gap: 16,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.bg,
   },
   primaryButton: {
     width: '100%',
     height: 56,
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.ember,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#FAC638',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...SHADOWS.glow(COLORS.ember),
   },
   primaryButtonText: {
-    color: '#ffffff',
+    color: COLORS.white,
     fontSize: 18,
     fontWeight: 'bold',
     letterSpacing: 0.5,
@@ -124,13 +130,15 @@ const styles = StyleSheet.create({
   secondaryButton: {
     width: '100%',
     height: 56,
-    backgroundColor: 'rgba(250, 198, 56, 0.2)',
+    backgroundColor: COLORS.emberSoft,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
   },
   secondaryButtonText: {
-    color: '#FAC638',
+    color: COLORS.ember,
     fontSize: 18,
     fontWeight: 'bold',
     letterSpacing: 0.5,

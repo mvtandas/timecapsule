@@ -1,8 +1,11 @@
 import { supabase } from '../lib/supabase';
 
+// `parent_capsule_id` exists in the DB but not in the generated Database type.
+const db: any = supabase;
+
 export class ChainService {
   static async getReplies(capsuleId: string): Promise<any[]> {
-    const { data } = await supabase
+    const { data } = await db
       .from('capsules')
       .select('id, owner_id, title, description, media_url, media_type, created_at')
       .eq('parent_capsule_id', capsuleId)
@@ -11,7 +14,7 @@ export class ChainService {
   }
 
   static async getParent(parentId: string): Promise<any> {
-    const { data } = await supabase
+    const { data } = await db
       .from('capsules')
       .select('id, owner_id, title, media_url, created_at')
       .eq('id', parentId)
@@ -20,7 +23,7 @@ export class ChainService {
   }
 
   static async getChainCount(capsuleId: string): Promise<number> {
-    const { count } = await supabase
+    const { count } = await db
       .from('capsules')
       .select('id', { count: 'exact', head: true })
       .eq('parent_capsule_id', capsuleId);

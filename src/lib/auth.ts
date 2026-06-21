@@ -167,6 +167,10 @@ export class AuthService {
         const { error: insertError } = await supabase.from('profiles').insert({
           id: user.id,
           display_name: user.user_metadata?.display_name || user.email?.split('@')[0],
+          // Persist email + username so username/email login lookups keep working
+          // for auto-created profiles (otherwise these stay null forever).
+          email: user.email || null,
+          username: user.user_metadata?.username || null,
         } as any);
 
         if (!insertError) {
@@ -242,17 +246,31 @@ export class AuthService {
       }
 
       // Prepare updates with lowercase username
-      const profileUpdates = {
+      const profileUpdates: any = {
         ...updates,
         username: updates.username ? updates.username.toLowerCase() : updates.username,
       };
 
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('profiles')
-        .update(profileUpdates as any)
+        .update(profileUpdates)
         .eq('id', user.id)
         .select()
         .single();
+
+      // Schema-drift fallback: if bio/location columns aren't present yet
+      // (migration 0003 not run), retry without them so the rest of the
+      // profile still saves. Once the migration is applied this never triggers.
+      const msg = (error?.message || '').toLowerCase();
+      if (error && (msg.includes('bio') || msg.includes('location')) && msg.includes('column')) {
+        const { bio, location, ...rest } = profileUpdates;
+        ({ data, error } = await supabase
+          .from('profiles')
+          .update(rest)
+          .eq('id', user.id)
+          .select()
+          .single());
+      }
 
       return { data, error };
     } catch (error) {

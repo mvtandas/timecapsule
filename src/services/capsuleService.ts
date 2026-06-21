@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase';
 
+import type { CapTypeId } from '../constants/capTypes';
+
 export interface Capsule {
   id: string;
   owner_id: string;
@@ -17,6 +19,11 @@ export interface Capsule {
   media_url?: string | null;
   media_type?: 'image' | 'video' | 'none';
   is_locked?: boolean;
+  // Voorcap cap-type fields (migration 0001)
+  type?: CapTypeId;
+  location_name?: string | null;
+  is_anonymous?: boolean;
+  cover_photo_url?: string | null;
 }
 
 export interface CreateCapsuleData {
@@ -31,6 +38,11 @@ export interface CreateCapsuleData {
   media_type?: 'image' | 'video' | 'none';
   is_locked?: boolean;
   category?: string;
+  // Voorcap cap-type fields (migration 0001)
+  type?: CapTypeId;
+  location_name?: string | null;
+  is_anonymous?: boolean;
+  cover_photo_url?: string | null;
 }
 
 export class CapsuleService {
@@ -92,13 +104,19 @@ export class CapsuleService {
           title: capsuleData.title,
           description: capsuleData.description || null,
           open_at: capsuleData.open_at || null,
-          lat: capsuleData.lat || null,
-          lng: capsuleData.lng || null,
+          // `?? null` not `|| null` so lat/lng of exactly 0 (equator / prime
+          // meridian) are preserved instead of being dropped to null.
+          lat: capsuleData.lat ?? null,
+          lng: capsuleData.lng ?? null,
           is_public: capsuleData.is_public || false,
           content_refs: capsuleData.content_refs || null,
           media_url: capsuleData.media_url || null,
           media_type: capsuleData.media_type || 'none',
           is_locked: capsuleData.is_locked || false,
+          type: capsuleData.type || 'public',
+          location_name: capsuleData.location_name || null,
+          is_anonymous: capsuleData.is_anonymous || false,
+          cover_photo_url: capsuleData.cover_photo_url || null,
         } as any)
         .select()
         .single();
@@ -190,7 +208,7 @@ export class CapsuleService {
 
       // Filter by distance and blocked users
       const filtered = data?.filter((capsule) => {
-        if (!capsule.lat || !capsule.lng) return false;
+        if (capsule.lat == null || capsule.lng == null) return false;
         if (blockedIds.includes(capsule.owner_id)) return false;
         const distance = calculateDistance(lat, lng, capsule.lat, capsule.lng);
         return distance <= radiusKm;
@@ -244,10 +262,20 @@ export class CapsuleService {
         .eq('blocker_id', user.id);
       const blockedIds = (blocked || []).map((b: any) => b.blocked_id);
 
+      // Capsules explicitly shared with the user (private shares) must also appear.
+      const { data: shared } = await supabase
+        .from('shared_capsules')
+        .select('capsule_id')
+        .eq('user_id', user.id);
+      const sharedIds = (shared || []).map((s: any) => s.capsule_id);
+
+      let orFilter = `owner_id.eq.${user.id},is_public.eq.true`;
+      if (sharedIds.length) orFilter += `,id.in.(${sharedIds.join(',')})`;
+
       const { data, error } = await supabase
         .from('capsules')
         .select('*')
-        .or(`owner_id.eq.${user.id},is_public.eq.true`)
+        .or(orFilter)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CapsuleService } from '../services/capsuleService';
+import { COLORS, font } from '../constants/theme';
+import { useT } from '../i18n';
 
 const { height } = Dimensions.get('window');
 const SHEET_HEIGHT = height * 0.6;
@@ -52,6 +54,7 @@ const EditCapsuleSheet: React.FC<EditCapsuleSheetProps> = ({
   onSaved,
   onDeleted,
 }) => {
+  const t = useT();
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
   const [category, setCategory] = useState(initialCategory || 'general');
@@ -83,24 +86,24 @@ const EditCapsuleSheet: React.FC<EditCapsuleSheetProps> = ({
 
   const handleDeleteCapsule = () => {
     Alert.alert(
-      'Delete Capsule',
-      'This will permanently delete this capsule and all its media. This cannot be undone.',
+      t('editCap.deleteTitle'),
+      t('editCap.deleteMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               const { error } = await CapsuleService.deleteCapsule(capsuleId);
               if (error) {
-                Alert.alert('Error', 'Failed to delete capsule');
+                Alert.alert(t('editCap.errorTitle'), t('editCap.deleteFailed'));
               } else {
                 onClose();
                 onDeleted?.();
               }
             } catch {
-              Alert.alert('Error', 'Something went wrong.');
+              Alert.alert(t('editCap.errorTitle'), t('editCap.somethingWrong'));
             }
           },
         },
@@ -110,7 +113,7 @@ const EditCapsuleSheet: React.FC<EditCapsuleSheetProps> = ({
 
   const handleSave = async () => {
     if (!title.trim()) {
-      Alert.alert('Error', 'Title cannot be empty.');
+      Alert.alert(t('editCap.errorTitle'), t('editCap.titleEmpty'));
       return;
     }
 
@@ -125,14 +128,14 @@ const EditCapsuleSheet: React.FC<EditCapsuleSheetProps> = ({
       });
 
       if (error) {
-        Alert.alert('Error', 'Failed to update capsule. Please try again.');
+        Alert.alert(t('editCap.errorTitle'), t('editCap.updateFailed'));
         return;
       }
 
       onSaved({ title: title.trim(), description: description.trim(), category });
       onClose();
     } catch (e) {
-      Alert.alert('Error', 'Something went wrong.');
+      Alert.alert(t('editCap.errorTitle'), t('editCap.somethingWrong'));
     } finally {
       setSaving(false);
     }
@@ -147,38 +150,38 @@ const EditCapsuleSheet: React.FC<EditCapsuleSheetProps> = ({
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.handleBar} />
-          <Text style={styles.headerTitle}>Edit Capsule</Text>
+          <Text style={styles.headerTitle}>{t('editCap.headerTitle')}</Text>
           <TouchableOpacity onPress={onClose} style={styles.headerClose}>
-            <Ionicons name="close" size={22} color="#aaa" />
+            <Ionicons name="close" size={22} color={COLORS.text2} />
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
           {/* Title */}
-          <Text style={styles.label}>Title</Text>
+          <Text style={styles.label}>{t('editCap.titleLabel')}</Text>
           <TextInput
             style={styles.input}
             value={title}
             onChangeText={setTitle}
-            placeholder="Capsule title"
-            placeholderTextColor="#666"
+            placeholder={t('editCap.titlePlaceholder')}
+            placeholderTextColor={COLORS.text3}
             maxLength={100}
           />
 
           {/* Description */}
-          <Text style={styles.label}>Description</Text>
+          <Text style={styles.label}>{t('editCap.descriptionLabel')}</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
             value={description}
             onChangeText={setDescription}
-            placeholder="Capsule description"
-            placeholderTextColor="#666"
+            placeholder={t('editCap.descriptionPlaceholder')}
+            placeholderTextColor={COLORS.text3}
             multiline
             maxLength={500}
           />
 
           {/* Category */}
-          <Text style={styles.label}>Category</Text>
+          <Text style={styles.label}>{t('editCap.categoryLabel')}</Text>
           <View style={styles.categoryGrid}>
             {CATEGORIES.map((cat) => (
               <TouchableOpacity
@@ -193,7 +196,7 @@ const EditCapsuleSheet: React.FC<EditCapsuleSheetProps> = ({
                 <Ionicons
                   name={cat.icon as any}
                   size={16}
-                  color={category === cat.id ? '#1c1c1e' : '#aaa'}
+                  color={category === cat.id ? COLORS.white : COLORS.text2}
                 />
                 <Text
                   style={[
@@ -201,7 +204,7 @@ const EditCapsuleSheet: React.FC<EditCapsuleSheetProps> = ({
                     category === cat.id && styles.categoryChipTextActive,
                   ]}
                 >
-                  {cat.label}
+                  {t(`editCap.cat_${cat.id}`)}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -215,9 +218,9 @@ const EditCapsuleSheet: React.FC<EditCapsuleSheetProps> = ({
             disabled={saving}
           >
             {saving ? (
-              <ActivityIndicator size="small" color="#1c1c1e" />
+              <ActivityIndicator size="small" color={COLORS.white} />
             ) : (
-              <Text style={styles.saveBtnText}>Save Changes</Text>
+              <Text style={styles.saveBtnText}>{t('editCap.saveChanges')}</Text>
             )}
           </TouchableOpacity>
 
@@ -227,8 +230,8 @@ const EditCapsuleSheet: React.FC<EditCapsuleSheetProps> = ({
             onPress={handleDeleteCapsule}
             activeOpacity={0.7}
           >
-            <Ionicons name="trash-outline" size={18} color="#FF3B30" />
-            <Text style={styles.deleteBtnText}>Delete Capsule</Text>
+            <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
+            <Text style={styles.deleteBtnText}>{t('editCap.deleteCapBtn')}</Text>
           </TouchableOpacity>
         </ScrollView>
       </Animated.View>
@@ -243,6 +246,7 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     flex: 1,
+    backgroundColor: COLORS.overlay,
   },
   sheet: {
     position: 'absolute',
@@ -250,7 +254,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: SHEET_HEIGHT,
-    backgroundColor: '#1c1c1e',
+    backgroundColor: COLORS.card,
     borderTopLeftRadius: 14,
     borderTopRightRadius: 14,
   },
@@ -259,19 +263,19 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 12,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#333',
+    borderBottomColor: COLORS.border,
   },
   handleBar: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#555',
+    backgroundColor: COLORS.text3,
     marginBottom: 10,
   },
   headerTitle: {
+    ...font('subtitle'),
     fontSize: 15,
-    fontWeight: '700',
-    color: '#fff',
+    color: COLORS.text,
   },
   headerClose: {
     position: 'absolute',
@@ -284,19 +288,18 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#aaa',
+    ...font('label'),
+    color: COLORS.text2,
     marginBottom: 6,
     marginTop: 12,
   },
   input: {
-    backgroundColor: '#2c2c2e',
+    backgroundColor: COLORS.bg3,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 15,
-    color: '#fff',
+    color: COLORS.text,
   },
   textArea: {
     minHeight: 80,
@@ -312,24 +315,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#2c2c2e',
+    backgroundColor: COLORS.bg3,
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 16,
   },
   categoryChipActive: {
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.ember,
   },
   categoryChipText: {
+    ...font('label'),
     fontSize: 13,
-    color: '#aaa',
-    fontWeight: '600',
+    color: COLORS.text2,
   },
   categoryChipTextActive: {
-    color: '#1c1c1e',
+    color: COLORS.white,
   },
   saveBtn: {
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.ember,
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
@@ -340,9 +343,8 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   saveBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1c1c1e',
+    ...font('subtitle'),
+    color: COLORS.white,
   },
   deleteBtn: {
     flexDirection: 'row',
@@ -354,13 +356,12 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 40,
     borderWidth: 1,
-    borderColor: '#FF3B30',
+    borderColor: COLORS.danger,
     backgroundColor: 'transparent',
   },
   deleteBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FF3B30',
+    ...font('subtitle'),
+    color: COLORS.danger,
   },
 });
 

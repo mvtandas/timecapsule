@@ -3,6 +3,8 @@ import {
   Modal, View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { COLORS, font } from '../constants/theme';
+import { useT } from '../i18n';
 
 const { width } = Dimensions.get('window');
 
@@ -16,6 +18,7 @@ interface DatePickerModalProps {
 const DatePickerModal: React.FC<DatePickerModalProps> = ({
   visible, onClose, onSelectDate, minimumDate = new Date(),
 }) => {
+  const t = useT();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
@@ -24,8 +27,18 @@ const DatePickerModal: React.FC<DatePickerModalProps> = ({
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 20 }, (_, i) => currentYear + i);
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const monthsFull = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const months = [
+    t('datePicker.monShortJan'), t('datePicker.monShortFeb'), t('datePicker.monShortMar'),
+    t('datePicker.monShortApr'), t('datePicker.monShortMay'), t('datePicker.monShortJun'),
+    t('datePicker.monShortJul'), t('datePicker.monShortAug'), t('datePicker.monShortSep'),
+    t('datePicker.monShortOct'), t('datePicker.monShortNov'), t('datePicker.monShortDec'),
+  ];
+  const monthsFull = [
+    t('datePicker.monFullJan'), t('datePicker.monFullFeb'), t('datePicker.monFullMar'),
+    t('datePicker.monFullApr'), t('datePicker.monFullMay'), t('datePicker.monFullJun'),
+    t('datePicker.monFullJul'), t('datePicker.monFullAug'), t('datePicker.monFullSep'),
+    t('datePicker.monFullOct'), t('datePicker.monFullNov'), t('datePicker.monFullDec'),
+  ];
   const hours = Array.from({ length: 24 }, (_, i) => i);
   const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
@@ -39,12 +52,12 @@ const DatePickerModal: React.FC<DatePickerModalProps> = ({
   };
 
   const presets = [
-    { label: '1 Hour', icon: 'time-outline', fn: () => { const d = new Date(); d.setHours(d.getHours() + 1); return d; } },
-    { label: '6 Hours', icon: 'time-outline', fn: () => { const d = new Date(); d.setHours(d.getHours() + 6); return d; } },
-    { label: '1 Day', icon: 'today-outline', fn: () => { const d = new Date(); d.setDate(d.getDate() + 1); return d; } },
-    { label: '1 Week', icon: 'calendar-outline', fn: () => { const d = new Date(); d.setDate(d.getDate() + 7); return d; } },
-    { label: '1 Month', icon: 'calendar', fn: () => { const d = new Date(); d.setMonth(d.getMonth() + 1); return d; } },
-    { label: '1 Year', icon: 'calendar', fn: () => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d; } },
+    { label: t('datePicker.preset1Hour'), icon: 'time-outline', fn: () => { const d = new Date(); d.setHours(d.getHours() + 1); return d; } },
+    { label: t('datePicker.preset6Hours'), icon: 'time-outline', fn: () => { const d = new Date(); d.setHours(d.getHours() + 6); return d; } },
+    { label: t('datePicker.preset1Day'), icon: 'today-outline', fn: () => { const d = new Date(); d.setDate(d.getDate() + 1); return d; } },
+    { label: t('datePicker.preset1Week'), icon: 'calendar-outline', fn: () => { const d = new Date(); d.setDate(d.getDate() + 7); return d; } },
+    { label: t('datePicker.preset1Month'), icon: 'calendar', fn: () => { const d = new Date(); d.setMonth(d.getMonth() + 1); return d; } },
+    { label: t('datePicker.preset1Year'), icon: 'calendar', fn: () => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d; } },
   ];
 
   const handlePreset = (fn: () => Date) => {
@@ -54,7 +67,7 @@ const DatePickerModal: React.FC<DatePickerModalProps> = ({
   };
 
   const formatHour = (h: number) => {
-    const ampm = h >= 12 ? 'PM' : 'AM';
+    const ampm = h >= 12 ? t('datePicker.pm') : t('datePicker.am');
     const hour12 = h % 12 || 12;
     return `${hour12} ${ampm}`;
   };
@@ -90,9 +103,9 @@ const DatePickerModal: React.FC<DatePickerModalProps> = ({
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>When should it open?</Text>
+            <Text style={styles.title}>{t('datePicker.title')}</Text>
             <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color="#64748b" />
+              <Ionicons name="close" size={24} color={COLORS.text2} />
             </TouchableOpacity>
           </View>
 
@@ -100,39 +113,44 @@ const DatePickerModal: React.FC<DatePickerModalProps> = ({
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.presetScroll} contentContainerStyle={{ paddingRight: 24 }}>
             {presets.map((p) => (
               <TouchableOpacity key={p.label} style={styles.presetCard} onPress={() => handlePreset(p.fn)}>
-                <Ionicons name={p.icon as any} size={20} color="#FAC638" />
+                <Ionicons name={p.icon as any} size={20} color={COLORS.ember} />
                 <Text style={styles.presetLabel}>{p.label}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
 
-          <Text style={styles.orText}>or pick exact date & time</Text>
+          <Text style={styles.orText}>{t('datePicker.orPickExact')}</Text>
 
           {/* Date Pickers */}
           <View style={styles.pickerRow}>
-            {renderPicker(months, months[selectedMonth], (m) => setSelectedMonth(months.indexOf(m)), 'Month')}
-            {renderPicker(days, selectedDay, setSelectedDay, 'Day')}
-            {renderPicker(years, selectedYear, setSelectedYear, 'Year')}
+            {renderPicker(months, months[selectedMonth], (m) => setSelectedMonth(months.indexOf(m)), t('datePicker.labelMonth'))}
+            {renderPicker(days, selectedDay, setSelectedDay, t('datePicker.labelDay'))}
+            {renderPicker(years, selectedYear, setSelectedYear, t('datePicker.labelYear'))}
           </View>
 
           {/* Time Pickers */}
           <View style={styles.timeRow}>
-            {renderPicker(hours, selectedHour, setSelectedHour, 'Hour', formatHour)}
+            {renderPicker(hours, selectedHour, setSelectedHour, t('datePicker.labelHour'), formatHour)}
             <Text style={styles.timeSeparator}>:</Text>
-            {renderPicker(minutes, selectedMinute, setSelectedMinute, 'Min', (m) => String(m).padStart(2, '0'))}
+            {renderPicker(minutes, selectedMinute, setSelectedMinute, t('datePicker.labelMin'), (m) => String(m).padStart(2, '0'))}
           </View>
 
           {/* Preview */}
           <View style={styles.previewBox}>
-            <Ionicons name="time" size={18} color="#FAC638" />
+            <Ionicons name="time" size={18} color={COLORS.ember} />
             <Text style={styles.previewText}>
-              {monthsFull[selectedMonth]} {selectedDay}, {selectedYear} at {formatHour(selectedHour)}:{String(selectedMinute).padStart(2, '0')}
+              {t('datePicker.previewText', {
+                month: monthsFull[selectedMonth],
+                day: selectedDay,
+                year: selectedYear,
+                time: `${formatHour(selectedHour)}:${String(selectedMinute).padStart(2, '0')}`,
+              })}
             </Text>
           </View>
 
           {/* Confirm */}
           <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm}>
-            <Text style={styles.confirmText}>Set Date & Time</Text>
+            <Text style={styles.confirmText}>{t('datePicker.setDateTime')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -141,45 +159,45 @@ const DatePickerModal: React.FC<DatePickerModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, backgroundColor: COLORS.overlay, justifyContent: 'flex-end' },
   container: {
-    backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    backgroundColor: COLORS.card, borderTopLeftRadius: 24, borderTopRightRadius: 24,
     paddingTop: 20, paddingBottom: 40, maxHeight: '90%',
   },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 24, marginBottom: 16,
   },
-  title: { fontSize: 22, fontWeight: '700', color: '#1e293b' },
+  title: { ...font('title'), fontSize: 22, color: COLORS.text },
   presetScroll: { paddingLeft: 24, marginBottom: 12 },
   presetCard: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#f8f8f5', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
-    marginRight: 8, borderWidth: 1.5, borderColor: '#e2e8f0',
+    backgroundColor: COLORS.bg3, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
+    marginRight: 8, borderWidth: 1.5, borderColor: COLORS.border,
   },
-  presetLabel: { fontSize: 13, fontWeight: '600', color: '#475569' },
-  orText: { textAlign: 'center', color: '#94a3b8', fontSize: 13, marginVertical: 10 },
+  presetLabel: { ...font('label'), fontSize: 13, color: COLORS.text },
+  orText: { ...font('body'), textAlign: 'center', color: COLORS.text3, fontSize: 13, marginVertical: 10 },
   pickerRow: { flexDirection: 'row', paddingHorizontal: 24, marginBottom: 12, gap: 8 },
   timeRow: { flexDirection: 'row', paddingHorizontal: 24, marginBottom: 16, gap: 8, alignItems: 'center' },
-  timeSeparator: { fontSize: 24, fontWeight: '700', color: '#1e293b', marginTop: 24 },
+  timeSeparator: { fontSize: 24, fontWeight: '700', color: COLORS.text, marginTop: 24 },
   pickerColumn: { flex: 1 },
-  columnLabel: { fontSize: 11, fontWeight: '600', color: '#94a3b8', marginBottom: 6, textAlign: 'center', textTransform: 'uppercase' },
-  picker: { height: 120, backgroundColor: '#f8f8f5', borderRadius: 12 },
+  columnLabel: { ...font('eyebrow'), color: COLORS.text3, marginBottom: 6, textAlign: 'center' },
+  picker: { height: 120, backgroundColor: COLORS.bg3, borderRadius: 12 },
   pickerItem: { paddingVertical: 8, paddingHorizontal: 12, alignItems: 'center' },
-  pickerItemSelected: { backgroundColor: '#FAC638', marginVertical: 1, marginHorizontal: 4, borderRadius: 8 },
-  pickerText: { fontSize: 15, color: '#475569' },
-  pickerTextSelected: { color: '#fff', fontWeight: '700' },
+  pickerItemSelected: { backgroundColor: COLORS.ember, marginVertical: 1, marginHorizontal: 4, borderRadius: 8 },
+  pickerText: { fontSize: 15, color: COLORS.text2 },
+  pickerTextSelected: { color: COLORS.white, fontWeight: '700' },
   previewBox: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#FFF8E1', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12,
+    backgroundColor: COLORS.emberSoft, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12,
     marginHorizontal: 24, marginBottom: 16,
   },
-  previewText: { fontSize: 15, fontWeight: '600', color: '#1e293b' },
+  previewText: { ...font('bodyBold'), fontSize: 15, color: COLORS.text },
   confirmBtn: {
-    backgroundColor: '#FAC638', paddingVertical: 16, marginHorizontal: 24,
+    backgroundColor: COLORS.ember, paddingVertical: 16, marginHorizontal: 24,
     borderRadius: 14, alignItems: 'center',
   },
-  confirmText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  confirmText: { ...font('subtitle'), color: COLORS.white, fontSize: 17 },
 });
 
 export default DatePickerModal;

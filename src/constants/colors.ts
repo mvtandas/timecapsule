@@ -1,22 +1,30 @@
+import { COLORS as T } from './theme';
+
+/**
+ * Backwards-compat shim. The app is migrating to the Voorcap dark design
+ * system in src/constants/theme.ts. The legacy COLORS keys below now map to
+ * dark equivalents so existing screens shift toward the new look without
+ * breaking imports. Port screens to `theme.ts` directly, then remove this file.
+ */
 export const COLORS = {
-  primary: '#FAC638',
-  primaryDark: '#E8AA1E',
-  primaryLight: '#FFF8E1',
-  background: '#fafaf8',
-  backgroundAlt: '#f8f8f5',
-  backgroundIOS: '#f2f2f7',
-  card: '#ffffff',
-  text: '#1e293b',
-  textSecondary: '#64748b',
-  textMuted: '#94a3b8',
-  textLight: '#cbd5e1',
-  border: '#e2e8f0',
-  borderLight: '#f1f5f9',
-  success: '#06D6A0',
-  error: '#FF6B6B',
-  destructive: '#FF3B30',
-  heart: '#FF375F',
-  white: '#ffffff',
-  black: '#000000',
-  overlay: 'rgba(0,0,0,0.4)',
+  primary: T.ember,
+  primaryDark: T.emberDark,
+  primaryLight: T.emberSoft,
+  background: T.bg,
+  backgroundAlt: T.bg2,
+  backgroundIOS: T.bg,
+  card: T.card,
+  text: T.text,
+  textSecondary: T.text2,
+  textMuted: T.text3,
+  textLight: T.text3,
+  border: T.border,
+  borderLight: T.borderLight,
+  success: T.success,
+  error: T.danger,
+  destructive: T.danger,
+  heart: T.ember,
+  white: T.white,
+  black: T.black,
+  overlay: T.overlay,
 } as const;

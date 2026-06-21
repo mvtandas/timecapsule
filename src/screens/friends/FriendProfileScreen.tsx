@@ -19,6 +19,9 @@ import { ReportService, REPORT_REASONS } from '../../services/reportService';
 import CapsuleDetailModal from '../../components/CapsuleDetailModal';
 import { getMediaUrl } from '../../utils/mediaUtils';
 import { timeAgo } from '../../utils/dateUtils';
+import { COLORS, GRADIENTS, font } from '../../constants/theme';
+import ScreenHeader from '../../components/common/ScreenHeader';
+import { useT } from '../../i18n';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48 - 12) / 2;
@@ -57,6 +60,7 @@ type CapsuleSummary = {
 };
 
 const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => {
+  const t = useT();
   const { user } = useAuthStore();
   const [profile, setProfile] = useState<FriendProfileUser | null>(null);
   const [publicCapsules, setPublicCapsules] = useState<CapsuleSummary[]>([]);
@@ -72,7 +76,7 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
   const viewedProfileId = friend?.id;
 
   const displayName = useMemo(() => {
-    return profile?.display_name || friend?.display_name || friend?.name || 'TimeCapsule User';
+    return profile?.display_name || friend?.display_name || friend?.name || t('friendProfile.defaultName');
   }, [profile?.display_name, friend?.display_name, friend?.name]);
 
   const username = useMemo(() => {
@@ -85,7 +89,7 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
 
   const loadProfileData = async () => {
     if (!viewedProfileId) {
-      setError('Profile not found');
+      setError(t('friendProfile.errorNotFound'));
       setLoading(false);
       return;
     }
@@ -104,14 +108,14 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
         .maybeSingle();
 
       if (profileError || !profileData) {
-        setError('Profile not found');
+        setError(t('friendProfile.errorNotFound'));
         setLoading(false);
         return;
       }
 
       setProfile({
         id: viewedProfileId,
-        display_name: profileData.display_name || 'TimeCapsule User',
+        display_name: profileData.display_name || t('friendProfile.defaultName'),
         username: profileData.username || null,
         avatar_url: profileData.avatar_url || null,
         created_at: profileData.created_at || null,
@@ -152,7 +156,7 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
         setFriendshipStatus(status);
       }
     } catch (err) {
-      setError('Unable to load profile right now. Please try again later.');
+      setError(t('friendProfile.errorLoad'));
     } finally {
       setLoading(false);
     }
@@ -195,51 +199,51 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
     if (!viewedProfileId || user?.id === viewedProfileId) return;
 
     Alert.alert(
-      'Options',
+      t('friendProfile.optionsTitle'),
       undefined,
       [
         {
-          text: 'Report User',
+          text: t('friendProfile.reportUser'),
           onPress: () => {
             Alert.alert(
-              'Report User',
-              'Select a reason:',
+              t('friendProfile.reportUser'),
+              t('friendProfile.selectReason'),
               [
                 ...REPORT_REASONS.map((reason) => ({
                   text: reason,
                   onPress: async () => {
                     const { error } = await ReportService.reportContent('user', viewedProfileId, reason);
                     if (error) {
-                      Alert.alert('Error', 'Failed to submit report. Please try again.');
+                      Alert.alert(t('friendProfile.errorTitle'), t('friendProfile.reportFailed'));
                     } else {
-                      Alert.alert('Reported', 'Thank you for your report. We will review it shortly.');
+                      Alert.alert(t('friendProfile.reportedTitle'), t('friendProfile.reportThanks'));
                     }
                   },
                 })),
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
               ]
             );
           },
         },
         {
-          text: 'Block User',
+          text: t('friendProfile.blockUser'),
           style: 'destructive',
           onPress: () => {
             Alert.alert(
-              'Block User',
-              `Are you sure you want to block ${displayName}? You will no longer see their content.`,
+              t('friendProfile.blockUser'),
+              t('friendProfile.blockConfirm', { name: displayName }),
               [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
                 {
-                  text: 'Block',
+                  text: t('friendProfile.blockAction'),
                   style: 'destructive',
                   onPress: async () => {
                     const { error } = await ReportService.blockUser(viewedProfileId);
                     if (error) {
-                      Alert.alert('Error', 'Failed to block user. Please try again.');
+                      Alert.alert(t('friendProfile.errorTitle'), t('friendProfile.blockFailed'));
                     } else {
-                      Alert.alert('Blocked', 'User has been blocked.', [
-                        { text: 'OK', onPress: () => onGoBack?.() },
+                      Alert.alert(t('friendProfile.blockedTitle'), t('friendProfile.blockedMessage'), [
+                        { text: t('friendProfile.ok'), onPress: () => onGoBack?.() },
                       ]);
                     }
                   },
@@ -248,7 +252,7 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
             );
           },
         },
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
       ]
     );
   };
@@ -256,38 +260,38 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
   const renderActionButton = () => {
     if (user?.id === viewedProfileId) return null;
 
-    let label = 'Add Friend';
-    let bgColor = '#FAC638';
-    let textColor = '#fff';
-    let borderColor = '#FAC638';
+    let label = t('friendProfile.addFriend');
+    let bgColor: string = COLORS.ember;
+    let textColor: string = COLORS.white;
+    let borderColor: string = COLORS.ember;
     let iconName: keyof typeof Ionicons.glyphMap = 'person-add';
     let outlined = false;
     let disabled = false;
 
     switch (friendshipStatus.status) {
       case 'friends':
-        label = 'Friends \u2713';
+        label = t('friendProfile.friends') + ' \u2713';
         iconName = 'checkmark-circle';
         bgColor = 'transparent';
-        textColor = '#1e293b';
-        borderColor = '#cbd5e1';
+        textColor = COLORS.text;
+        borderColor = COLORS.borderLight;
         outlined = true;
         disabled = true;
         break;
       case 'pending_sent':
-        label = 'Request Sent';
+        label = t('friendProfile.requestSent');
         iconName = 'time';
         bgColor = 'transparent';
-        textColor = '#94a3b8';
-        borderColor = '#cbd5e1';
+        textColor = COLORS.text3;
+        borderColor = COLORS.borderLight;
         outlined = true;
         break;
       case 'pending_received':
-        label = 'Accept';
+        label = t('friendProfile.accept');
         iconName = 'checkmark';
-        bgColor = '#06D6A0';
-        textColor = '#fff';
-        borderColor = '#06D6A0';
+        bgColor = COLORS.success;
+        textColor = COLORS.white;
+        borderColor = COLORS.success;
         break;
       case 'none':
       default:
@@ -322,29 +326,24 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => onGoBack && onGoBack()}>
-          <Ionicons name="arrow-back" size={24} color="#1e293b" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>@{username}</Text>
-        {user?.id !== viewedProfileId ? (
-          <TouchableOpacity style={styles.backButton} onPress={handleMoreOptions}>
-            <Ionicons name="ellipsis-vertical" size={22} color="#1e293b" />
+      <ScreenHeader
+        title={`@${username}`}
+        onBack={onGoBack}
+        right={user?.id !== viewedProfileId ? (
+          <TouchableOpacity style={styles.backButton} onPress={handleMoreOptions} accessibilityRole="button">
+            <Ionicons name="ellipsis-vertical" size={22} color={COLORS.text} />
           </TouchableOpacity>
-        ) : (
-          <View style={styles.headerSpacer} />
-        )}
-      </View>
+        ) : undefined}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {loading ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#FAC638" />
+            <ActivityIndicator size="large" color={COLORS.ember} />
           </View>
         ) : error ? (
           <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle" size={28} color="#ef4444" />
+            <Ionicons name="alert-circle" size={28} color={COLORS.danger} />
             <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : (
@@ -358,7 +357,7 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
                     <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
                   ) : (
                     <View style={styles.avatarPlaceholder}>
-                      <Ionicons name="person" size={44} color="#FAC638" />
+                      <Ionicons name="person" size={44} color={COLORS.ember} />
                     </View>
                   )}
                 </View>
@@ -371,21 +370,21 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
               {/* Stats Row */}
               <View style={styles.statsRow}>
                 <View style={styles.statPill}>
-                  <Ionicons name="time" size={16} color="#FAC638" />
+                  <Ionicons name="time" size={16} color={COLORS.ember} />
                   <Text style={styles.statValue}>{capsulesCount}</Text>
-                  <Text style={styles.statLabel}>Capsules</Text>
+                  <Text style={styles.statLabel}>{t('friendProfile.statCaps')}</Text>
                 </View>
 
                 <View style={styles.statPill}>
-                  <Ionicons name="people" size={16} color="#FAC638" />
+                  <Ionicons name="people" size={16} color={COLORS.ember} />
                   <Text style={styles.statValue}>{friendsCount}</Text>
-                  <Text style={styles.statLabel}>Friends</Text>
+                  <Text style={styles.statLabel}>{t('friendProfile.statFriends')}</Text>
                 </View>
 
                 <View style={styles.statPill}>
-                  <Ionicons name="flame" size={16} color="#FAC638" />
+                  <Ionicons name="flame" size={16} color={COLORS.ember} />
                   <Text style={styles.statValue}>{daysActive}</Text>
-                  <Text style={styles.statLabel}>Days</Text>
+                  <Text style={styles.statLabel}>{t('friendProfile.statDays')}</Text>
                 </View>
               </View>
 
@@ -395,7 +394,7 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
 
             {/* Section Header */}
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Public Capsules</Text>
+              <Text style={styles.sectionTitle}>{t('friendProfile.publicCaps')}</Text>
               {publicCapsules.length > 0 && (
                 <Text style={styles.sectionCount}>{publicCapsules.length}</Text>
               )}
@@ -405,11 +404,11 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
             {publicCapsules.length === 0 ? (
               <View style={styles.emptyBox}>
                 <View style={styles.emptyIcon}>
-                  <Ionicons name="time-outline" size={40} color="#FAC638" />
+                  <Ionicons name="time-outline" size={40} color={COLORS.ember} />
                 </View>
-                <Text style={styles.emptyTitle}>No Public Capsules</Text>
+                <Text style={styles.emptyTitle}>{t('friendProfile.emptyTitle')}</Text>
                 <Text style={styles.emptyText}>
-                  This user hasn't shared any public capsules yet
+                  {t('friendProfile.emptyText')}
                 </Text>
               </View>
             ) : (
@@ -431,20 +430,20 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
                           <Image source={{ uri: mediaUrl }} style={styles.cardImage} resizeMode="cover" />
                         ) : (
                           <LinearGradient
-                            colors={['#FAC638', '#F59E0B']}
+                            colors={GRADIENTS.ember}
                             style={styles.cardImagePlaceholder}
                           >
-                            <Ionicons name="time" size={28} color="#fff" />
+                            <Ionicons name="time" size={28} color={COLORS.white} />
                           </LinearGradient>
                         )}
                         {isLocked && (
                           <View style={styles.cardLockBadge}>
-                            <Ionicons name="lock-closed" size={12} color="#fff" />
+                            <Ionicons name="lock-closed" size={12} color={COLORS.white} />
                           </View>
                         )}
                         {capsule.is_public && (
                           <View style={styles.cardPublicBadge}>
-                            <Ionicons name="globe-outline" size={10} color="#fff" />
+                            <Ionicons name="globe-outline" size={10} color={COLORS.white} />
                           </View>
                         )}
                       </View>
@@ -477,33 +476,15 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fafaf8',
+    backgroundColor: COLORS.bg,
   },
 
   // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 58,
-    paddingBottom: 12,
-    paddingHorizontal: 20,
-    backgroundColor: '#fafaf8',
-  },
   backButton: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
-    letterSpacing: -0.3,
-  },
-  headerSpacer: {
-    width: 40,
   },
 
   // Hero
@@ -524,35 +505,34 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    borderColor: '#FAC638',
+    borderColor: COLORS.ember,
     padding: 3,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.card,
   },
   avatarImage: {
     width: '100%',
     height: '100%',
     borderRadius: 47,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: COLORS.bg3,
   },
   avatarPlaceholder: {
     width: '100%',
     height: '100%',
     borderRadius: 47,
-    backgroundColor: '#FFF8E1',
+    backgroundColor: COLORS.emberSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   // Name
   displayName: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1e293b',
-    letterSpacing: -0.3,
+    ...font('display'),
+    color: COLORS.text,
   },
   username: {
+    ...font('body'),
     fontSize: 14,
-    color: '#94a3b8',
+    color: COLORS.text3,
     marginTop: 2,
     marginBottom: 18,
   },
@@ -567,24 +547,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.card,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   statValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text,
   },
   statLabel: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: COLORS.text2,
     fontWeight: '500',
   },
 
@@ -612,14 +589,13 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
+    ...font('title'),
+    color: COLORS.text,
   },
   sectionCount: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: COLORS.text3,
   },
 
   // Cards Grid
@@ -631,14 +607,11 @@ const styles = StyleSheet.create({
   },
   card: {
     width: CARD_WIDTH,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.card,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   cardImageContainer: {
     width: '100%',
@@ -648,7 +621,7 @@ const styles = StyleSheet.create({
   cardImage: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: COLORS.bg3,
   },
   cardImagePlaceholder: {
     width: '100%',
@@ -674,7 +647,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: 'rgba(6,214,160,0.8)',
+    backgroundColor: 'rgba(61,155,122,0.85)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -684,12 +657,12 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text,
     marginBottom: 3,
   },
   cardTime: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: COLORS.text2,
   },
 
   // Loading
@@ -703,47 +676,45 @@ const styles = StyleSheet.create({
     padding: 32,
     margin: 16,
     borderRadius: 16,
-    backgroundColor: '#fee2e2',
+    backgroundColor: 'rgba(231,76,60,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(231,76,60,0.3)',
     alignItems: 'center',
     gap: 12,
   },
   errorText: {
     fontSize: 16,
-    color: '#b91c1c',
+    color: COLORS.danger,
     textAlign: 'center',
   },
 
   // Empty
   emptyBox: {
     marginHorizontal: 20,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.card,
     borderRadius: 20,
     padding: 32,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 1,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   emptyIcon: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#FFF8E1',
+    backgroundColor: COLORS.emberSoft,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
+    ...font('title'),
+    color: COLORS.text,
     marginBottom: 6,
   },
   emptyText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: COLORS.text2,
     textAlign: 'center',
     lineHeight: 20,
   },

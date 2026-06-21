@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "TimeCapsule",
+    "name": "Voorcap",
     "slug": "time-capsule",
     "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "automatic",
-    "scheme": "timecapsule",
+    "userInterfaceStyle": "dark",
+    "scheme": "voorcap",
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FAC638"
+      "backgroundColor": "#0E1116"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -19,17 +19,17 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.timecapsule.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "TimeCapsule needs camera access to take photos for your time capsules and profile picture.",
-        "NSPhotoLibraryUsageDescription": "TimeCapsule needs photo library access to add photos to your time capsules.",
-        "NSLocationWhenInUseUsageDescription": "TimeCapsule uses your location to place capsules on the map and discover nearby capsules.",
-        "NSUserNotificationsUsageDescription": "TimeCapsule sends notifications when your capsules are ready to open or when friends interact with you."
+        "NSCameraUsageDescription": "Voorcap needs camera access to take photos for your caps and profile picture.",
+        "NSPhotoLibraryUsageDescription": "Voorcap needs photo library access to add photos to your caps.",
+        "NSLocationWhenInUseUsageDescription": "Voorcap uses your location to drop caps on the map and discover sealed moments nearby.",
+        "NSUserNotificationsUsageDescription": "Voorcap notifies you when a cap is ready to open or when someone interacts with you."
       }
     },
     "android": {
       "package": "com.timecapsule.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FAC638"
+        "backgroundColor": "#0E1116"
       },
       "permissions": [
         "INTERNET",
@@ -44,36 +44,47 @@
       "intentFilters": [
         {
           "action": "VIEW",
-          "data": [{ "scheme": "timecapsule" }],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "data": [
+            {
+              "scheme": "voorcap"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "plugins": [
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "TimeCapsule uses your location to place capsules on the map and discover nearby capsules."
+          "locationWhenInUsePermission": "Voorcap uses your location to drop caps on the map and discover sealed moments nearby."
         }
       ],
       [
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#FAC638"
+          "color": "#E8633A"
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "TimeCapsule needs photo library access to add photos to your time capsules.",
-          "cameraPermission": "TimeCapsule needs camera access to take photos for your capsules and profile picture."
+          "photosPermission": "Voorcap needs photo library access to add photos to your caps.",
+          "cameraPermission": "Voorcap needs camera access to take photos for your caps and profile picture."
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "notification": {
-      "color": "#FAC638",
+      "color": "#E8633A",
       "iosDisplayInForeground": true
     },
     "extra": {}

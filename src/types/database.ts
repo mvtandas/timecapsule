@@ -17,6 +17,8 @@ export interface Database {
           email: string | null
           avatar_url: string | null
           phone_number: string | null
+          bio: string | null
+          location: string | null
           created_at: string
         }
         Insert: {
@@ -26,6 +28,8 @@ export interface Database {
           email?: string | null
           avatar_url?: string | null
           phone_number?: string | null
+          bio?: string | null
+          location?: string | null
           created_at?: string
         }
         Update: {
@@ -35,6 +39,8 @@ export interface Database {
           email?: string | null
           avatar_url?: string | null
           phone_number?: string | null
+          bio?: string | null
+          location?: string | null
           created_at?: string
         }
         Relationships: []

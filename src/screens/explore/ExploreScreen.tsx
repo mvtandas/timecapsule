@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, Dimensions, Platform, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, Circle, Callout } from 'react-native-maps';
+import MapView, { Marker, Circle, Callout, PROVIDER_GOOGLE } from 'react-native-maps';
+import { DARK_MAP_STYLE } from '../../constants/mapStyle';
 import * as Location from 'expo-location';
 import { CapsuleService } from '../../services/capsuleService';
 import CapsuleDetailModal from '../../components/CapsuleDetailModal';
 import { calculateDistance, formatDistance } from '../../utils/geoUtils';
 import { isLocked } from '../../utils/mediaUtils';
+import { COLORS, font } from '../../constants/theme';
+import { capColor } from '../../constants/capTypes';
+import { useT } from '../../i18n';
 
 const { width, height } = Dimensions.get('window');
 
@@ -21,6 +25,7 @@ interface ExploreScreenProps {
 const RADIUS_KM = 50; // 50km radius to view capsules
 
 const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
+  const t = useT();
   const [location, setLocation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [nearbyCapsules, setNearbyCapsules] = useState<any[]>([]);
@@ -86,7 +91,7 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
       }
     } catch (error) {
       if (__DEV__) console.error('Error loading location:', error);
-      Alert.alert('Error', 'Failed to load location');
+      Alert.alert(t('explore.alert_error_title'), t('explore.alert_load_location_msg'));
     } finally {
       setLoading(false);
     }
@@ -123,8 +128,8 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
 
     if (distance > 5) {
       Alert.alert(
-        'Too Far Away',
-        `This capsule is ${formatDistance(distance)} away. You need to be within 5km to open it.`
+        t('explore.alert_too_far_title'),
+        t('explore.alert_too_far_msg', { distance: formatDistance(distance) })
       );
       return;
     }
@@ -134,8 +139,8 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
       const openDate = new Date(capsule.open_at);
       if (openDate > new Date()) {
         Alert.alert(
-          'Locked',
-          `This capsule will unlock on ${openDate.toLocaleDateString()}`
+          t('explore.alert_locked_title'),
+          t('explore.alert_locked_msg', { date: openDate.toLocaleDateString() })
         );
         return;
       }
@@ -153,49 +158,63 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Explore Capsules</Text>
+        <Text style={styles.headerTitle}>{t('explore.header_title')}</Text>
         <View style={styles.headerButtons}>
+          <TouchableOpacity onPress={() => onNavigate('Search')} style={styles.refreshButton}>
+            <Ionicons name="search" size={24} color={COLORS.ember} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={loadLocation} style={styles.refreshButton}>
-            <Ionicons name="refresh" size={24} color="#FAC638" />
+            <Ionicons name="refresh" size={24} color={COLORS.ember} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setMapView(mapView === 'standard' ? 'satellite' : 'standard')}
-            style={styles.mapToggle}
+            style={[styles.mapToggle, mapView === 'satellite' && styles.mapToggleActive]}
           >
-            <Ionicons name="layers-outline" size={24} color="#FAC638" />
+            <Ionicons
+              name={mapView === 'satellite' ? 'earth' : 'layers-outline'}
+              size={24}
+              color={mapView === 'satellite' ? COLORS.white : COLORS.ember}
+            />
           </TouchableOpacity>
         </View>
       </View>
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FAC638" />
-          <Text style={styles.loadingText}>Finding nearby capsules...</Text>
+          <ActivityIndicator size="large" color={COLORS.ember} />
+          <Text style={styles.loadingText}>{t('explore.finding_nearby')}</Text>
         </View>
       ) : !location ? (
         <View style={styles.errorContainer}>
-          <Ionicons name="location-outline" size={80} color="#FAC638" />
+          <Ionicons name="location-outline" size={80} color={COLORS.ember} />
           <Text style={styles.errorTitle}>
-            {locationDenied ? 'Location Access Denied' : 'Location Not Available'}
+            {locationDenied ? t('explore.location_denied_title') : t('explore.location_unavailable_title')}
           </Text>
           <Text style={styles.errorText}>
             {locationDenied
-              ? 'Location access helps you discover nearby capsules. You can still browse public capsules.'
-              : 'Please enable location permissions to explore nearby capsules'}
+              ? t('explore.location_denied_text')
+              : t('explore.location_unavailable_text')}
           </Text>
-          <TouchableOpacity onPress={loadLocation} style={styles.retryButton}>
-            <Text style={styles.retryButtonText}>Try Again</Text>
+          <TouchableOpacity
+            onPress={locationDenied ? () => Linking.openSettings() : loadLocation}
+            style={styles.retryButton}
+            accessibilityRole="button"
+            accessibilityLabel={locationDenied ? t('explore.open_settings') : t('common.retry')}
+          >
+            <Text style={styles.retryButtonText}>
+              {locationDenied ? t('explore.open_settings') : t('common.retry')}
+            </Text>
           </TouchableOpacity>
           {locationDenied && (
             <TouchableOpacity onPress={loadPublicCapsules} style={styles.browsePublicButton}>
-              <Ionicons name="globe-outline" size={20} color="#FAC638" />
-              <Text style={styles.browsePublicButtonText}>Browse All Public Capsules</Text>
+              <Ionicons name="globe-outline" size={20} color={COLORS.ember} />
+              <Text style={styles.browsePublicButtonText}>{t('explore.browse_public')}</Text>
             </TouchableOpacity>
           )}
           {locationDenied && nearbyCapsules.length > 0 && (
             <ScrollView style={styles.publicCapsulesList}>
               <Text style={styles.publicCapsulesTitle}>
-                Public Capsules ({nearbyCapsules.length})
+                {t('explore.public_caps_title', { count: nearbyCapsules.length })}
               </Text>
               {nearbyCapsules.map((capsule) => (
                 <TouchableOpacity
@@ -206,14 +225,14 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
                     setShowDetailModal(true);
                   }}
                 >
-                  <Ionicons name="time-outline" size={24} color="#FAC638" />
+                  <Ionicons name="time-outline" size={24} color={COLORS.ember} />
                   <View style={styles.publicCapsuleInfo}>
                     <Text style={styles.publicCapsuleName} numberOfLines={1}>{capsule.title}</Text>
                     <Text style={styles.publicCapsuleStatus}>
-                      {isLocked(capsule.open_at) ? 'Locked' : 'Unlocked'}
+                      {isLocked(capsule.open_at) ? t('explore.status_locked') : t('explore.status_unlocked')}
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+                  <Ionicons name="chevron-forward" size={20} color={COLORS.text3} />
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -235,7 +254,7 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
                 onPress={() => setActiveFilter(filter)}
               >
                 <Text style={[styles.filterChipText, activeFilter === filter && styles.filterChipTextActive]}>
-                  {filter}
+                  {t(`explore.filter_${filter.toLowerCase()}`)}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -243,6 +262,8 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
 
           {/* Map View */}
           <MapView
+            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+            customMapStyle={DARK_MAP_STYLE}
             style={styles.map}
             mapType={mapView}
             initialRegion={{
@@ -261,8 +282,8 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
                 longitude: location.coords.longitude,
               }}
               radius={RADIUS_KM * 1000}
-              strokeColor="rgba(250, 198, 56, 0.3)"
-              fillColor="rgba(250, 198, 56, 0.05)"
+              strokeColor="rgba(232, 99, 58, 0.3)"
+              fillColor="rgba(232, 99, 58, 0.05)"
               strokeWidth={2}
             />
 
@@ -273,8 +294,8 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
                 longitude: location.coords.longitude,
               }}
               radius={5000}
-              strokeColor="rgba(6, 214, 160, 0.5)"
-              fillColor="rgba(6, 214, 160, 0.1)"
+              strokeColor="rgba(61, 155, 122, 0.5)"
+              fillColor="rgba(61, 155, 122, 0.1)"
               strokeWidth={2}
             />
 
@@ -296,19 +317,19 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
                     latitude: capsule.lat,
                     longitude: capsule.lng,
                   }}
-                  pinColor={canInteract ? (locked ? '#FF6B6B' : '#06D6A0') : '#94a3b8'}
+                  pinColor={canInteract ? (locked ? COLORS.danger : capColor(capsule.type)) : COLORS.text3}
                   onPress={() => handleCapsuleTap(capsule)}
                 >
                   <Callout>
                     <View style={styles.calloutContainer}>
                       <Text style={styles.calloutTitle}>{capsule.title}</Text>
-                      <Text style={styles.calloutDistance}>{formatDistance(distance)} away</Text>
+                      <Text style={styles.calloutDistance}>{t('explore.callout_away', { distance: formatDistance(distance) })}</Text>
                       <Text style={styles.calloutStatus}>
                         {!canInteract
-                          ? '🚫 Too far to open'
+                          ? t('explore.callout_too_far')
                           : locked
-                          ? '🔒 Locked'
-                          : '🔓 Can open'}
+                          ? t('explore.callout_locked')
+                          : t('explore.callout_can_open')}
                       </Text>
                     </View>
                   </Callout>
@@ -320,20 +341,25 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
           {/* Info Card */}
           <View style={styles.infoCard}>
             <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#06D6A0' }]} />
-              <Text style={styles.legendText}>Can open (within 5km, unlocked)</Text>
+              <View style={[styles.legendDot, { backgroundColor: COLORS.moss }]} />
+              <Text style={styles.legendText}>{t('explore.legend_can_open')}</Text>
             </View>
             <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#FF6B6B' }]} />
-              <Text style={styles.legendText}>Within 5km but locked</Text>
+              <View style={[styles.legendDot, { backgroundColor: COLORS.danger }]} />
+              <Text style={styles.legendText}>{t('explore.legend_locked')}</Text>
             </View>
             <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#94a3b8' }]} />
-              <Text style={styles.legendText}>Too far (outside 5km)</Text>
+              <View style={[styles.legendDot, { backgroundColor: COLORS.text3 }]} />
+              <Text style={styles.legendText}>{t('explore.legend_too_far')}</Text>
             </View>
             <Text style={styles.capsuleCount}>
-              Found {filteredNearbyCapsules.length} capsule{filteredNearbyCapsules.length !== 1 ? 's' : ''} within {RADIUS_KM}km
-              {activeFilter !== 'All' ? ` (${activeFilter})` : ''}
+              {t(filteredNearbyCapsules.length === 1 ? 'explore.found_count_one' : 'explore.found_count_other', {
+                count: filteredNearbyCapsules.length,
+                radius: RADIUS_KM,
+              })}
+              {activeFilter !== 'All'
+                ? t('explore.found_count_filter_suffix', { filter: t(`explore.filter_${activeFilter.toLowerCase()}`) })
+                : ''}
             </Text>
             {filteredNearbyCapsules.length === 0 && (
               <TouchableOpacity
@@ -341,7 +367,7 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
                 onPress={() => onNavigate('Create')}
                 activeOpacity={0.8}
               >
-                <Text style={styles.exploreCtaButtonText}>Create a Capsule Here</Text>
+                <Text style={styles.exploreCtaButtonText}>{t('explore.create_cap_here')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -362,7 +388,7 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f5',
+    backgroundColor: COLORS.bg,
   },
   header: {
     flexDirection: 'row',
@@ -371,15 +397,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 60,
     paddingBottom: 16,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: COLORS.border,
     zIndex: 10,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1e293b',
+    ...font('title'),
+    color: COLORS.text,
   },
   headerButtons: {
     flexDirection: 'row',
@@ -390,6 +415,10 @@ const styles = StyleSheet.create({
   },
   mapToggle: {
     padding: 8,
+    borderRadius: 10,
+  },
+  mapToggleActive: {
+    backgroundColor: COLORS.ember,
   },
   loadingContainer: {
     flex: 1,
@@ -400,7 +429,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#94a3b8',
+    color: COLORS.text2,
   },
   errorContainer: {
     flex: 1,
@@ -409,26 +438,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   errorTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1e293b',
+    ...font('title'),
+    color: COLORS.text,
     marginTop: 16,
     marginBottom: 8,
   },
   errorText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: COLORS.text2,
     textAlign: 'center',
     marginBottom: 24,
   },
   retryButton: {
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.ember,
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 12,
   },
   retryButtonText: {
-    color: 'white',
+    color: COLORS.white,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -440,11 +468,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#FAC638',
+    borderColor: COLORS.ember,
     gap: 8,
   },
   browsePublicButtonText: {
-    color: '#FAC638',
+    color: COLORS.ember,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -454,21 +482,22 @@ const styles = StyleSheet.create({
     maxHeight: 300,
   },
   publicCapsulesTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
+    ...font('subtitle'),
+    color: COLORS.text,
     marginBottom: 12,
     paddingHorizontal: 16,
   },
   publicCapsuleItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: COLORS.card,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 12,
     marginBottom: 8,
     marginHorizontal: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -482,18 +511,18 @@ const styles = StyleSheet.create({
   publicCapsuleName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text,
   },
   publicCapsuleStatus: {
     fontSize: 13,
-    color: '#94a3b8',
+    color: COLORS.text2,
     marginTop: 2,
   },
   filterChipsContainer: {
     maxHeight: 48,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: COLORS.border,
   },
   filterChipsContent: {
     paddingHorizontal: 16,
@@ -505,52 +534,56 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: COLORS.bg3,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border,
   },
   filterChipActive: {
-    backgroundColor: '#FAC638',
-    borderColor: '#FAC638',
+    backgroundColor: COLORS.ember,
+    borderColor: COLORS.ember,
   },
   filterChipText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#64748b',
+    color: COLORS.text2,
   },
   filterChipTextActive: {
-    color: '#ffffff',
+    color: COLORS.white,
   },
   map: {
     flex: 1,
   },
   calloutContainer: {
-    padding: 8,
+    padding: 12,
     minWidth: 150,
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
   },
   calloutTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1e293b',
+    color: COLORS.text,
     marginBottom: 4,
   },
   calloutDistance: {
     fontSize: 14,
-    color: '#64748b',
+    color: COLORS.text2,
     marginBottom: 4,
   },
   calloutStatus: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: COLORS.text3,
   },
   infoCard: {
     position: 'absolute',
-    top: 140,
+    bottom: 120, // sit above the floating glass tab bar
     left: 16,
     right: 16,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.card,
     borderRadius: 12,
     padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -570,19 +603,19 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 12,
-    color: '#64748b',
+    color: COLORS.text2,
   },
   capsuleCount: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.text,
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
+    borderTopColor: COLORS.border,
   },
   exploreCtaButton: {
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.ember,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
@@ -592,7 +625,7 @@ const styles = StyleSheet.create({
   exploreCtaButtonText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#ffffff',
+    color: COLORS.white,
   },
 });
 

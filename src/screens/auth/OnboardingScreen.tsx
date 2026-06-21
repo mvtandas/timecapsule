@@ -4,6 +4,11 @@ import {
   Dimensions, ViewToken, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { COLORS, GRADIENTS, SPACING, font } from '../../constants/theme';
+import { VoorcapMark } from '../../components/common/VoorcapLogo';
+import { useT } from '../../i18n';
 
 const { width, height } = Dimensions.get('window');
 
@@ -14,78 +19,80 @@ interface OnboardingScreenProps {
 const PAGES = [
   {
     id: '1',
-    bg: '#1a1a2e',
-    accent: '#FAC638',
+    bg: COLORS.bg,
+    accent: COLORS.ember,
     icon: 'time' as const,
     emoji: '⏳',
-    title: 'Create Time Capsules',
-    subtitle: 'Preserve your memories',
+    titleKey: 'onboarding.p1Title',
+    subKey: 'onboarding.p1Sub',
     features: [
-      { icon: 'camera' as const, text: 'Add photos & videos' },
-      { icon: 'mic' as const, text: 'Record voice messages' },
-      { icon: 'create' as const, text: 'Write letters to your future self' },
-      { icon: 'pricetags' as const, text: 'Organize with categories' },
+      { icon: 'camera' as const, textKey: 'onboarding.p1f1' },
+      { icon: 'mic' as const, textKey: 'onboarding.p1f2' },
+      { icon: 'create' as const, textKey: 'onboarding.p1f3' },
+      { icon: 'pricetags' as const, textKey: 'onboarding.p1f4' },
     ],
   },
   {
     id: '2',
-    bg: '#0f172a',
-    accent: '#06D6A0',
+    bg: COLORS.bg,
+    accent: COLORS.moss,
     icon: 'lock-closed' as const,
     emoji: '🔒',
-    title: 'Lock Until Ready',
-    subtitle: 'Set when & where it opens',
+    titleKey: 'onboarding.p2Title',
+    subKey: 'onboarding.p2Sub',
     features: [
-      { icon: 'calendar' as const, text: 'Choose an exact date & time' },
-      { icon: 'location' as const, text: 'Pin to a specific location' },
-      { icon: 'timer' as const, text: 'From 1 hour to 50 years' },
-      { icon: 'eye-off' as const, text: 'Contents hidden until unlocked' },
+      { icon: 'calendar' as const, textKey: 'onboarding.p2f1' },
+      { icon: 'location' as const, textKey: 'onboarding.p2f2' },
+      { icon: 'timer' as const, textKey: 'onboarding.p2f3' },
+      { icon: 'eye-off' as const, textKey: 'onboarding.p2f4' },
     ],
   },
   {
     id: '3',
-    bg: '#1e1b4b',
-    accent: '#818cf8',
+    bg: COLORS.bg,
+    accent: COLORS.purple,
     icon: 'map' as const,
     emoji: '🗺️',
-    title: 'Explore & Discover',
-    subtitle: 'Find capsules around you',
+    titleKey: 'onboarding.p3Title',
+    subKey: 'onboarding.p3Sub',
     features: [
-      { icon: 'navigate' as const, text: 'See capsules on the map' },
-      { icon: 'walk' as const, text: 'Go to the location to open' },
-      { icon: 'globe' as const, text: 'Public capsules from everyone' },
-      { icon: 'compass' as const, text: 'Discover nearby memories' },
+      { icon: 'navigate' as const, textKey: 'onboarding.p3f1' },
+      { icon: 'walk' as const, textKey: 'onboarding.p3f2' },
+      { icon: 'globe' as const, textKey: 'onboarding.p3f3' },
+      { icon: 'compass' as const, textKey: 'onboarding.p3f4' },
     ],
   },
   {
     id: '4',
-    bg: '#1a1a2e',
-    accent: '#FF6B6B',
+    bg: COLORS.bg,
+    accent: COLORS.blue,
     icon: 'people' as const,
     emoji: '👫',
-    title: 'Connect with Friends',
-    subtitle: 'Share memories together',
+    titleKey: 'onboarding.p4Title',
+    subKey: 'onboarding.p4Sub',
     features: [
-      { icon: 'heart' as const, text: 'React with emojis ❤️ 🔥 🎉' },
-      { icon: 'chatbubble' as const, text: 'Comment & @mention friends' },
-      { icon: 'flame' as const, text: 'Build sharing streaks' },
-      { icon: 'notifications' as const, text: 'Get notified when tagged' },
+      { icon: 'heart' as const, textKey: 'onboarding.p4f1' },
+      { icon: 'chatbubble' as const, textKey: 'onboarding.p4f2' },
+      { icon: 'flame' as const, textKey: 'onboarding.p4f3' },
+      { icon: 'notifications' as const, textKey: 'onboarding.p4f4' },
     ],
   },
   {
     id: '5',
-    bg: '#FAC638',
-    accent: '#1a1a2e',
+    bg: COLORS.bg,
+    accent: COLORS.ember,
     icon: 'rocket' as const,
     emoji: '🚀',
-    title: "You're Ready!",
-    subtitle: 'Start capturing moments',
+    titleKey: 'onboarding.p5Title',
+    subKey: 'onboarding.p5Sub',
     features: [],
     isFinal: true,
   },
 ];
 
 const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
+  const insets = useSafeAreaInsets();
+  const t = useT();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
@@ -108,25 +115,27 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
 
   const renderPage = ({ item, index }: { item: typeof PAGES[0]; index: number }) => {
     const isFinal = (item as any).isFinal;
-    const isLight = item.bg === '#FAC638';
-    const textColor = isLight ? '#1a1a2e' : '#fff';
-    const subtextColor = isLight ? 'rgba(26,26,46,0.6)' : 'rgba(255,255,255,0.6)';
+    const textColor = COLORS.text;
+    const subtextColor = COLORS.text2;
 
     return (
       <View style={[styles.page, { backgroundColor: item.bg }]}>
         {/* Content */}
         <View style={styles.content}>
-          {/* Big emoji */}
-          <Text style={styles.emoji}>{item.emoji}</Text>
-
-          {/* Icon circle */}
-          <View style={[styles.iconCircle, { backgroundColor: item.accent + '25' }]}>
-            <Ionicons name={item.icon} size={44} color={item.accent} />
-          </View>
+          {/* Single brand/icon mark (no stacked emoji) */}
+          {index === 0 ? (
+            <View style={styles.markWrap}>
+              <VoorcapMark size={76} />
+            </View>
+          ) : (
+            <View style={[styles.iconCircle, { backgroundColor: item.accent + '25' }]}>
+              <Ionicons name={item.icon} size={44} color={item.accent} />
+            </View>
+          )}
 
           {/* Title */}
-          <Text style={[styles.title, { color: textColor }]}>{item.title}</Text>
-          <Text style={[styles.subtitle, { color: subtextColor }]}>{item.subtitle}</Text>
+          <Text style={[styles.title, font('display'), { color: textColor }]}>{t(item.titleKey)}</Text>
+          <Text style={[styles.subtitle, { color: subtextColor }]}>{t(item.subKey)}</Text>
 
           {/* Feature list */}
           {item.features.length > 0 && (
@@ -136,7 +145,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                   <View style={[styles.featureIcon, { backgroundColor: item.accent + '20' }]}>
                     <Ionicons name={f.icon} size={18} color={item.accent} />
                   </View>
-                  <Text style={[styles.featureText, { color: textColor }]}>{f.text}</Text>
+                  <Text style={[styles.featureText, { color: textColor }]}>{t(f.textKey)}</Text>
                 </View>
               ))}
             </View>
@@ -146,17 +155,24 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
           {isFinal && (
             <View style={styles.finalContent}>
               <Text style={[styles.finalText, { color: textColor }]}>
-                Create your first time capsule{'\n'}and start preserving memories
+                {t('onboarding.p5Body')}
               </Text>
               <TouchableOpacity
-                style={[styles.startButton, { backgroundColor: item.accent }]}
+                style={styles.startButton}
                 onPress={onComplete}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.startButtonText, { color: '#FAC638' }]}>
-                  Let's Go!
-                </Text>
-                <Ionicons name="arrow-forward" size={20} color="#FAC638" />
+                <LinearGradient
+                  colors={GRADIENTS.ember as readonly [string, string]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.startButtonGradient}
+                >
+                  <Text style={[styles.startButtonText, { color: COLORS.white }]}>
+                    {t('onboarding.letsGo')}
+                  </Text>
+                  <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           )}
@@ -187,11 +203,11 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       />
 
       {/* Bottom controls */}
-      <View style={styles.bottomBar}>
+      <View style={[styles.bottomBar, { bottom: insets.bottom + SPACING.xl }]}>
         {/* Skip */}
         {!isLast ? (
           <TouchableOpacity onPress={onComplete} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Text style={styles.skipText}>Skip</Text>
+            <Text style={styles.skipText}>{t('common.skip')}</Text>
           </TouchableOpacity>
         ) : (
           <View style={{ width: 40 }} />
@@ -223,7 +239,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
         {/* Next */}
         {!isLast ? (
           <TouchableOpacity onPress={goNext} style={styles.nextButton}>
-            <Ionicons name="arrow-forward" size={22} color="#1a1a2e" />
+            <Ionicons name="arrow-forward" size={22} color={COLORS.white} />
           </TouchableOpacity>
         ) : (
           <View style={{ width: 40 }} />
@@ -236,7 +252,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: COLORS.bg,
   },
   page: {
     width,
@@ -250,10 +266,9 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
 
-  // Emoji
-  emoji: {
-    fontSize: 48,
-    marginBottom: 16,
+  // Brand mark
+  markWrap: {
+    marginBottom: 28,
   },
 
   // Icon
@@ -316,6 +331,10 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   startButton: {
+    borderRadius: 28,
+    overflow: 'hidden',
+  },
+  startButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -331,7 +350,6 @@ const styles = StyleSheet.create({
   // Bottom bar
   bottomBar: {
     position: 'absolute',
-    bottom: 50,
     left: 0,
     right: 0,
     flexDirection: 'row',
@@ -342,7 +360,7 @@ const styles = StyleSheet.create({
   skipText: {
     fontSize: 16,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.5)',
+    color: COLORS.text2,
   },
   dots: {
     flexDirection: 'row',
@@ -352,13 +370,13 @@ const styles = StyleSheet.create({
   dot: {
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.ember,
   },
   nextButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.ember,
     alignItems: 'center',
     justifyContent: 'center',
   },

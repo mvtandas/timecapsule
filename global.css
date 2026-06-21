@@ -2,17 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom styles for Time Capsule app */
+/* Custom styles for Voorcap app */
 body {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  body {
-    background-color: #231e0f;
-    color: #F9FAFB;
-  }
+  font-family: system-ui, -apple-system, sans-serif;
+  background-color: #0B0E13;
+  color: #EDE8DD;
 }
 
 /* Custom animations */

@@ -3,6 +3,9 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIn
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/authStore';
 import { AuthService } from '../../lib/auth';
+import { COLORS, font } from '../../constants/theme';
+import ScreenHeader from '../../components/common/ScreenHeader';
+import { useT, useLanguage, LANGUAGES } from '../../i18n';
 
 interface AccountSettingsScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -11,6 +14,8 @@ interface AccountSettingsScreenProps {
 }
 
 const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettingsScreenProps) => {
+  const t = useT();
+  const { locale, setLocale } = useLanguage();
   const { user, updateProfile } = useAuthStore();
 
   // Edit fields
@@ -18,7 +23,10 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
   const [editEmail, setEditEmail] = useState(user?.email || '');
   const [editUsername, setEditUsername] = useState(user?.username || '');
   const [editPhoneNumber, setEditPhoneNumber] = useState(user?.phone_number || '');
+  const [editLocation, setEditLocation] = useState(user?.location || '');
+  const [editBio, setEditBio] = useState(user?.bio || '');
   const [savingInfo, setSavingInfo] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; username?: string; phone?: string }>({});
 
   // Password change fields
   const [showPasswordChange, setShowPasswordChange] = useState(false);
@@ -32,6 +40,8 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
     email: user?.email || '',
     username: user?.username || '',
     phoneNumber: user?.phone_number || '',
+    location: user?.location || '',
+    bio: user?.bio || '',
   });
 
   useEffect(() => {
@@ -41,11 +51,15 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
         email: user.email || '',
         username: user.username || '',
         phoneNumber: user.phone_number || '',
+        location: user.location || '',
+        bio: user.bio || '',
       };
       setEditDisplayName(vals.displayName);
       setEditEmail(vals.email);
       setEditUsername(vals.username);
       setEditPhoneNumber(vals.phoneNumber);
+      setEditLocation(vals.location);
+      setEditBio(vals.bio);
       setOriginalValues(vals);
     }
   }, [user]);
@@ -53,8 +67,10 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
   const hasChanges =
     editDisplayName !== originalValues.displayName ||
     editEmail !== originalValues.email ||
-    editUsername !== originalValues.username ||
-    editPhoneNumber !== originalValues.phoneNumber;
+    editUsername.toLowerCase() !== originalValues.username.toLowerCase() ||
+    editPhoneNumber !== originalValues.phoneNumber ||
+    editLocation !== originalValues.location ||
+    editBio !== originalValues.bio;
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -73,21 +89,13 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
   };
 
   const handleSaveInfo = async () => {
-    // Validate inputs
-    if (!validateEmail(editEmail)) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address.');
-      return;
-    }
-
-    if (editUsername && !validateUsername(editUsername)) {
-      Alert.alert('Invalid Username', 'Username must be 3-20 characters long and contain only letters, numbers, and underscores.');
-      return;
-    }
-
-    if (editPhoneNumber && !validatePhoneNumber(editPhoneNumber)) {
-      Alert.alert('Invalid Phone Number', 'Please enter a valid phone number.');
-      return;
-    }
+    // Inline field validation
+    const fe: { email?: string; username?: string; phone?: string } = {};
+    if (!validateEmail(editEmail)) fe.email = t('auth.invalid_email');
+    if (editUsername && !validateUsername(editUsername)) fe.username = t('settingsMore.alert_invalid_username_msg');
+    if (editPhoneNumber && !validatePhoneNumber(editPhoneNumber)) fe.phone = t('settingsMore.alert_invalid_phone_msg');
+    if (Object.keys(fe).length) { setErrors(fe); return; }
+    setErrors({});
 
     try {
       setSavingInfo(true);
@@ -96,17 +104,19 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
       const usernameChanged = editUsername !== originalValues.username;
       const phoneChanged = editPhoneNumber !== originalValues.phoneNumber;
       const displayNameChanged = editDisplayName !== originalValues.displayName;
+      const locationChanged = editLocation !== originalValues.location;
+      const bioChanged = editBio !== originalValues.bio;
 
       // Update email separately via auth if changed
       if (emailChanged) {
         const { error: emailError } = await AuthService.updateEmail(editEmail);
         if (emailError) {
-          throw new Error((emailError as any).message || 'Failed to update email');
+          throw new Error((emailError as any).message || t('settingsMore.err_update_email'));
         }
       }
 
       // Update profile fields if changed
-      if (usernameChanged || phoneChanged || displayNameChanged) {
+      if (usernameChanged || phoneChanged || displayNameChanged || locationChanged || bioChanged) {
         const profileUpdates: any = {};
 
         if (usernameChanged) {
@@ -121,14 +131,22 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
           profileUpdates.display_name = editDisplayName;
         }
 
+        if (locationChanged) {
+          profileUpdates.location = editLocation.trim() || null;
+        }
+
+        if (bioChanged) {
+          profileUpdates.bio = editBio.trim() || null;
+        }
+
         const { error: profileError } = await updateProfile(profileUpdates);
 
         if (profileError) {
           const errorMsg = profileError.message || '';
           if (errorMsg.toLowerCase().includes('username') && errorMsg.toLowerCase().includes('already')) {
-            throw new Error('Username is already taken. Please choose a different one.');
+            throw new Error(t('settingsMore.err_username_taken'));
           }
-          throw new Error(errorMsg || 'Failed to update profile');
+          throw new Error(errorMsg || t('settingsMore.err_update_profile'));
         }
       }
 
@@ -144,14 +162,16 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
         email: editEmail,
         username: editUsername,
         phoneNumber: editPhoneNumber,
+        location: editLocation,
+        bio: editBio,
       });
 
-      Alert.alert('Success', 'Profile updated successfully!');
+      Alert.alert(t('settingsMore.alert_success_title'), t('settingsMore.alert_profile_updated_msg'));
     } catch (error: any) {
       if (__DEV__) console.error('Error updating account info:', error);
       Alert.alert(
-        'Update Failed',
-        error.message || 'Failed to update account information. Please try again.'
+        t('settingsMore.alert_update_failed_title'),
+        error.message || t('settingsMore.alert_update_failed_msg')
       );
     } finally {
       setSavingInfo(false);
@@ -160,12 +180,12 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
 
   const handleChangePassword = async () => {
     if (newPassword.length < 6) {
-      Alert.alert('Invalid Password', 'Password must be at least 6 characters long.');
+      Alert.alert(t('settingsMore.alert_invalid_password_title'), t('settingsMore.alert_invalid_password_msg'));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      Alert.alert('Passwords Do Not Match', 'Please make sure both passwords match.');
+      Alert.alert(t('settingsMore.alert_password_mismatch_title'), t('settingsMore.alert_password_mismatch_msg'));
       return;
     }
 
@@ -174,18 +194,18 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
       const { error } = await AuthService.changePassword(newPassword);
 
       if (error) {
-        throw new Error((error as any).message || 'Failed to change password');
+        throw new Error((error as any).message || t('settingsMore.err_change_password'));
       }
 
       setNewPassword('');
       setConfirmPassword('');
       setShowPasswordChange(false);
-      Alert.alert('Success', 'Your password has been changed successfully.');
+      Alert.alert(t('settingsMore.alert_success_title'), t('settingsMore.alert_password_changed_msg'));
     } catch (error: any) {
       if (__DEV__) console.error('Error changing password:', error);
       Alert.alert(
-        'Password Change Failed',
-        error.message || 'Failed to change password. Please try again.'
+        t('settingsMore.alert_password_failed_title'),
+        error.message || t('settingsMore.alert_password_failed_msg')
       );
     } finally {
       setSavingPassword(false);
@@ -194,23 +214,23 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Delete Account',
-      'This will permanently delete your account, all your capsules, comments, and data. This action cannot be undone.',
+      t('settingsMore.alert_delete_account_title'),
+      t('settingsMore.alert_delete_account_msg'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete Forever',
+          text: t('settingsMore.delete_forever'),
           style: 'destructive',
           onPress: async () => {
             try {
               const { error } = await AuthService.deleteAccount();
               if (error) {
-                Alert.alert('Error', 'Failed to delete account. Please try again.');
+                Alert.alert(t('settingsMore.alert_error_title'), t('settingsMore.alert_delete_failed_msg'));
               } else {
                 onLogout();
               }
             } catch {
-              Alert.alert('Error', 'Something went wrong.');
+              Alert.alert(t('settingsMore.alert_error_title'), t('settingsMore.alert_something_wrong_msg'));
             }
           },
         },
@@ -219,9 +239,9 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
   };
 
   const handleLogoutPress = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', onPress: onLogout, style: 'destructive' },
+    Alert.alert(t('settingsMore.alert_logout_title'), t('settingsMore.alert_logout_msg'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('settingsMore.logout'), onPress: onLogout, style: 'destructive' },
     ]);
   };
 
@@ -240,29 +260,19 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
         <Ionicons
           name={icon as any}
           size={20}
-          color={options?.destructive ? '#FF3B30' : '#1e293b'}
+          color={options?.destructive ? COLORS.danger : COLORS.text}
         />
         <Text style={[styles.menuItemLabel, options?.destructive && styles.menuItemLabelDestructive]}>
           {label}
         </Text>
       </View>
-      <Ionicons name="chevron-forward" size={18} color="#c7c7cc" />
+      <Ionicons name="chevron-forward" size={18} color={COLORS.text3} />
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => onGoBack && onGoBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#1e293b" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <ScreenHeader title={t('settingsMore.header_title')} onBack={onGoBack} />
 
       <ScrollView
         style={styles.content}
@@ -276,69 +286,120 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
               <Image source={{ uri: user.avatar_url }} style={styles.profileCardAvatarImage} />
             ) : (
               <View style={styles.profileCardAvatarPlaceholder}>
-                <Ionicons name="person" size={36} color="white" />
+                <Ionicons name="person" size={36} color={COLORS.white} />
               </View>
             )}
           </View>
-          <Text style={styles.profileCardName}>{user?.display_name || 'User'}</Text>
-          <Text style={styles.profileCardUsername}>@{user?.username || 'username'}</Text>
+          <Text style={styles.profileCardName}>{user?.display_name || t('settingsMore.default_user')}</Text>
+          <Text style={styles.profileCardUsername}>@{user?.username || t('settingsMore.default_username')}</Text>
+        </View>
+
+        {/* Language Section */}
+        <Text style={styles.sectionHeader}>{t('settings.language').toUpperCase()}</Text>
+        <View style={styles.card}>
+          {LANGUAGES.map((l, i) => {
+            const active = locale === l.code;
+            return (
+              <TouchableOpacity
+                key={l.code}
+                style={[styles.langItem, i < LANGUAGES.length - 1 && styles.langItemBorder]}
+                onPress={() => setLocale(l.code)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.langFlag}>{l.flag}</Text>
+                <Text style={[styles.langItemLabel, active && styles.langItemLabelActive]}>{l.label}</Text>
+                {active && <Ionicons name="checkmark" size={20} color={COLORS.ember} />}
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* Edit Profile Section */}
-        <Text style={styles.sectionHeader}>EDIT PROFILE</Text>
+        <Text style={styles.sectionHeader}>{t('settingsMore.section_edit_profile')}</Text>
         <View style={styles.card}>
           <View style={styles.editField}>
-            <Text style={styles.editFieldLabel}>Display Name</Text>
+            <Text style={styles.editFieldLabel}>{t('settingsMore.label_display_name')}</Text>
             <TextInput
               style={styles.editFieldInput}
               value={editDisplayName}
               onChangeText={setEditDisplayName}
-              placeholder="Enter display name"
-              placeholderTextColor="#c7c7cc"
+              placeholder={t('settingsMore.placeholder_display_name')}
+              placeholderTextColor={COLORS.text3}
               autoCapitalize="words"
             />
           </View>
           <View style={styles.editFieldSeparator} />
 
           <View style={styles.editField}>
-            <Text style={styles.editFieldLabel}>Username</Text>
+            <Text style={[styles.editFieldLabel, !!errors.username && styles.editFieldLabelError]}>{t('settingsMore.label_username')}</Text>
             <TextInput
               style={styles.editFieldInput}
               value={editUsername}
-              onChangeText={setEditUsername}
-              placeholder="Enter username"
-              placeholderTextColor="#c7c7cc"
+              onChangeText={(v) => { setEditUsername(v); if (errors.username) setErrors((e) => ({ ...e, username: undefined })); }}
+              placeholder={t('settingsMore.placeholder_username')}
+              placeholderTextColor={COLORS.text3}
               autoCapitalize="none"
               autoCorrect={false}
             />
+            {!!errors.username && <Text style={styles.fieldError}>{errors.username}</Text>}
           </View>
           <View style={styles.editFieldSeparator} />
 
           <View style={styles.editField}>
-            <Text style={styles.editFieldLabel}>Email</Text>
+            <Text style={[styles.editFieldLabel, !!errors.email && styles.editFieldLabelError]}>{t('settingsMore.label_email')}</Text>
             <TextInput
               style={styles.editFieldInput}
               value={editEmail}
-              onChangeText={setEditEmail}
-              placeholder="Enter email"
-              placeholderTextColor="#c7c7cc"
+              onChangeText={(v) => { setEditEmail(v); if (errors.email) setErrors((e) => ({ ...e, email: undefined })); }}
+              placeholder={t('settingsMore.placeholder_email')}
+              placeholderTextColor={COLORS.text3}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+            />
+            {!!errors.email && <Text style={styles.fieldError}>{errors.email}</Text>}
+          </View>
+          <View style={styles.editFieldSeparator} />
+
+          <View style={styles.editField}>
+            <Text style={[styles.editFieldLabel, !!errors.phone && styles.editFieldLabelError]}>{t('settingsMore.label_phone')}</Text>
+            <TextInput
+              style={styles.editFieldInput}
+              value={editPhoneNumber}
+              onChangeText={(v) => { setEditPhoneNumber(v); if (errors.phone) setErrors((e) => ({ ...e, phone: undefined })); }}
+              placeholder={t('settingsMore.placeholder_phone')}
+              placeholderTextColor={COLORS.text3}
+              keyboardType="phone-pad"
+            />
+            {!!errors.phone && <Text style={styles.fieldError}>{errors.phone}</Text>}
+          </View>
+          <View style={styles.editFieldSeparator} />
+
+          <View style={styles.editField}>
+            <Text style={styles.editFieldLabel}>{t('settingsMore.label_location')}</Text>
+            <TextInput
+              style={styles.editFieldInput}
+              value={editLocation}
+              onChangeText={setEditLocation}
+              placeholder={t('settingsMore.placeholder_location')}
+              placeholderTextColor={COLORS.text3}
+              autoCapitalize="words"
             />
           </View>
           <View style={styles.editFieldSeparator} />
 
           <View style={styles.editFieldLast}>
-            <Text style={styles.editFieldLabel}>Phone</Text>
+            <Text style={styles.editFieldLabel}>{t('settingsMore.label_bio')}</Text>
             <TextInput
-              style={styles.editFieldInput}
-              value={editPhoneNumber}
-              onChangeText={setEditPhoneNumber}
-              placeholder="Enter phone number"
-              placeholderTextColor="#c7c7cc"
-              keyboardType="phone-pad"
+              style={[styles.editFieldInput, styles.bioInput]}
+              value={editBio}
+              onChangeText={(v) => setEditBio(v.slice(0, 160))}
+              placeholder={t('settingsMore.placeholder_bio')}
+              placeholderTextColor={COLORS.text3}
+              multiline
+              maxLength={160}
             />
+            <Text style={styles.bioCounter}>{editBio.length}/160</Text>
           </View>
 
           {hasChanges && (
@@ -349,16 +410,16 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
               disabled={savingInfo}
             >
               {savingInfo ? (
-                <ActivityIndicator size="small" color="#1e293b" />
+                <ActivityIndicator size="small" color={COLORS.white} />
               ) : (
-                <Text style={styles.saveButtonText}>Save Changes</Text>
+                <Text style={styles.saveButtonText}>{t('settingsMore.btn_save_changes')}</Text>
               )}
             </TouchableOpacity>
           )}
         </View>
 
         {/* Change Password Section */}
-        <Text style={styles.sectionHeader}>CHANGE PASSWORD</Text>
+        <Text style={styles.sectionHeader}>{t('settingsMore.section_change_password')}</Text>
         <View style={styles.card}>
           {!showPasswordChange ? (
             <TouchableOpacity
@@ -367,21 +428,21 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
               activeOpacity={0.6}
             >
               <View style={styles.menuItemLeft}>
-                <Ionicons name="lock-closed-outline" size={20} color="#1e293b" />
-                <Text style={styles.menuItemLabel}>Change Password</Text>
+                <Ionicons name="lock-closed-outline" size={20} color={COLORS.text} />
+                <Text style={styles.menuItemLabel}>{t('settingsMore.menu_change_password')}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color="#c7c7cc" />
+              <Ionicons name="chevron-forward" size={18} color={COLORS.text3} />
             </TouchableOpacity>
           ) : (
             <View>
               <View style={styles.editField}>
-                <Text style={styles.editFieldLabel}>New Password</Text>
+                <Text style={styles.editFieldLabel}>{t('settingsMore.label_new_password')}</Text>
                 <TextInput
                   style={styles.editFieldInput}
                   value={newPassword}
                   onChangeText={setNewPassword}
-                  placeholder="Enter new password"
-                  placeholderTextColor="#c7c7cc"
+                  placeholder={t('settingsMore.placeholder_new_password')}
+                  placeholderTextColor={COLORS.text3}
                   secureTextEntry
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -390,13 +451,13 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
               <View style={styles.editFieldSeparator} />
 
               <View style={styles.editFieldLast}>
-                <Text style={styles.editFieldLabel}>Confirm Password</Text>
+                <Text style={styles.editFieldLabel}>{t('settingsMore.label_confirm_password')}</Text>
                 <TextInput
                   style={styles.editFieldInput}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
-                  placeholder="Confirm new password"
-                  placeholderTextColor="#c7c7cc"
+                  placeholder={t('settingsMore.placeholder_confirm_password')}
+                  placeholderTextColor={COLORS.text3}
                   secureTextEntry
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -413,7 +474,7 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.passwordCancelText}>Cancel</Text>
+                  <Text style={styles.passwordCancelText}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -423,9 +484,9 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
                   disabled={savingPassword}
                 >
                   {savingPassword ? (
-                    <ActivityIndicator size="small" color="#1e293b" />
+                    <ActivityIndicator size="small" color={COLORS.white} />
                   ) : (
-                    <Text style={styles.saveButtonText}>Update Password</Text>
+                    <Text style={styles.saveButtonText}>{t('settingsMore.btn_update_password')}</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -434,31 +495,31 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
         </View>
 
         {/* Account Group */}
-        <Text style={styles.sectionHeader}>ACCOUNT</Text>
+        <Text style={styles.sectionHeader}>{t('settingsMore.section_account')}</Text>
         <View style={styles.card}>
-          {renderMenuItem('notifications-outline', 'Notifications', () => onNavigate('Notifications'), { isLast: true })}
+          {renderMenuItem('notifications-outline', t('settingsMore.menu_notifications'), () => onNavigate('Notifications'), { isLast: true })}
         </View>
 
         {/* Support Group */}
-        <Text style={styles.sectionHeader}>SUPPORT</Text>
+        <Text style={styles.sectionHeader}>{t('settingsMore.section_support')}</Text>
         <View style={styles.card}>
-          {renderMenuItem('help-circle-outline', 'Help & Support', () => {
-            Alert.alert('Help & Support', 'Need help? Contact us at support@timecapsule.app');
+          {renderMenuItem('help-circle-outline', t('settingsMore.menu_help_support'), () => {
+            Alert.alert(t('settingsMore.alert_help_title'), t('settingsMore.alert_help_msg'));
           })}
-          {renderMenuItem('information-circle-outline', 'About', () => {
-            Alert.alert('About TimeCapsule', 'TimeCapsule v1.0.0\n\nSave your memories for the future.');
+          {renderMenuItem('information-circle-outline', t('settingsMore.menu_about'), () => {
+            Alert.alert(t('settingsMore.alert_about_title'), t('settingsMore.alert_about_msg'));
           }, { isLast: true })}
         </View>
 
         {/* Actions Group */}
-        <Text style={styles.sectionHeader}>ACTIONS</Text>
+        <Text style={styles.sectionHeader}>{t('settingsMore.section_actions')}</Text>
         <View style={styles.card}>
-          {renderMenuItem('log-out-outline', 'Logout', handleLogoutPress, { destructive: true })}
-          {renderMenuItem('trash-outline', 'Delete Account', handleDeleteAccount, { destructive: true, isLast: true })}
+          {renderMenuItem('log-out-outline', t('settingsMore.menu_logout'), handleLogoutPress, { destructive: true })}
+          {renderMenuItem('trash-outline', t('settingsMore.menu_delete_account'), handleDeleteAccount, { destructive: true, isLast: true })}
         </View>
 
         {/* Version */}
-        <Text style={styles.versionText}>TimeCapsule v1.0.0</Text>
+        <Text style={styles.versionText}>Voorcap v1.0.0</Text>
       </ScrollView>
     </View>
   );
@@ -467,31 +528,7 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f2f2f7',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 16,
-    backgroundColor: '#f2f2f7',
-  },
-  backButton: {
-    padding: 4,
-    width: 32,
-    alignItems: 'flex-start',
-  },
-  headerSpacer: {
-    width: 32,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1e293b',
-    flex: 1,
-    textAlign: 'center',
+    backgroundColor: COLORS.bg,
   },
   content: {
     flex: 1,
@@ -502,17 +539,14 @@ const styles = StyleSheet.create({
   },
   // Profile Card
   profileCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.card,
     borderRadius: 14,
     paddingVertical: 24,
     paddingHorizontal: 20,
     alignItems: 'center',
     marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   profileCardAvatar: {
     marginBottom: 12,
@@ -526,39 +560,33 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.ember,
     alignItems: 'center',
     justifyContent: 'center',
   },
   profileCardName: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1e293b',
+    ...font('title'),
+    color: COLORS.text,
     marginBottom: 2,
   },
   profileCardUsername: {
     fontSize: 15,
-    color: '#8e8e93',
+    color: COLORS.text3,
   },
   // Section Header
   sectionHeader: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#8e8e93',
+    ...font('eyebrow'),
+    color: COLORS.text2,
     marginBottom: 8,
     marginLeft: 4,
-    letterSpacing: 0.5,
   },
   // Card
   card: {
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.card,
     borderRadius: 14,
     marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     overflow: 'hidden',
   },
   // Edit Fields
@@ -572,23 +600,41 @@ const styles = StyleSheet.create({
   },
   editFieldSeparator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: '#c6c6c8',
+    backgroundColor: COLORS.border,
     marginLeft: 16,
   },
   editFieldLabel: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#8e8e93',
+    color: COLORS.text2,
     marginBottom: 4,
   },
   editFieldInput: {
     fontSize: 16,
-    color: '#1e293b',
+    color: COLORS.text,
     paddingVertical: 4,
+  },
+  editFieldLabelError: {
+    color: COLORS.danger,
+  },
+  fieldError: {
+    color: COLORS.danger,
+    fontSize: 12,
+    marginTop: 6,
+  },
+  bioInput: {
+    minHeight: 56,
+    textAlignVertical: 'top',
+  },
+  bioCounter: {
+    ...font('caption'),
+    color: COLORS.text3,
+    textAlign: 'right',
+    marginTop: 2,
   },
   // Save Button
   saveButton: {
-    backgroundColor: '#FAC638',
+    backgroundColor: COLORS.ember,
     marginHorizontal: 16,
     marginTop: 8,
     marginBottom: 16,
@@ -599,9 +645,30 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e293b',
+    color: COLORS.white,
   },
   // Menu Items
+  langItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  langItemBorder: {
+    borderBottomWidth: 0.5,
+    borderBottomColor: COLORS.border,
+  },
+  langFlag: { fontSize: 22 },
+  langItemLabel: {
+    ...font('body'),
+    color: COLORS.text,
+    flex: 1,
+  },
+  langItemLabelActive: {
+    color: COLORS.ember,
+    ...font('bodyBold'),
+  },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -609,7 +676,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 44,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#c6c6c8',
+    borderBottomColor: COLORS.border,
   },
   menuItemLast: {
     borderBottomWidth: 0,
@@ -621,10 +688,10 @@ const styles = StyleSheet.create({
   },
   menuItemLabel: {
     fontSize: 16,
-    color: '#1e293b',
+    color: COLORS.text,
   },
   menuItemLabelDestructive: {
-    color: '#FF3B30',
+    color: COLORS.danger,
   },
   // Password Actions
   passwordActions: {
@@ -638,20 +705,20 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 10,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: COLORS.bg3,
     borderWidth: 1,
-    borderColor: '#c6c6c8',
+    borderColor: COLORS.border,
   },
   passwordCancelText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#8e8e93',
+    color: COLORS.text2,
   },
   // Version
   versionText: {
     textAlign: 'center',
     fontSize: 13,
-    color: '#8e8e93',
+    color: COLORS.text3,
     marginTop: 8,
     marginBottom: 20,
   },

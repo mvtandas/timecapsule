@@ -93,8 +93,8 @@ export class NotificationService {
     openDate: Date
   ): Promise<string | null> {
     const notificationData: NotificationData = {
-      title: 'Time Capsule Ready! 🎉',
-      body: `Your capsule "${capsuleTitle}" is ready to open!`,
+      title: 'Your cap is ready! 🎉',
+      body: `Your cap "${capsuleTitle}" is ready to open!`,
       data: {
         type: 'capsule_open',
         capsuleId,
@@ -174,8 +174,8 @@ export class NotificationService {
     locationName: string
   ): Promise<string | null> {
     const notificationData: NotificationData = {
-      title: 'Nearby Time Capsule! 📍',
-      body: `You're near "${locationName}" where a capsule is waiting for you!`,
+      title: 'A cap is sealed nearby 📍',
+      body: `You're near "${locationName}" where a cap is waiting for you!`,
       data: {
         type: 'capsule_nearby',
         capsuleId,

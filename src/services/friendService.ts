@@ -38,6 +38,14 @@ export class FriendService {
         return { data: null, error: { message: 'Request already exists or already friends' } };
       }
 
+      // Clear any stale 'rejected' row for this pair so re-friending works
+      // (a leftover rejected row otherwise collides with the UNIQUE constraint).
+      await supabase
+        .from('friend_requests')
+        .delete()
+        .eq('status', 'rejected')
+        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${user.id})`);
+
       const { data, error } = await supabase
         .from('friend_requests')
         .insert({
@@ -75,37 +83,30 @@ export class FriendService {
         return { status: 'none' };
       }
 
-      // Check for any existing request in either direction
+      // Check for any existing request in either direction. NOTE: do NOT use
+      // .maybeSingle() — two directional rows can legitimately exist and that
+      // would throw, hiding a real pending request. Fetch all and pick the most
+      // relevant (accepted > pending > none).
       const { data, error } = await supabase
         .from('friend_requests')
         .select('id, sender_id, receiver_id, status')
         .or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${user.id})`)
-        .maybeSingle();
+        .order('updated_at', { ascending: false });
 
       if (error) {
         if (__DEV__) console.error('Error checking friendship status:', error);
         return { status: 'none' };
       }
 
-      if (!data) {
-        return { status: 'none' };
-      }
+      const rows = (data as any[]) || [];
+      const accepted = rows.find((r) => r.status === 'accepted');
+      if (accepted) return { status: 'friends', requestId: accepted.id };
 
-      const row = data as any;
-
-      // If accepted, they are friends
-      if (row.status === 'accepted') {
-        return { status: 'friends', requestId: row.id };
-      }
-
-      // If pending and current user is sender
-      if (row.status === 'pending' && row.sender_id === user.id) {
-        return { status: 'pending_sent', requestId: row.id };
-      }
-
-      // If pending and current user is receiver
-      if (row.status === 'pending' && row.receiver_id === user.id) {
-        return { status: 'pending_received', requestId: row.id };
+      const pending = rows.find((r) => r.status === 'pending');
+      if (pending) {
+        return pending.sender_id === user.id
+          ? { status: 'pending_sent', requestId: pending.id }
+          : { status: 'pending_received', requestId: pending.id };
       }
 
       return { status: 'none' };

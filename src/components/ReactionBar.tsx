@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { REACTIONS, ReactionService, ReactionSummary } from '../services/reactionService';
+import { COLORS, SHADOWS } from '../constants/theme';
+import { useT } from '../i18n';
 
 interface ReactionBarProps {
   capsuleId: string;
@@ -8,6 +10,7 @@ interface ReactionBarProps {
 }
 
 const ReactionBar: React.FC<ReactionBarProps> = ({ capsuleId, compact }) => {
+  const t = useT();
   const [reactions, setReactions] = useState<ReactionSummary[]>([]);
   const [showPicker, setShowPicker] = useState(false);
   const [scaleAnim] = useState(new Animated.Value(0));
@@ -77,7 +80,13 @@ const ReactionBar: React.FC<ReactionBarProps> = ({ capsuleId, compact }) => {
         ))}
 
         {/* Add reaction button */}
-        <TouchableOpacity style={styles.addButton} onPress={togglePicker} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={togglePicker}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.addReaction')}
+        >
           <Text style={styles.addButtonText}>{userReacted ? '😊' : '+'}</Text>
         </TouchableOpacity>
       </View>
@@ -128,9 +137,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   reactionPillActive: {
-    backgroundColor: 'rgba(250,198,56,0.25)',
+    backgroundColor: COLORS.emberGlow,
     borderWidth: 1,
-    borderColor: 'rgba(250,198,56,0.4)',
+    borderColor: COLORS.ember,
   },
   reactionEmoji: {
     fontSize: 16,
@@ -141,7 +150,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   reactionCountActive: {
-    color: '#FAC638',
+    color: COLORS.ember,
   },
   addButton: {
     width: 32,
@@ -157,13 +166,17 @@ const styles = StyleSheet.create({
   },
   picker: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(30,30,50,0.95)',
+    backgroundColor: COLORS.bg3,
     borderRadius: 24,
     padding: 8,
     gap: 4,
     position: 'absolute',
-    bottom: 44,
+    // Anchor directly above the bar so it's never pushed off-screen,
+    // regardless of where the bar sits in a scroll view / modal.
+    bottom: '100%',
+    marginBottom: 8,
     left: 0,
+    ...SHADOWS.lg,
   },
   pickerItem: {
     width: 40,
