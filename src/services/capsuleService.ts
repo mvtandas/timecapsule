@@ -17,7 +17,7 @@ export interface Capsule {
   created_at: string;
   view_count?: number;
   media_url?: string | null;
-  media_type?: 'image' | 'video' | 'none';
+  media_type?: 'image' | 'video' | 'audio' | 'none';
   is_locked?: boolean;
   // Voorcap cap-type fields (migration 0001)
   type?: CapTypeId;
@@ -35,7 +35,7 @@ export interface CreateCapsuleData {
   is_public?: boolean;
   content_refs?: any[];
   media_url?: string | null;
-  media_type?: 'image' | 'video' | 'none';
+  media_type?: 'image' | 'video' | 'audio' | 'none';
   is_locked?: boolean;
   category?: string;
   // Voorcap cap-type fields (migration 0001)
@@ -43,6 +43,20 @@ export interface CreateCapsuleData {
   location_name?: string | null;
   is_anonymous?: boolean;
   cover_photo_url?: string | null;
+  // Per-type create-flow fields (migration 0004)
+  recipient_id?: string | null;
+  is_self_whisper?: boolean;
+  location_hint?: string | null;
+  allow_reactions?: boolean;
+  allow_comments?: boolean;
+  expires_at?: string | null;
+  status?: 'sealed' | 'open';
+  gathering_blind?: boolean;
+  allow_join_requests?: boolean;
+  total_distance_km?: number | null;
+  total_minutes?: number | null;
+  cover_transform?: any;
+  body?: any;
 }
 
 export class CapsuleService {
@@ -113,10 +127,25 @@ export class CapsuleService {
           media_url: capsuleData.media_url || null,
           media_type: capsuleData.media_type || 'none',
           is_locked: capsuleData.is_locked || false,
+          category: capsuleData.category ?? null,
           type: capsuleData.type || 'public',
           location_name: capsuleData.location_name || null,
           is_anonymous: capsuleData.is_anonymous || false,
           cover_photo_url: capsuleData.cover_photo_url || null,
+          // Per-type create-flow fields (migration 0004)
+          recipient_id: capsuleData.recipient_id ?? null,
+          is_self_whisper: capsuleData.is_self_whisper ?? false,
+          location_hint: capsuleData.location_hint ?? null,
+          allow_reactions: capsuleData.allow_reactions ?? true,
+          allow_comments: capsuleData.allow_comments ?? true,
+          expires_at: capsuleData.expires_at ?? null,
+          status: capsuleData.status ?? (capsuleData.is_locked ? 'sealed' : 'open'),
+          gathering_blind: capsuleData.gathering_blind ?? false,
+          allow_join_requests: capsuleData.allow_join_requests ?? false,
+          total_distance_km: capsuleData.total_distance_km ?? null,
+          total_minutes: capsuleData.total_minutes ?? null,
+          cover_transform: capsuleData.cover_transform ?? null,
+          body: capsuleData.body ?? null,
         } as any)
         .select()
         .single();
@@ -214,6 +243,8 @@ export class CapsuleService {
         return distance <= radiusKm;
       });
 
+      await CapsuleService.attachProfiles(filtered || []);
+
       return { data: filtered, error: null };
     } catch (error) {
       return { data: null, error };
@@ -283,9 +314,65 @@ export class CapsuleService {
       // Filter out blocked users' content
       const filtered = data?.filter((c: any) => !blockedIds.includes(c.owner_id)) || [];
 
+      // Attach creator profile (username/display_name/avatar) so feed/discover
+      // cards can show "@handle" without an N+1 query per card.
+      await CapsuleService.attachProfiles(filtered);
+
       return { data: filtered, error: null };
     } catch (error) {
       return { data: null, error };
+    }
+  }
+
+  /**
+   * Batch-fetch the creator profile for a list of caps and attach it as
+   * `c.profiles` (mirrors PostgREST embedding) — one query for the whole set.
+   * Mutates in place and also returns the list.
+   */
+  static async attachProfiles(caps: any[]): Promise<any[]> {
+    if (!caps || caps.length === 0) return caps || [];
+    const ownerIds = Array.from(new Set(caps.map((c) => c.owner_id).filter(Boolean)));
+    if (ownerIds.length === 0) return caps;
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, username, display_name, avatar_url')
+      .in('id', ownerIds);
+    const byId = new Map((profiles || []).map((p: any) => [p.id, p]));
+    caps.forEach((c) => {
+      if (!c.profiles) c.profiles = byId.get(c.owner_id) || null;
+    });
+    return caps;
+  }
+
+  /**
+   * Record that the current user has opened a cap (per-user, for the Discover
+   * "Unopened" filter and the profile "Opened" stat). Idempotent upsert;
+   * silently no-ops if the capsule_opens table isn't present yet (migration 0006).
+   */
+  static async recordOpen(capsuleId: string): Promise<void> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await (supabase as any)
+        .from('capsule_opens')
+        .upsert({ user_id: user.id, capsule_id: capsuleId } as any, { onConflict: 'user_id,capsule_id' });
+    } catch {
+      // table may not exist yet — non-fatal
+    }
+  }
+
+  /** Capsule ids the current user has opened (for Unopened filter / Opened stat). */
+  static async getOpenedCapsuleIds(): Promise<string[]> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      const { data } = await (supabase as any)
+        .from('capsule_opens')
+        .select('capsule_id')
+        .eq('user_id', user.id);
+      return ((data as any[]) || []).map((r) => r.capsule_id);
+    } catch {
+      return [];
     }
   }
 

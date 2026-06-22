@@ -87,6 +87,46 @@ export class TrailService {
     return count || 0;
   }
 
+  /** In-progress trails for the current user (for the Activity screen). */
+  static async getActiveTrails(): Promise<any[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+    const { data } = await db
+      .from('trail_progress')
+      .select('current_stop_idx, capsule_id, capsules(*)')
+      .eq('user_id', user.id)
+      .is('completed_at', null)
+      .order('started_at', { ascending: false });
+    return ((data as any[]) || [])
+      .filter((r) => r.capsules)
+      .map((r) => ({ ...r.capsules, _currentIdx: r.current_stop_idx }));
+  }
+
+  /** How many users have completed a given trail (for "completed by N others"). */
+  static async getCompletionCount(capsuleId: string): Promise<number> {
+    const { count } = await db
+      .from('trail_progress')
+      .select('id', { count: 'exact', head: true })
+      .eq('capsule_id', capsuleId)
+      .not('completed_at', 'is', null);
+    return count || 0;
+  }
+
+  /** Trails the current user has completed (for the profile "Completed trails" section). */
+  static async getCompletedTrails(): Promise<any[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+    const { data } = await db
+      .from('trail_progress')
+      .select('completed_at, capsule_id, capsules(*)')
+      .eq('user_id', user.id)
+      .not('completed_at', 'is', null)
+      .order('completed_at', { ascending: false });
+    return ((data as any[]) || [])
+      .filter((r) => r.capsules)
+      .map((r) => ({ ...r.capsules, _completedAt: r.completed_at }));
+  }
+
   static async getProgress(capsuleId: string): Promise<TrailProgress | null> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;

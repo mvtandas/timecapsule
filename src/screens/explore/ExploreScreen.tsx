@@ -1,632 +1,324 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, Dimensions, Platform, Linking } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, Circle, Callout, PROVIDER_GOOGLE } from 'react-native-maps';
-import { DARK_MAP_STYLE } from '../../constants/mapStyle';
+import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { CapsuleService } from '../../services/capsuleService';
+import { SavedService } from '../../services/savedService';
 import CapsuleDetailModal from '../../components/CapsuleDetailModal';
-import { calculateDistance, formatDistance } from '../../utils/geoUtils';
-import { isLocked } from '../../utils/mediaUtils';
-import { COLORS, font } from '../../constants/theme';
-import { capColor } from '../../constants/capTypes';
+import MessagesButton from '../../components/common/MessagesButton';
+import { calculateDistance } from '../../utils/geoUtils';
+import { COLORS, SPACING, RADIUS, font } from '../../constants/theme';
+import { Skeleton } from '../../components/common/Skeleton';
+import { VoorcapWordmark } from '../../components/common/VoorcapLogo';
+import { supabase } from '../../lib/supabase';
 import { useT } from '../../i18n';
-
-const { width, height } = Dimensions.get('window');
-
-type ExploreFilter = 'All' | 'Unlocked' | 'Locked' | 'Travel' | 'Family' | 'Friends' | 'Events' | 'Personal';
-
-const EXPLORE_FILTERS: ExploreFilter[] = ['All', 'Unlocked', 'Locked', 'Travel', 'Family', 'Friends', 'Events', 'Personal'];
+import ActivityTicker from './components/ActivityTicker';
+import TallDiscoverCard, { CARD_W, CARD_H } from './components/TallDiscoverCard';
+import TrendingRow from './components/TrendingRow';
+import DiscoverFilters, { DiscoverFilterId } from './components/DiscoverFilters';
 
 interface ExploreScreenProps {
-  onNavigate: (screen: string) => void;
+  onNavigate: (screen: string, data?: any) => void;
 }
 
-const RADIUS_KM = 50; // 50km radius to view capsules
+/** Per-filter empty/feedback block — keeps a tap that returns little feeling responsive. */
+const EmptyState: React.FC<{
+  icon: keyof typeof Ionicons.glyphMap;
+  text: string;
+  action?: { label: string; onPress: () => void };
+  busy?: boolean;
+}> = ({ icon, text, action, busy }) => (
+  <View style={styles.emptyState}>
+    <Ionicons name={icon} size={22} color={COLORS.text3} />
+    <Text style={styles.emptyText}>{text}</Text>
+    {action && (
+      <TouchableOpacity style={styles.emptyBtn} onPress={action.onPress} activeOpacity={0.85} disabled={busy}>
+        <Ionicons name="location" size={14} color={COLORS.ember} />
+        <Text style={styles.emptyBtnText}>{action.label}</Text>
+      </TouchableOpacity>
+    )}
+  </View>
+);
 
+/** Section-shaped loading state: a "Live" panel shell, 3 tall card shells, 3 row shells. */
+const DiscoverSkeleton: React.FC = () => (
+  <View>
+    <View style={styles.skelPanel}>
+      {[0, 1, 2].map((i) => (
+        <View key={i} style={styles.skelTickerRow}>
+          <Skeleton width={26} height={26} radius={9} />
+          <View style={{ flex: 1, gap: 6 }}>
+            <Skeleton width="70%" height={9} />
+            <Skeleton width="40%" height={7} />
+          </View>
+        </View>
+      ))}
+    </View>
+    <View style={styles.sectionHeader}><Skeleton width={90} height={11} /></View>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel} scrollEnabled={false}>
+      {[0, 1, 2].map((i) => (
+        <View key={i} style={{ marginRight: SPACING.md }}>
+          <Skeleton width={CARD_W} height={CARD_H} radius={RADIUS.xl} />
+        </View>
+      ))}
+    </ScrollView>
+    <View style={styles.sectionHeader}><Skeleton width={110} height={11} /></View>
+    <View style={styles.list}>
+      {[0, 1, 2].map((i) => (
+        <View key={i} style={styles.skelTrendRow}>
+          <Skeleton width={60} height={60} radius={RADIUS.md} />
+          <View style={{ flex: 1, gap: 8 }}>
+            <Skeleton width="70%" height={13} />
+            <Skeleton width="45%" height={10} />
+          </View>
+        </View>
+      ))}
+    </View>
+  </View>
+);
+
+/** Discover — a no-map discovery FEED (the map lives on Home). Mirrors the demo's
+ *  Discover: header+search, "Live around you" ticker, "For You" carousel, filter
+ *  chips (For You/Nearby/Unopened/Trending), and a "Trending now" list. */
 const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
   const t = useT();
-  const [location, setLocation] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [nearbyCapsules, setNearbyCapsules] = useState<any[]>([]);
-  const [selectedCapsule, setSelectedCapsule] = useState<any>(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [mapView, setMapView] = useState<'standard' | 'satellite'>('standard');
-  const [activeFilter, setActiveFilter] = useState<ExploreFilter>('All');
-  const [locationDenied, setLocationDenied] = useState(false);
+  const insets = useSafeAreaInsets();
+  const [pool, setPool] = useState<any[] | null>(null);
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [openedIds, setOpenedIds] = useState<Set<string>>(new Set());
+  const [userId, setUserId] = useState<string | null>(null);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [filter, setFilter] = useState<DiscoverFilterId>('for_you');
+  const [selected, setSelected] = useState<any>(null);
+  const [showDetail, setShowDetail] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  // True while we're actively resolving a location fix for the "Nearby" filter.
+  const [locating, setLocating] = useState(false);
 
-  const filteredNearbyCapsules = useMemo(() => {
-    if (activeFilter === 'All') return nearbyCapsules;
-    if (activeFilter === 'Unlocked') return nearbyCapsules.filter((c) => !isLocked(c.open_at));
-    if (activeFilter === 'Locked') return nearbyCapsules.filter((c) => isLocked(c.open_at));
-    // Category filters - match against capsule category field or title
-    const category = activeFilter.toLowerCase();
-    return nearbyCapsules.filter(
-      (c) =>
-        (c.category && c.category.toLowerCase() === category) ||
-        (c.title && c.title.toLowerCase().includes(category))
-    );
-  }, [nearbyCapsules, activeFilter]);
-
-  useEffect(() => {
-    loadLocation();
+  const load = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserId(user?.id ?? null);
+      const { data } = await CapsuleService.getAllAccessibleCapsules();
+      const caps = (data || []).slice();
+      caps.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      setPool(caps);
+      const saved = await SavedService.list();
+      setSavedIds(new Set(saved.map((c: any) => c.id)));
+      // Caps the user has already opened — feeds the "Unopened" filter.
+      const opened = await CapsuleService.getOpenedCapsuleIds();
+      setOpenedIds(new Set(opened));
+    } catch (e) {
+      if (__DEV__) console.error('Discover load error:', e);
+      setPool([]);
+    }
   }, []);
 
-  const loadLocation = async () => {
+  // Best-effort location (no blocking prompt) so the "Nearby" filter can sort.
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({});
+          setCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+        }
+      } catch { /* ignore */ }
+    })();
+  }, []);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+
+  // Resolve a location fix on demand — requesting permission if we don't have one
+  // yet — so tapping "Nearby" produces a visible result instead of a silent no-op.
+  const ensureLocation = useCallback(async () => {
+    if (coords || locating) return;
+    setLocating(true);
     try {
-      setLoading(true);
-      
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      
+      let { status } = await Location.getForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setLocationDenied(true);
-        setLoading(false);
-        return;
+        ({ status } = await Location.requestForegroundPermissionsAsync());
       }
-
-      const currentLocation = await Location.getCurrentPositionAsync({});
-      setLocation(currentLocation);
-
-      // Load nearby capsules
-      const { data, error } = await CapsuleService.getNearbyCapsules(
-        currentLocation.coords.latitude,
-        currentLocation.coords.longitude,
-        RADIUS_KM
-      );
-
-      if (!error && data) {
-        const capsulesWithDistance = data
-          .filter((capsule: any) => capsule.lat != null && capsule.lng != null)
-          .map((capsule: any) => ({
-            ...capsule,
-            distance: calculateDistance(
-              currentLocation.coords.latitude,
-              currentLocation.coords.longitude,
-              capsule.lat,
-              capsule.lng
-            ),
-          })).sort((a: any, b: any) => a.distance - b.distance);
-
-        setNearbyCapsules(capsulesWithDistance);
+      if (status === 'granted') {
+        const loc = await Location.getCurrentPositionAsync({});
+        setCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude });
       }
-    } catch (error) {
-      if (__DEV__) console.error('Error loading location:', error);
-      Alert.alert(t('explore.alert_error_title'), t('explore.alert_load_location_msg'));
-    } finally {
-      setLoading(false);
+    } catch { /* ignore */ }
+    finally { setLocating(false); }
+  }, [coords, locating]);
+
+  // When the user switches to the Nearby filter, kick off a fix if we lack one.
+  const onChangeFilter = useCallback((id: DiscoverFilterId) => {
+    setFilter(id);
+    if (id === 'nearby') ensureLocation();
+  }, [ensureLocation]);
+
+  const filtered = useMemo(() => {
+    const caps = pool || [];
+    if (filter === 'trending') return [...caps].sort((a, b) => (b.view_count || 0) - (a.view_count || 0));
+    if (filter === 'unopened') return caps.filter((c) => !openedIds.has(c.id));
+    if (filter === 'nearby') {
+      if (!coords) return caps;
+      return caps
+        .filter((c) => c.lat != null && c.lng != null)
+        .map((c) => ({ ...c, _d: calculateDistance(coords.lat, coords.lng, c.lat, c.lng) }))
+        .sort((a: any, b: any) => a._d - b._d);
     }
+    return caps; // for_you = recency
+  }, [pool, filter, userId, coords, openedIds]);
+
+  const toggleSave = async (cap: any) => {
+    setSavedIds((prev) => { const n = new Set(prev); n.has(cap.id) ? n.delete(cap.id) : n.add(cap.id); return n; });
+    await SavedService.toggle(cap.id);
   };
+  const openCap = (cap: any) => { setSelected(cap); setShowDetail(true); CapsuleService.incrementViewCount(cap.id); };
 
-  const loadPublicCapsules = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await CapsuleService.getAllAccessibleCapsules();
-      if (!error && data) {
-        const publicCapsules = data.filter((c: any) => c.is_public && c.lat && c.lng);
-        setNearbyCapsules(publicCapsules);
-      }
-    } catch (error) {
-      if (__DEV__) console.error('Error loading public capsules:', error);
-    } finally {
-      setLoading(false);
+  const loading = pool === null;
+  // "Öne çıkanlar" hero strip — a fixed highlights cut (most recent), independent
+  // of the filter chips. The chips drive the single list below, not this strip.
+  const featured = (pool || []).slice(0, 8);
+  // The single feed reflects the active filter; its header label matches the chip.
+  const sectionLabel = filter === 'nearby'
+    ? t('discover.filter_nearby')
+    : filter === 'unopened'
+      ? t('discover.filter_unopened')
+      : filter === 'trending'
+        ? t('discover.filter_trending')
+        : t('discover.for_you');
+
+  // Per-filter empty copy so a tap that legitimately returns little still reads as
+  // responsive feedback rather than a dead screen.
+  const emptyCopy = (): string => {
+    if (filter === 'nearby') {
+      if (locating) return t('discover.locating', { defaultValue: 'Getting your location…' });
+      if (!coords) return t('discover.enableLocation', { defaultValue: 'Enable location to see caps near you.' });
+      return t('discover.emptyNearby', { defaultValue: 'No caps near you right now.' });
     }
-  };
-
-  const getRandomIcon = () => {
-    const icons = ['🏖️', '👨‍👩‍👧‍👦', '🎓', '🎉', '🎂', '🌴', '🎸', '📸', '✈️', '🎨'];
-    return icons[Math.floor(Math.random() * icons.length)];
-  };
-
-  const handleCapsuleTap = (capsule: any) => {
-    if (!location) return;
-    const distance = calculateDistance(
-      location.coords.latitude,
-      location.coords.longitude,
-      capsule.lat,
-      capsule.lng
-    );
-
-    if (distance > 5) {
-      Alert.alert(
-        t('explore.alert_too_far_title'),
-        t('explore.alert_too_far_msg', { distance: formatDistance(distance) })
-      );
-      return;
-    }
-
-    // Check if capsule is unlocked
-    if (capsule.open_at) {
-      const openDate = new Date(capsule.open_at);
-      if (openDate > new Date()) {
-        Alert.alert(
-          t('explore.alert_locked_title'),
-          t('explore.alert_locked_msg', { date: openDate.toLocaleDateString() })
-        );
-        return;
-      }
-    }
-
-    // Capsule can be opened - show detail modal
-    setSelectedCapsule(capsule);
-    setShowDetailModal(true);
-
-    // Increment view count
-    CapsuleService.incrementViewCount(capsule.id);
+    if (filter === 'unopened') return t('discover.emptyUnopened', { defaultValue: 'You’ve opened everything here.' });
+    return t('discover.empty');
   };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('explore.header_title')}</Text>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity onPress={() => onNavigate('Search')} style={styles.refreshButton}>
-            <Ionicons name="search" size={24} color={COLORS.ember} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={loadLocation} style={styles.refreshButton}>
-            <Ionicons name="refresh" size={24} color={COLORS.ember} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setMapView(mapView === 'standard' ? 'satellite' : 'standard')}
-            style={[styles.mapToggle, mapView === 'satellite' && styles.mapToggleActive]}
-          >
-            <Ionicons
-              name={mapView === 'satellite' ? 'earth' : 'layers-outline'}
-              size={24}
-              color={mapView === 'satellite' ? COLORS.white : COLORS.ember}
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.ember} />
-          <Text style={styles.loadingText}>{t('explore.finding_nearby')}</Text>
-        </View>
-      ) : !location ? (
-        <View style={styles.errorContainer}>
-          <Ionicons name="location-outline" size={80} color={COLORS.ember} />
-          <Text style={styles.errorTitle}>
-            {locationDenied ? t('explore.location_denied_title') : t('explore.location_unavailable_title')}
-          </Text>
-          <Text style={styles.errorText}>
-            {locationDenied
-              ? t('explore.location_denied_text')
-              : t('explore.location_unavailable_text')}
-          </Text>
-          <TouchableOpacity
-            onPress={locationDenied ? () => Linking.openSettings() : loadLocation}
-            style={styles.retryButton}
-            accessibilityRole="button"
-            accessibilityLabel={locationDenied ? t('explore.open_settings') : t('common.retry')}
-          >
-            <Text style={styles.retryButtonText}>
-              {locationDenied ? t('explore.open_settings') : t('common.retry')}
+      <ScrollView
+        contentContainerStyle={{ paddingTop: insets.top + SPACING.sm, paddingBottom: 124 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.ember} />}
+      >
+        <View style={styles.header}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>{t('discover.title')}</Text>
+            <Text style={styles.subtitle}>
+              {t('discover.subtitle')}
+              {'\n'}
+              {t('discover.subtitle2_pre', { defaultValue: 'Find what’s meant to be ' })}
+              <Text style={styles.subtitleAccent}>{t('discover.subtitle2_accent', { defaultValue: 'felt' })}</Text>
+              {t('discover.subtitle2_post', { defaultValue: '.' })}
             </Text>
-          </TouchableOpacity>
-          {locationDenied && (
-            <TouchableOpacity onPress={loadPublicCapsules} style={styles.browsePublicButton}>
-              <Ionicons name="globe-outline" size={20} color={COLORS.ember} />
-              <Text style={styles.browsePublicButtonText}>{t('explore.browse_public')}</Text>
-            </TouchableOpacity>
-          )}
-          {locationDenied && nearbyCapsules.length > 0 && (
-            <ScrollView style={styles.publicCapsulesList}>
-              <Text style={styles.publicCapsulesTitle}>
-                {t('explore.public_caps_title', { count: nearbyCapsules.length })}
-              </Text>
-              {nearbyCapsules.map((capsule) => (
-                <TouchableOpacity
-                  key={capsule.id}
-                  style={styles.publicCapsuleItem}
-                  onPress={() => {
-                    setSelectedCapsule(capsule);
-                    setShowDetailModal(true);
-                  }}
-                >
-                  <Ionicons name="time-outline" size={24} color={COLORS.ember} />
-                  <View style={styles.publicCapsuleInfo}>
-                    <Text style={styles.publicCapsuleName} numberOfLines={1}>{capsule.title}</Text>
-                    <Text style={styles.publicCapsuleStatus}>
-                      {isLocked(capsule.open_at) ? t('explore.status_locked') : t('explore.status_unlocked')}
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color={COLORS.text3} />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-        </View>
-      ) : (
-        <>
-          {/* Filter Chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.filterChipsContainer}
-            contentContainerStyle={styles.filterChipsContent}
-          >
-            {EXPLORE_FILTERS.map((filter) => (
-              <TouchableOpacity
-                key={filter}
-                style={[styles.filterChip, activeFilter === filter && styles.filterChipActive]}
-                onPress={() => setActiveFilter(filter)}
-              >
-                <Text style={[styles.filterChipText, activeFilter === filter && styles.filterChipTextActive]}>
-                  {t(`explore.filter_${filter.toLowerCase()}`)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Map View */}
-          <MapView
-            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-            customMapStyle={DARK_MAP_STYLE}
-            style={styles.map}
-            mapType={mapView}
-            initialRegion={{
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude,
-              latitudeDelta: 0.5,
-              longitudeDelta: 0.5,
-            }}
-            showsUserLocation
-            showsMyLocationButton
-          >
-            {/* 50km search radius circle */}
-            <Circle
-              center={{
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude,
-              }}
-              radius={RADIUS_KM * 1000}
-              strokeColor="rgba(232, 99, 58, 0.3)"
-              fillColor="rgba(232, 99, 58, 0.05)"
-              strokeWidth={2}
-            />
-
-            {/* 5km interaction radius circle */}
-            <Circle
-              center={{
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude,
-              }}
-              radius={5000}
-              strokeColor="rgba(61, 155, 122, 0.5)"
-              fillColor="rgba(61, 155, 122, 0.1)"
-              strokeWidth={2}
-            />
-
-            {/* Capsule Markers */}
-            {filteredNearbyCapsules.map((capsule) => {
-              const distance = calculateDistance(
-                location.coords.latitude,
-                location.coords.longitude,
-                capsule.lat,
-                capsule.lng
-              );
-              const canInteract = distance <= 5;
-              const locked = isLocked(capsule.open_at);
-
-              return (
-                <Marker
-                  key={capsule.id}
-                  coordinate={{
-                    latitude: capsule.lat,
-                    longitude: capsule.lng,
-                  }}
-                  pinColor={canInteract ? (locked ? COLORS.danger : capColor(capsule.type)) : COLORS.text3}
-                  onPress={() => handleCapsuleTap(capsule)}
-                >
-                  <Callout>
-                    <View style={styles.calloutContainer}>
-                      <Text style={styles.calloutTitle}>{capsule.title}</Text>
-                      <Text style={styles.calloutDistance}>{t('explore.callout_away', { distance: formatDistance(distance) })}</Text>
-                      <Text style={styles.calloutStatus}>
-                        {!canInteract
-                          ? t('explore.callout_too_far')
-                          : locked
-                          ? t('explore.callout_locked')
-                          : t('explore.callout_can_open')}
-                      </Text>
-                    </View>
-                  </Callout>
-                </Marker>
-              );
-            })}
-          </MapView>
-
-          {/* Info Card */}
-          <View style={styles.infoCard}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: COLORS.moss }]} />
-              <Text style={styles.legendText}>{t('explore.legend_can_open')}</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: COLORS.danger }]} />
-              <Text style={styles.legendText}>{t('explore.legend_locked')}</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: COLORS.text3 }]} />
-              <Text style={styles.legendText}>{t('explore.legend_too_far')}</Text>
-            </View>
-            <Text style={styles.capsuleCount}>
-              {t(filteredNearbyCapsules.length === 1 ? 'explore.found_count_one' : 'explore.found_count_other', {
-                count: filteredNearbyCapsules.length,
-                radius: RADIUS_KM,
-              })}
-              {activeFilter !== 'All'
-                ? t('explore.found_count_filter_suffix', { filter: t(`explore.filter_${activeFilter.toLowerCase()}`) })
-                : ''}
-            </Text>
-            {filteredNearbyCapsules.length === 0 && (
-              <TouchableOpacity
-                style={styles.exploreCtaButton}
-                onPress={() => onNavigate('Create')}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.exploreCtaButtonText}>{t('explore.create_cap_here')}</Text>
-              </TouchableOpacity>
-            )}
           </View>
-        </>
-      )}
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.searchBtn} onPress={() => onNavigate('Search')} accessibilityRole="button" accessibilityLabel={t('discover.title')}>
+              <Ionicons name="search" size={20} color={COLORS.text} />
+            </TouchableOpacity>
+            <MessagesButton onPress={() => onNavigate('Messages')} />
+          </View>
+        </View>
 
-      <CapsuleDetailModal
-        visible={showDetailModal}
-        capsule={selectedCapsule}
-        capsules={nearbyCapsules}
-        onClose={() => setShowDetailModal(false)}
-      />
+        {loading ? (
+          <DiscoverSkeleton />
+        ) : (
+          <>
+            <ActivityTicker items={pool || []} onOpen={openCap} />
 
+            {/* Fixed highlights strip — independent of the filter chips. */}
+            {featured.length > 0 && (
+              <>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionLabel}>{t('discover.featured', { defaultValue: 'Öne çıkanlar' })}</Text>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
+                  {featured.map((c) => (
+                    <TallDiscoverCard key={c.id} cap={c} saved={savedIds.has(c.id)} onToggleSave={toggleSave} onPress={openCap} />
+                  ))}
+                </ScrollView>
+              </>
+            )}
+
+            {/* Filter chips drive the single feed below. */}
+            <DiscoverFilters active={filter} onChange={onChangeFilter} />
+
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionLabel}>{sectionLabel}</Text>
+            </View>
+            <View style={styles.list}>
+              {filtered.map((c) => (
+                <TrendingRow key={c.id} cap={c} saved={savedIds.has(c.id)} onToggleSave={toggleSave} onPress={openCap} />
+              ))}
+              {!filtered.length && (
+                <EmptyState
+                  icon={filter === 'nearby' ? 'location-outline' : 'sparkles-outline'}
+                  text={emptyCopy()}
+                  action={filter === 'nearby' && !coords && !locating
+                    ? { label: t('discover.filter_nearby'), onPress: ensureLocation }
+                    : undefined}
+                  busy={filter === 'nearby' && locating}
+                />
+              )}
+            </View>
+
+            <View style={styles.footer}>
+              <VoorcapWordmark size={18} />
+              <Text style={styles.footerTag}>{t('discover.tagline', { defaultValue: 'Sealed moments, dropped in time' })}</Text>
+            </View>
+          </>
+        )}
+      </ScrollView>
+
+      <CapsuleDetailModal visible={showDetail} capsule={selected} capsules={filtered} onClose={() => setShowDetail(false)} />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
+  container: { flex: 1, backgroundColor: COLORS.bg },
+  header: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: SPACING.lg, paddingBottom: SPACING.sm },
+  title: { ...font('display'), color: COLORS.text, marginBottom: 4 },
+  subtitle: { ...font('body'), color: COLORS.text2, marginTop: 2 },
+  subtitleAccent: { color: COLORS.ember },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  searchBtn: {
+    width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: COLORS.bg3, borderWidth: 1, borderColor: COLORS.border,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 16,
-    backgroundColor: COLORS.card,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    zIndex: 10,
+  sectionHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: SPACING.lg, marginTop: SPACING.lg, marginBottom: SPACING.sm,
   },
-  headerTitle: {
-    ...font('title'),
-    color: COLORS.text,
+  sectionLabel: { ...font('eyebrow'), color: COLORS.text2 },
+  sectionAction: { ...font('labelBold'), color: COLORS.ember },
+  carousel: { paddingHorizontal: SPACING.lg, paddingRight: SPACING.sm },
+  list: { paddingHorizontal: SPACING.lg },
+  emptyState: { alignItems: 'center', gap: SPACING.sm, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.xl },
+  emptyText: { ...font('body'), color: COLORS.text3, textAlign: 'center' },
+  emptyBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2,
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.emberSoft, borderWidth: 1, borderColor: COLORS.ember + '40',
   },
-  headerButtons: {
-    flexDirection: 'row',
-    gap: 12,
+  emptyBtnText: { ...font('labelBold'), color: COLORS.ember },
+  skelPanel: {
+    marginTop: SPACING.sm, marginHorizontal: SPACING.lg, gap: SPACING.sm,
+    backgroundColor: COLORS.bg2, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.border,
+    padding: SPACING.md,
   },
-  refreshButton: {
-    padding: 8,
-  },
-  mapToggle: {
-    padding: 8,
-    borderRadius: 10,
-  },
-  mapToggleActive: {
-    backgroundColor: COLORS.ember,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: COLORS.text2,
-  },
-  errorContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 40,
-  },
-  errorTitle: {
-    ...font('title'),
-    color: COLORS.text,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  errorText: {
-    fontSize: 14,
-    color: COLORS.text2,
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  retryButton: {
-    backgroundColor: COLORS.ember,
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  retryButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  browsePublicButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: COLORS.ember,
-    gap: 8,
-  },
-  browsePublicButtonText: {
-    color: COLORS.ember,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  publicCapsulesList: {
-    width: '100%',
-    marginTop: 24,
-    maxHeight: 300,
-  },
-  publicCapsulesTitle: {
-    ...font('subtitle'),
-    color: COLORS.text,
-    marginBottom: 12,
-    paddingHorizontal: 16,
-  },
-  publicCapsuleItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.card,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginBottom: 8,
-    marginHorizontal: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  publicCapsuleInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  publicCapsuleName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  publicCapsuleStatus: {
-    fontSize: 13,
-    color: COLORS.text2,
-    marginTop: 2,
-  },
-  filterChipsContainer: {
-    maxHeight: 48,
-    backgroundColor: COLORS.card,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  filterChipsContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
-    flexDirection: 'row',
-  },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: COLORS.bg3,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  filterChipActive: {
-    backgroundColor: COLORS.ember,
-    borderColor: COLORS.ember,
-  },
-  filterChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.text2,
-  },
-  filterChipTextActive: {
-    color: COLORS.white,
-  },
-  map: {
-    flex: 1,
-  },
-  calloutContainer: {
-    padding: 12,
-    minWidth: 150,
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-  },
-  calloutTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: 4,
-  },
-  calloutDistance: {
-    fontSize: 14,
-    color: COLORS.text2,
-    marginBottom: 4,
-  },
-  calloutStatus: {
-    fontSize: 12,
-    color: COLORS.text3,
-  },
-  infoCard: {
-    position: 'absolute',
-    bottom: 120, // sit above the floating glass tab bar
-    left: 16,
-    right: 16,
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 8,
-  },
-  legendText: {
-    fontSize: 12,
-    color: COLORS.text2,
-  },
-  capsuleCount: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  exploreCtaButton: {
-    backgroundColor: COLORS.ember,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginTop: 12,
-    alignItems: 'center',
-  },
-  exploreCtaButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
+  skelTickerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  skelTrendRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingVertical: SPACING.sm },
+  footer: { alignItems: 'center', gap: 6, marginTop: SPACING.xl, marginBottom: SPACING.sm },
+  footerTag: { ...font('micro'), color: COLORS.text3, letterSpacing: 0.4 },
 });
 
 export default ExploreScreen;

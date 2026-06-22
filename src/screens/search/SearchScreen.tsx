@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Image, Keyboard,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, ScrollView, ActivityIndicator, Image, Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SearchService } from '../../services/searchService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SearchService, type PlaceResult } from '../../services/searchService';
+
+const RECENT_KEY = 'voorcap.recentSearches';
+const TRENDING = ['Coffee', 'Sunset', 'Street art', 'Hidden gems', 'Food', 'Nature'];
 import CapsuleDetailModal from '../../components/CapsuleDetailModal';
 import CapTypeBadge from '../../components/common/CapTypeBadge';
 import { COLORS, font } from '../../constants/theme';
@@ -16,7 +20,7 @@ interface SearchScreenProps {
   onGoBack?: () => void;
 }
 
-type Tab = 'all' | 'caps' | 'people';
+type Tab = 'all' | 'caps' | 'people' | 'places';
 
 const SearchScreen = ({ onNavigate, onGoBack }: SearchScreenProps) => {
   const t = useT();
@@ -26,26 +30,43 @@ const SearchScreen = ({ onNavigate, onGoBack }: SearchScreenProps) => {
   const [loading, setLoading] = useState(false);
   const [caps, setCaps] = useState<any[]>([]);
   const [people, setPeople] = useState<any[]>([]);
+  const [places, setPlaces] = useState<PlaceResult[]>([]);
   const [selected, setSelected] = useState<any>(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [recent, setRecent] = useState<string[]>([]);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    (async () => { try { const raw = await AsyncStorage.getItem(RECENT_KEY); if (raw) setRecent(JSON.parse(raw)); } catch { /* ignore */ } })();
+  }, []);
+
+  const saveRecent = async (q: string) => {
+    const v = q.trim(); if (!v) return;
+    const next = [v, ...recent.filter((r) => r.toLowerCase() !== v.toLowerCase())].slice(0, 8);
+    setRecent(next);
+    try { await AsyncStorage.setItem(RECENT_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  };
+  const clearRecent = async () => { setRecent([]); try { await AsyncStorage.removeItem(RECENT_KEY); } catch { /* ignore */ } };
 
   useEffect(() => {
     if (debounce.current) clearTimeout(debounce.current);
     if (!query.trim()) {
       setCaps([]);
       setPeople([]);
+      setPlaces([]);
       setLoading(false);
       return;
     }
     setLoading(true);
     debounce.current = setTimeout(async () => {
-      const [c, p] = await Promise.all([
+      const [c, p, pl] = await Promise.all([
         SearchService.searchCaps(query),
         SearchService.searchPeople(query),
+        SearchService.searchPlaces(query),
       ]);
       setCaps(c);
       setPeople(p);
+      setPlaces(pl);
       setLoading(false);
     }, 350);
     return () => {
@@ -55,12 +76,21 @@ const SearchScreen = ({ onNavigate, onGoBack }: SearchScreenProps) => {
 
   const showCaps = tab === 'all' || tab === 'caps';
   const showPeople = tab === 'all' || tab === 'people';
+  const showPlaces = tab === 'all' || tab === 'places';
 
-  type Row = { kind: 'header'; label: string } | { kind: 'cap'; data: any } | { kind: 'person'; data: any };
+  type Row =
+    | { kind: 'header'; label: string }
+    | { kind: 'cap'; data: any }
+    | { kind: 'person'; data: any }
+    | { kind: 'place'; data: PlaceResult };
   const rows: Row[] = [];
   if (showPeople && people.length) {
     rows.push({ kind: 'header', label: t('search.header_people') });
     people.forEach((p) => rows.push({ kind: 'person', data: p }));
+  }
+  if (showPlaces && places.length) {
+    rows.push({ kind: 'header', label: t('search.header_places') });
+    places.forEach((p) => rows.push({ kind: 'place', data: p }));
   }
   if (showCaps && caps.length) {
     rows.push({ kind: 'header', label: t('search.header_caps') });
@@ -96,6 +126,33 @@ const SearchScreen = ({ onNavigate, onGoBack }: SearchScreenProps) => {
             {!!p.username && (
               <Text style={[font('caption'), { color: COLORS.text3 }]}>@{p.username}</Text>
             )}
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={COLORS.text3} />
+        </TouchableOpacity>
+      );
+    }
+    if (item.kind === 'place') {
+      const pl = item.data;
+      return (
+        <TouchableOpacity
+          style={styles.row}
+          activeOpacity={0.85}
+          onPress={() => {
+            Keyboard.dismiss();
+            setTab('caps');
+            setQuery(pl.name);
+          }}
+        >
+          <View style={styles.placeIcon}>
+            <Ionicons name="location" size={18} color={COLORS.ember} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[font('bodyBold'), { color: COLORS.text }]} numberOfLines={1}>
+              {pl.name}
+            </Text>
+            <Text style={[font('caption'), { color: COLORS.text3 }]}>
+              {t('search.place_caps', { n: pl.count })}
+            </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={COLORS.text3} />
         </TouchableOpacity>
@@ -147,6 +204,7 @@ const SearchScreen = ({ onNavigate, onGoBack }: SearchScreenProps) => {
             placeholderTextColor={COLORS.text3}
             autoFocus
             returnKeyType="search"
+            onSubmitEditing={() => saveRecent(query)}
           />
           {hasQuery && (
             <TouchableOpacity onPress={() => setQuery('')}>
@@ -157,10 +215,16 @@ const SearchScreen = ({ onNavigate, onGoBack }: SearchScreenProps) => {
       </View>
 
       <View style={styles.tabs}>
-        {(['all', 'caps', 'people'] as Tab[]).map((tabKey) => (
+        {(['all', 'caps', 'people', 'places'] as Tab[]).map((tabKey) => (
           <TouchableOpacity key={tabKey} onPress={() => setTab(tabKey)} style={[styles.tab, tab === tabKey && styles.tabActive]}>
             <Text style={[font('label'), { color: tab === tabKey ? COLORS.ember : COLORS.text3 }]}>
-              {tabKey === 'all' ? t('search.tab_all') : tabKey === 'caps' ? t('search.tab_caps') : t('search.tab_people')}
+              {tabKey === 'all'
+                ? t('search.tab_all')
+                : tabKey === 'caps'
+                ? t('search.tab_caps')
+                : tabKey === 'people'
+                ? t('search.tab_people')
+                : t('search.tab_places')}
             </Text>
           </TouchableOpacity>
         ))}
@@ -174,16 +238,36 @@ const SearchScreen = ({ onNavigate, onGoBack }: SearchScreenProps) => {
           <Text style={[font('subtitle'), { color: COLORS.text2, marginTop: 10 }]}>{t('search.no_results')}</Text>
         </View>
       ) : !hasQuery ? (
-        <View style={styles.center}>
-          <Ionicons name="compass-outline" size={44} color={COLORS.text3} />
-          <Text style={[font('caption'), { color: COLORS.text3, marginTop: 10 }]}>
-            {t('search.empty_hint')}
-          </Text>
-        </View>
+        <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+          {recent.length > 0 && (
+            <>
+              <View style={styles.recentHead}>
+                <Text style={[font('eyebrow'), { color: COLORS.text3 }]}>{t('search.recent')}</Text>
+                <TouchableOpacity onPress={clearRecent}><Text style={[font('caption'), { color: COLORS.ember }]}>{t('search.clear')}</Text></TouchableOpacity>
+              </View>
+              {recent.map((r) => (
+                <TouchableOpacity key={r} style={styles.recentRow} onPress={() => setQuery(r)} activeOpacity={0.7}>
+                  <Ionicons name="time-outline" size={16} color={COLORS.text3} />
+                  <Text style={[font('body'), { color: COLORS.text, flex: 1 }]} numberOfLines={1}>{r}</Text>
+                  <Ionicons name="arrow-forward" size={14} color={COLORS.text3} />
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+          <Text style={[font('eyebrow'), { color: COLORS.text3, marginTop: recent.length ? 20 : 0, marginBottom: 10 }]}>{t('search.trending')}</Text>
+          <View style={styles.trendWrap}>
+            {TRENDING.map((term) => (
+              <TouchableOpacity key={term} style={styles.trendChip} onPress={() => setQuery(term)} activeOpacity={0.8}>
+                <Ionicons name="trending-up" size={13} color={COLORS.ember} />
+                <Text style={[font('label'), { color: COLORS.text }]}>{term}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
       ) : (
         <FlatList
           data={rows}
-          keyExtractor={(item, i) => (item.kind === 'header' ? `h-${item.label}` : `${item.kind}-${item.data.id}-${i}`)}
+          keyExtractor={(item, i) => (item.kind === 'header' ? `h-${item.label}` : item.kind === 'place' ? `place-${item.data.name}-${i}` : `${item.kind}-${item.data.id}-${i}`)}
           renderItem={renderRow}
           contentContainerStyle={{ padding: 16, gap: 8 }}
           keyboardShouldPersistTaps="handled"
@@ -214,6 +298,10 @@ const styles = StyleSheet.create({
   tab: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: COLORS.bg3 },
   tabActive: { backgroundColor: COLORS.emberSoft },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  recentHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  recentRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border },
+  trendWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  trendChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: COLORS.bg3, borderWidth: 1, borderColor: COLORS.border },
   sectionHeader: { color: COLORS.text3, marginTop: 8, marginBottom: 2 },
   row: {
     flexDirection: 'row',
@@ -229,6 +317,10 @@ const styles = StyleSheet.create({
   avatar: {
     width: 38, height: 38, borderRadius: 19, backgroundColor: COLORS.bg3,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+  },
+  placeIcon: {
+    width: 38, height: 38, borderRadius: 12, backgroundColor: COLORS.emberSoft,
+    alignItems: 'center', justifyContent: 'center',
   },
   avatarImg: { width: 38, height: 38 },
 });

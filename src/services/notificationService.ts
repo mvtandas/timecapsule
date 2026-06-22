@@ -5,7 +5,7 @@ export interface AppNotification {
   user_id: string;
   from_user_id: string | null;
   capsule_id: string | null;
-  type: 'like' | 'comment' | 'friend_request' | 'friend_accepted' | 'capsule_opened';
+  type: 'like' | 'comment' | 'friend_request' | 'friend_accepted' | 'capsule_opened' | 'message';
   message: string;
   is_read: boolean;
   created_at: string;
@@ -18,6 +18,26 @@ export interface AppNotification {
 }
 
 export class NotificationAppService {
+  /** Insert a notification for another user (e.g. a new message). The
+   *  notifications RLS insert policy is permissive, so this works with the anon key. */
+  static async create(params: {
+    userId: string;
+    fromUserId?: string | null;
+    type: AppNotification['type'];
+    message: string;
+    capsuleId?: string | null;
+  }): Promise<void> {
+    try {
+      await supabase.from('notifications').insert({
+        user_id: params.userId,
+        from_user_id: params.fromUserId ?? null,
+        capsule_id: params.capsuleId ?? null,
+        type: params.type,
+        message: params.message,
+      } as any);
+    } catch (e) { if (__DEV__) console.error('notif create', e); }
+  }
+
   static async getNotifications(): Promise<{ data: AppNotification[]; error: any }> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { data: [], error: { message: 'Not authenticated' } };

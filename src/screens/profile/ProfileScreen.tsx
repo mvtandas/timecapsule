@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 
 import { useAuthStore } from '../../store/authStore';
+import { supabase } from '../../lib/supabase';
 import { CapsuleService } from '../../services/capsuleService';
 import { MediaService } from '../../services/mediaService';
 import { SavedService } from '../../services/savedService';
@@ -16,6 +17,7 @@ import { AchievementService, type AchievementSummary } from '../../services/achi
 import { TrailService } from '../../services/trailService';
 import { FriendService } from '../../services/friendService';
 import CapsuleDetailModal from '../../components/CapsuleDetailModal';
+import MessagesButton from '../../components/common/MessagesButton';
 import { COLORS, SPACING, font } from '../../constants/theme';
 import { useT } from '../../i18n';
 
@@ -27,6 +29,8 @@ import CapGridCard from './components/CapGridCard';
 import MemoryCard from './components/MemoryCard';
 import ProfileEmptyState from './components/ProfileEmptyState';
 import PhotoPickerSheet from './components/PhotoPickerSheet';
+import CompletedTrails from './components/CompletedTrails';
+import FriendsPreview, { type FriendPreviewItem } from './components/FriendsPreview';
 
 const { width } = Dimensions.get('window');
 const PAD = SPACING.lg;
@@ -49,8 +53,11 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
   const [caps, setCaps] = useState<any[]>([]);
   const [loadingCaps, setLoadingCaps] = useState(true);
   const [capsulesCount, setCapsulesCount] = useState(0);
+  const [openedCount, setOpenedCount] = useState(0);
+  const [gatheringsCount, setGatheringsCount] = useState(0);
   const [friendsCount, setFriendsCount] = useState(0);
-  const [trailsCount, setTrailsCount] = useState(0);
+  const [friends, setFriends] = useState<FriendPreviewItem[]>([]);
+  const [completedTrails, setCompletedTrails] = useState<any[] | null>(null);
   const [summary, setSummary] = useState<AchievementSummary | null>(null);
 
   // Lazy tab data (null = not loaded yet)
@@ -85,18 +92,34 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
   const loadCore = async () => {
     try {
       setLoadingCaps(true);
-      const [capsRes, friends, ach, trails] = await Promise.all([
+      const [capsRes, friendsRes, ach, openedIds, completed] = await Promise.all([
         CapsuleService.getUserCapsules(),
         FriendService.getFriends(),
         AchievementService.compute(),
-        TrailService.getCompletedCount(),
+        CapsuleService.getOpenedCapsuleIds(),
+        TrailService.getCompletedTrails(),
       ]);
       const list = capsRes?.data || [];
       setCaps(list);
       setCapsulesCount(list.length);
-      setFriendsCount(friends?.data?.length || 0);
-      setTrailsCount(trails || 0);
+      setGatheringsCount(list.filter((c: any) => c.type === 'gathering').length);
+      setOpenedCount((openedIds || []).length);
+      setCompletedTrails(completed || []);
       setSummary(ach);
+
+      // FriendService.getFriends() returns just the friend IDs — resolve them to
+      // profiles so the inline preview can show avatars/handles.
+      const friendIds = friendsRes?.data || [];
+      setFriendsCount(friendIds.length);
+      if (friendIds.length) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, username, display_name, avatar_url')
+          .in('id', friendIds.slice(0, 12));
+        setFriends((profiles as FriendPreviewItem[]) || []);
+      } else {
+        setFriends([]);
+      }
     } catch (e) {
       if (__DEV__) console.warn('profile loadCore:', e);
     } finally {
@@ -167,9 +190,10 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
   const detailList = isMemories ? (memories || []).map((m) => m.capsule) : data;
 
   const stats: StatItem[] = [
-    { key: 'caps', label: t('profile.statCaps'), value: capsulesCount, onPress: () => onNavigate('MyCapsules') },
+    { key: 'created', label: t('profile.statCreated'), value: capsulesCount, onPress: () => onNavigate('MyCapsules') },
+    { key: 'opened', label: t('profile.statOpened'), value: openedCount },
+    { key: 'gatherings', label: t('profile.statGatherings'), value: gatheringsCount },
     { key: 'friends', label: t('profile.statFriends'), value: friendsCount, onPress: () => onNavigate('Friends') },
-    { key: 'trails', label: t('profile.statTrails'), value: trailsCount },
   ];
   const tabs: TabDef[] = [
     { key: 'caps', label: t('profile.myCaps') },
@@ -219,8 +243,10 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
       />
       <ProfileActions onEdit={() => onNavigate('AccountSettings')} onInvite={invite} />
       <AchievementStrip summary={summary} onPress={() => onNavigate('Achievements')} />
+      <CompletedTrails trails={completedTrails} onPress={openCap} />
+      <FriendsPreview friends={friends} count={friendsCount} onSeeAll={() => onNavigate('Friends')} />
       <View
-        style={styles.tabsHolder}
+        style={[styles.tabsHolder, styles.tabsHolderSpaced]}
         onLayout={(e) => { tabY.current = e.nativeEvent.layout.y; }}
       >
         <ProfileTabs tabs={tabs} active={activeTab} onChange={onChangeTab} />
@@ -237,6 +263,10 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
       >
         <Text style={styles.handle} numberOfLines={1}>@{user?.username || t('profile.defaultUsername')}</Text>
         <View style={styles.headerActions}>
+          <MessagesButton onPress={() => onNavigate('Messages')} />
+          <TouchableOpacity onPress={() => onNavigate('Drafts')} activeOpacity={0.7} style={styles.headerBtn}>
+            <Ionicons name="document-text-outline" size={21} color={COLORS.text} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => onNavigate('AccountSettings')} activeOpacity={0.7} style={styles.headerBtn}>
             <Ionicons name="settings-outline" size={22} color={COLORS.text} />
           </TouchableOpacity>
@@ -278,7 +308,13 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
       <CapsuleDetailModal
         visible={!!selectedCapsule}
         capsule={selectedCapsule}
-        capsules={detailList}
+        capsules={
+          // Completed-trail caps live outside the active-tab list; pass a list the
+          // selected cap is actually in so the modal opens to the right page.
+          selectedCapsule && !detailList.some((c: any) => c?.id === selectedCapsule.id)
+            ? [selectedCapsule]
+            : detailList
+        }
         onClose={() => setSelectedCapsule(null)}
       />
     </View>
@@ -301,6 +337,7 @@ const styles = StyleSheet.create({
   column: { paddingHorizontal: PAD, gap: GAP },
   memoryItem: { paddingHorizontal: PAD, marginBottom: SPACING.sm },
   tabsHolder: { marginTop: SPACING.md },
+  tabsHolderSpaced: { marginTop: SPACING.lg },
 
   sticky: {
     position: 'absolute', left: 0, right: 0, zIndex: 15, backgroundColor: COLORS.bg,

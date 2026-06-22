@@ -1,11 +1,12 @@
-import React from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MaterialTopTabBarProps } from '@react-navigation/material-top-tabs';
-import { COLORS, GRADIENTS, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
+import { COLORS, GRADIENTS, SPACING, RADIUS, SHADOWS, font } from '../../constants/theme';
 import GlassView from './GlassView';
+import { NotificationAppService } from '../../services/notificationService';
 import { useT } from '../../i18n';
 
 /**
@@ -34,6 +35,27 @@ const BottomTabBar: React.FC<MaterialTopTabBarProps> = ({ state, navigation }) =
   const t = useT();
   const insets = useSafeAreaInsets();
   const activeRoute = state.routes[state.index]?.name;
+  const [unread, setUnread] = useState(0);
+
+  // Poll the unread notification count for the Activity badge. Re-checks on a
+  // light interval and whenever the user leaves the Activity tab (where they'd
+  // have marked things read).
+  useEffect(() => {
+    let alive = true;
+    const refresh = () => {
+      NotificationAppService.getUnreadCount()
+        .then((n) => { if (alive) setUnread(n); })
+        .catch(() => {});
+    };
+    refresh();
+    const id = setInterval(refresh, 30000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+
+  // Clear the badge optimistically when the user opens Activity.
+  useEffect(() => {
+    if (activeRoute === 'Activity') setUnread(0);
+  }, [activeRoute]);
 
   const openCreate = () => {
     navigation.getParent()?.navigate('Create' as never);
@@ -68,6 +90,11 @@ const BottomTabBar: React.FC<MaterialTopTabBarProps> = ({ state, navigation }) =
                     size={22}
                     color={isActive ? COLORS.ember : COLORS.text3}
                   />
+                  {slot.route === 'Activity' && unread > 0 && (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
+                    </View>
+                  )}
                 </View>
               </TouchableOpacity>
             );
@@ -123,6 +150,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingVertical: 6,
     borderRadius: RADIUS.pill,
+  },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: 6,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    backgroundColor: COLORS.ember,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    ...font('micro'),
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 10,
   },
   iconWrapActive: {
     backgroundColor: COLORS.emberSoft,

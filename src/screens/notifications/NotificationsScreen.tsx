@@ -12,9 +12,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NotificationAppService, AppNotification } from '../../services/notificationService';
+import { TrailService } from '../../services/trailService';
 import { timeAgo } from '../../utils/dateUtils';
 import { SkeletonList } from '../../components/common/Skeleton';
 import ScreenHeader from '../../components/common/ScreenHeader';
+import MessagesButton from '../../components/common/MessagesButton';
+import CapTypeIcon from '../../components/common/CapTypeIcon';
+import CapsuleDetailModal from '../../components/CapsuleDetailModal';
+import { getCapType } from '../../constants/capTypes';
 import { COLORS, SPACING, RADIUS, font } from '../../constants/theme';
 import { useT } from '../../i18n';
 
@@ -33,6 +38,9 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<NotifFilter>('All');
+  const [activeTrails, setActiveTrails] = useState<any[]>([]);
+  const [selected, setSelected] = useState<any>(null);
+  const [showDetail, setShowDetail] = useState(false);
 
   const filteredNotifications = useMemo(() => {
     if (activeFilter === 'All') return notifications;
@@ -53,6 +61,7 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
     setLoading(true);
     const { data } = await NotificationAppService.getNotifications();
     setNotifications(data);
+    TrailService.getActiveTrails().then(setActiveTrails).catch(() => {});
     setLoading(false);
     // Mark all as read on the server, then reflect it locally so the unread
     // accent stays consistent with the backend (no stale "unread" dots).
@@ -103,11 +112,19 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
       case 'friend_request': return { name: 'person-add', color: COLORS.moss };
       case 'friend_accepted': return { name: 'people', color: COLORS.moss };
       case 'capsule_opened': return { name: 'lock-open', color: COLORS.blue };
+      case 'message': return { name: 'chatbubble-ellipses', color: COLORS.ember };
       default: return { name: 'notifications', color: COLORS.text3 };
     }
   };
 
   const handleNotificationPress = (notif: AppNotification) => {
+    if (notif.type === 'message' && notif.from_user_id) {
+      onNavigate('Chat', {
+        otherUserId: notif.from_user_id,
+        title: notif.from_profile?.display_name || notif.from_profile?.username || t('capDetail.someone'),
+      });
+      return;
+    }
     if (notif.from_user_id && (notif.type === 'friend_request' || notif.type === 'friend_accepted')) {
       onNavigate('FriendProfile', {
         friend: {
@@ -126,11 +143,16 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
         title={t('notifications.title')}
         onBack={onGoBack}
         borderBottom
-        right={notifications.length > 0 ? (
-          <TouchableOpacity onPress={handleClearAll} style={styles.clearAllBtn}>
-            <Text style={styles.clearAllText}>{t('notifications.clearAll')}</Text>
-          </TouchableOpacity>
-        ) : undefined}
+        right={(
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.sm }}>
+            {notifications.length > 0 && (
+              <TouchableOpacity onPress={handleClearAll} style={styles.clearAllBtn}>
+                <Text style={styles.clearAllText}>{t('notifications.clearAll')}</Text>
+              </TouchableOpacity>
+            )}
+            <MessagesButton onPress={() => onNavigate('Messages')} />
+          </View>
+        )}
       />
 
       {/* Filter Chips */}
@@ -159,7 +181,25 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
         <FlatList
           data={filteredNotifications}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={filteredNotifications.length === 0 ? styles.emptyContainer : styles.listContent}
+          contentContainerStyle={(filteredNotifications.length === 0 && activeTrails.length === 0) ? styles.emptyContainer : styles.listContent}
+          ListHeaderComponent={activeTrails.length > 0 ? (
+            <View style={styles.trailsSection}>
+              <Text style={styles.trailsTitle}>{t('notifications.activeTrails')}</Text>
+              {activeTrails.map((tr) => {
+                const ct = getCapType('trail');
+                return (
+                  <TouchableOpacity key={tr.id} style={styles.trailRow} onPress={() => { setSelected(tr); setShowDetail(true); }} activeOpacity={0.8}>
+                    <View style={[styles.trailIcon, { backgroundColor: `${ct.color}22` }]}><CapTypeIcon size={20} color={ct.color} /></View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.trailName} numberOfLines={1}>{tr.title || ct.name}</Text>
+                      <Text style={styles.trailSub}>{t('notifications.trailStop', { n: (tr._currentIdx || 0) + 1 })}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={COLORS.text3} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : null}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.ember} />
           }
@@ -219,6 +259,7 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
           }}
         />
       )}
+      <CapsuleDetailModal visible={showDetail} capsule={selected} onClose={() => setShowDetail(false)} />
     </View>
   );
 };
@@ -273,6 +314,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContent: { paddingBottom: 124 }, // clear the floating glass tab bar
+  trailsSection: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.sm, paddingBottom: SPACING.md },
+  trailsTitle: { ...font('eyebrow'), color: COLORS.text2, marginBottom: SPACING.sm },
+  trailRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, backgroundColor: COLORS.bg3, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.sm },
+  trailIcon: { width: 42, height: 42, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
+  trailName: { ...font('bodyBold'), color: COLORS.text },
+  trailSub: { ...font('caption'), color: COLORS.text2, marginTop: 2 },
   empty: {
     alignItems: 'center',
     gap: 8,

@@ -29,10 +29,11 @@ import FriendProfileScreen from './src/screens/friends/FriendProfileScreen';
 import FriendsScreen from './src/screens/friends/FriendsScreen';
 import AccountSettingsScreen from './src/screens/profile/AccountSettingsScreen';
 import NotificationsScreen from './src/screens/notifications/NotificationsScreen';
-import MemoriesScreen from './src/screens/memories/MemoriesScreen';
-import SavedScreen from './src/screens/saved/SavedScreen';
 import AchievementsScreen from './src/screens/achievements/AchievementsScreen';
 import SearchScreen from './src/screens/search/SearchScreen';
+import DraftsScreen from './src/screens/drafts/DraftsScreen';
+import MessagesScreen from './src/screens/messages/MessagesScreen';
+import ChatScreen from './src/screens/messages/ChatScreen';
 import CapScreen from './src/screens/cap/CapScreen';
 import TrailStopsScreen from './src/screens/trails/TrailStopsScreen';
 import BottomTabBar from './src/components/common/BottomTabBar';
@@ -118,13 +119,10 @@ function AppStack() {
     <RootStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.bg } }}>
       <RootStack.Screen name="MainTabs" component={MainTabs} />
       <RootStack.Screen name="Create" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}>
-        {({ navigation }) => <CreateCapsuleScreen {...makeNav(navigation)} />}
+        {({ navigation, route }) => <CreateCapsuleScreen {...makeNav(navigation)} initialType={(route.params as any)?.type} />}
       </RootStack.Screen>
       <RootStack.Screen name="MyCapsules">
         {({ navigation }) => <MyCapsulesScreen {...makeNav(navigation)} onLogout={signOut} />}
-      </RootStack.Screen>
-      <RootStack.Screen name="Memories">
-        {({ navigation }) => <MemoriesScreen {...makeNav(navigation)} />}
       </RootStack.Screen>
       <RootStack.Screen name="AccountSettings">
         {({ navigation }) => <AccountSettingsScreen {...makeNav(navigation)} onLogout={signOut} />}
@@ -137,14 +135,27 @@ function AppStack() {
       <RootStack.Screen name="Friends">
         {({ navigation }) => <FriendsScreen {...makeNav(navigation)} />}
       </RootStack.Screen>
-      <RootStack.Screen name="Saved">
-        {({ navigation }) => <SavedScreen {...makeNav(navigation)} />}
-      </RootStack.Screen>
       <RootStack.Screen name="Achievements">
         {({ navigation }) => <AchievementsScreen {...makeNav(navigation)} />}
       </RootStack.Screen>
       <RootStack.Screen name="Search">
         {({ navigation }) => <SearchScreen {...makeNav(navigation)} />}
+      </RootStack.Screen>
+      <RootStack.Screen name="Drafts">
+        {({ navigation }) => <DraftsScreen {...makeNav(navigation)} />}
+      </RootStack.Screen>
+      <RootStack.Screen name="Messages">
+        {({ navigation }) => <MessagesScreen {...makeNav(navigation)} />}
+      </RootStack.Screen>
+      <RootStack.Screen name="Chat">
+        {({ navigation, route }) => (
+          <ChatScreen
+            {...makeNav(navigation)}
+            otherUserId={(route.params as any)?.otherUserId}
+            conversationId={(route.params as any)?.conversationId}
+            title={(route.params as any)?.title}
+          />
+        )}
       </RootStack.Screen>
       <RootStack.Screen name="Cap">
         {({ navigation, route }) => (

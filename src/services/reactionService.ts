@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 
-export const REACTIONS = ['❤️', '🔥', '😢', '😮', '🎉', '💀'] as const;
+// Canonical reaction set — matches the demo's CAP_REACTION_DEFS (Love/Fire/Wow/Celebrate).
+export const REACTIONS = ['❤️', '🔥', '😮', '🙌'] as const;
 export type ReactionType = typeof REACTIONS[number];
 
 export interface ReactionSummary {

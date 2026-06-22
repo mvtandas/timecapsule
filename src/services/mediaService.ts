@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 export interface MediaUploadResult {
   url: string;
   path: string;
-  type: 'image' | 'video';
+  type: 'image' | 'video' | 'audio';
 }
 
 export class MediaService {
@@ -26,7 +26,8 @@ export class MediaService {
       // Determine file type from URI
       const fileExtension = uri.split('.').pop()?.toLowerCase() || 'jpg';
       const isVideo = ['mp4', 'mov', 'avi', 'mkv'].includes(fileExtension);
-      const mediaType: 'image' | 'video' = isVideo ? 'video' : 'image';
+      const isAudio = ['m4a', 'caf', 'wav', 'mp3', 'aac'].includes(fileExtension);
+      const mediaType: 'image' | 'video' | 'audio' = isVideo ? 'video' : isAudio ? 'audio' : 'image';
 
       // Generate unique file name
       const timestamp = Date.now();
@@ -36,7 +37,9 @@ export class MediaService {
       // Determine content type
       const contentType = isVideo
         ? `video/${fileExtension}`
-        : `image/${fileExtension}`;
+        : isAudio
+          ? `audio/${fileExtension === 'm4a' ? 'mp4' : fileExtension}`
+          : `image/${fileExtension}`;
 
       // Read file using fetch with timeout (works in React Native without deprecated warnings)
       const controller = new AbortController();

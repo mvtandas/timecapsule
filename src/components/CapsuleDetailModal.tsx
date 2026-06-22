@@ -29,8 +29,12 @@ import { getMediaUrl, isLocked } from '../utils/mediaUtils';
 import { formatDate, timeAgo } from '../utils/dateUtils';
 import { ReportService, REPORT_REASONS } from '../services/reportService';
 import { SavedService } from '../services/savedService';
+import { CapsuleService } from '../services/capsuleService';
 import { TrailService, TrailStop } from '../services/trailService';
 import { GatheringService, Contribution } from '../services/gatheringService';
+import ScrollRenderer from './detail/ScrollRenderer';
+import Countdown from './detail/Countdown';
+import AudioPlayer from './detail/AudioPlayer';
 import { useProximity, ARRIVE_RADIUS_M } from '../hooks/useProximity';
 import { openDirections } from '../utils/directions';
 import { COLORS, font } from '../constants/theme';
@@ -39,6 +43,18 @@ import CapTypeBadge from './common/CapTypeBadge';
 import { useT } from '../i18n';
 
 const { width, height } = Dimensions.get('window');
+
+// Rough word count across scroll body blocks → drives the "N min read" byline.
+function countScrollWords(blocks: any[]): number {
+  if (!Array.isArray(blocks)) return 0;
+  let s = '';
+  blocks.forEach((b) => {
+    if (typeof b?.text === 'string') s += ' ' + b.text;
+    if (Array.isArray(b?.items)) s += ' ' + b.items.join(' ');
+  });
+  const trimmed = s.trim();
+  return trimmed ? trimmed.split(/\s+/).length : 0;
+}
 
 interface CapsuleDetailModalProps {
   visible: boolean;
@@ -59,6 +75,10 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
   const [showEditSheet, setShowEditSheet] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [joinRequested, setJoinRequested] = useState(false);
+  const [trailCompletions, setTrailCompletions] = useState(0);
+  const [trailStarted, setTrailStarted] = useState(false);
   const [displayTitle, setDisplayTitle] = useState(item?.title || '');
   const [displayDescription, setDisplayDescription] = useState(item?.description || '');
   const [displayCategory, setDisplayCategory] = useState(item?.category || '');
@@ -70,6 +90,7 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
   const [contributionText, setContributionText] = useState('');
   const [addingPhoto, setAddingPhoto] = useState(false);
   const [submittingText, setSubmittingText] = useState(false);
+  const [readProgress, setReadProgress] = useState(0);
 
   useEffect(() => {
     setOwner(null);
@@ -83,14 +104,25 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
     setCompleted([]);
     setContributions([]);
     setContributionText('');
+    setJoinRequested(false);
+    setTrailCompletions(0);
+    setTrailStarted(false);
+    setReadProgress(0);
     if (item?.owner_id) loadOwner(item.owner_id);
     if (item?.lat && item?.lng) loadAddress(item.lat, item.lng);
     if (item?.id) loadCommentCount();
     if (item?.id) loadSaved();
-    if (item?.id && item?.type === 'trail') { loadTrailStops(); loadTrailProgress(); }
+    if (item?.id && item?.type === 'trail') { loadTrailStops(); loadTrailProgress(); loadTrailCompletions(); }
     if (item?.id && item?.type === 'gathering') loadContributions();
     checkOwnership();
   }, [item?.id]);
+
+  const loadTrailCompletions = async () => {
+    try {
+      const n = await TrailService.getCompletionCount(item.id);
+      setTrailCompletions(n);
+    } catch (e) { if (__DEV__) console.error(e); }
+  };
 
   const loadSaved = async () => {
     try {
@@ -122,12 +154,27 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
       const p = await TrailService.getProgress(item.id);
       setCurrentIdx(p?.current_stop_idx ?? 0);
       setCompleted(p?.completed_stops ?? []);
+      // A progress row means the user already started walking this trail.
+      setTrailStarted(!!p);
+    } catch (e) { if (__DEV__) console.error(e); }
+  };
+
+  const handleStartTrail = () => {
+    setTrailStarted(true);
+    // Persist a started-but-no-progress row so it shows in "Active trails".
+    TrailService.setProgress(item.id, 0, []).catch(() => {});
+  };
+
+  const handleRequestJoin = async () => {
+    setJoinRequested(true);
+    try {
+      await GatheringService.requestJoin(item.id);
     } catch (e) { if (__DEV__) console.error(e); }
   };
 
   const cur = trailStops[currentIdx];
   const trailActive = item?.type === 'trail' && currentIdx < trailStops.length;
-  const { distanceM, withinRange } = useProximity(
+  const { distanceM, withinRange, denied: stopDenied, unavailable: stopUnavailable } = useProximity(
     { lat: cur?.lat, lng: cur?.lng },
     trailActive,
   );
@@ -195,8 +242,9 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
   const checkOwnership = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user && item?.owner_id) {
-        setIsOwner(user.id === item.owner_id);
+      if (user) {
+        setCurrentUserId(user.id);
+        if (item?.owner_id) setIsOwner(user.id === item.owner_id);
       }
     } catch (e) {
       // silently fail
@@ -306,10 +354,150 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
   const distanceLocked = distanceGated && !locked && !capProx.withinRange;
   const sealed = locked || distanceLocked;
 
+  // Record that the viewer opened this cap (powers Discover "Unopened" + profile "Opened").
+  useEffect(() => {
+    if (item?.id && !sealed && !isOwner) CapsuleService.recordOpen(item.id);
+  }, [item?.id, sealed, isOwner]);
+
+  // Gathering contribution visibility (mirrors the demo): open caps after seal
+  // show all; while sealed, blind hides every contribution (even from the owner),
+  // open mode lets the owner see all but others only their own.
+  const visibleContributions = (() => {
+    if (item?.type !== 'gathering') return contributions;
+    if (!sealed) return contributions;
+    if (item?.gathering_blind) return contributions.filter((c) => c.user_id === currentUserId);
+    return isOwner ? contributions : contributions.filter((c) => c.user_id === currentUserId);
+  })();
+  const hiddenContributions = contributions.length - visibleContributions.length;
+
+  // Scroll caps get a dedicated, vertically-scrollable article reader (the story
+  // overlay can't show a long article). The locked state still uses the story layout.
+  const isScrollCap = item?.type === 'scroll' && Array.isArray(item?.body) && item.body.length > 0;
+  const scrollWords = isScrollCap ? countScrollWords(item.body) : 0;
+  const readMin = Math.max(1, Math.round(scrollWords / 200));
+
+  if (isScrollCap && !sealed) {
+    const cover = item.cover_photo_url || mediaUrl;
+    return (
+      <View style={styles.scrollPage}>
+        <View style={styles.readProgressTrack}>
+          <View style={[styles.readProgressFill, { width: `${Math.round(readProgress * 100)}%` }]} />
+        </View>
+        <View style={styles.scrollTopBar}>
+          <TouchableOpacity
+            style={styles.ownerRow}
+            onPress={() => owner && onOwnerPress?.(owner)}
+            disabled={!onOwnerPress || !owner}
+            activeOpacity={0.8}
+          >
+            <View style={styles.avatarDark}>
+              {owner?.avatar_url ? (
+                <Image source={{ uri: owner.avatar_url }} style={styles.avatarImg} />
+              ) : (
+                <Ionicons name="person" size={16} color={COLORS.text2} />
+              )}
+            </View>
+            <Text style={styles.scrollOwnerName} numberOfLines={1}>
+              {owner?.display_name || owner?.username || '...'}
+            </Text>
+          </TouchableOpacity>
+          <View style={styles.topBarRight}>
+            {!isOwner && (
+              <TouchableOpacity onPress={handleMoreOptions} style={styles.moreBtn}>
+                <Ionicons name="ellipsis-vertical" size={22} color={COLORS.text} />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+              <Ionicons name="close" size={26} color={COLORS.text} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <ScrollView
+          style={styles.scrollArticle}
+          contentContainerStyle={styles.scrollArticleContent}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
+          onScroll={(e) => {
+            const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+            const max = contentSize.height - layoutMeasurement.height;
+            setReadProgress(max > 0 ? Math.min(1, Math.max(0, contentOffset.y / max)) : 0);
+          }}
+        >
+          {cover ? <Image source={{ uri: cover }} style={styles.scrollCover} resizeMode="cover" /> : null}
+          <View style={styles.typeBadgeRow}>
+            <CapTypeBadge type={item?.type} size="md" />
+          </View>
+          <Text style={styles.scrollTitle}>{displayTitle}</Text>
+          <Text style={styles.scrollByline}>
+            {(owner?.display_name || owner?.username || '')}
+            {scrollWords > 0 ? `  ·  ${t('capDetail.readTime', { min: readMin })}` : ''}
+          </Text>
+          <ScrollRenderer blocks={item.body} />
+
+          {(displayDescription || address || scrollWords > 0) ? (
+            <View style={styles.aboutBox}>
+              <Text style={styles.aboutTitle}>{t('capDetail.aboutScroll')}</Text>
+              {displayDescription ? <Text style={styles.aboutText}>{displayDescription}</Text> : null}
+              {address ? (
+                <View style={styles.aboutRow}>
+                  <Ionicons name="location-outline" size={14} color={COLORS.text2} />
+                  <Text style={styles.aboutMeta}>{address}</Text>
+                </View>
+              ) : null}
+              {scrollWords > 0 ? <Text style={styles.aboutMeta}>{t('capDetail.wordCount', { n: scrollWords })}</Text> : null}
+            </View>
+          ) : null}
+
+          <ReactionBar capsuleId={item.id} />
+
+          <View style={styles.scrollActionRow}>
+            <TouchableOpacity onPress={() => setShowComments(true)} style={styles.actionBtn} activeOpacity={0.7}>
+              <Ionicons name="chatbubble-outline" size={22} color={COLORS.text} />
+              {commentCount > 0 && <Text style={[styles.actionCount, { color: COLORS.text }]}>{commentCount}</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowShare(true)} style={styles.actionBtn} activeOpacity={0.7}>
+              <Ionicons name="share-outline" size={22} color={COLORS.text} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={toggleSaved} style={styles.actionBtn} activeOpacity={0.7}>
+              <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={22} color={saved ? COLORS.ember : COLORS.text} />
+            </TouchableOpacity>
+            {isOwner && (
+              <TouchableOpacity onPress={() => setShowEditSheet(true)} style={styles.actionBtn} activeOpacity={0.7}>
+                <Ionicons name="pencil-outline" size={22} color={COLORS.text} />
+              </TouchableOpacity>
+            )}
+            {item?.lat && item?.lng && (
+              <TouchableOpacity onPress={() => openDirections(item.lat, item.lng, item.title)} style={styles.actionBtn} activeOpacity={0.7}>
+                <Ionicons name="navigate" size={22} color={COLORS.text} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </ScrollView>
+
+        <CommentSheet capsuleId={item.id} visible={showComments} onClose={() => setShowComments(false)} onCountChange={(c) => setCommentCount(c)} />
+        <ShareSheet visible={showShare} cap={item} onClose={() => setShowShare(false)} />
+        <EditCapsuleSheet
+          capsuleId={item.id}
+          visible={showEditSheet}
+          onClose={() => setShowEditSheet(false)}
+          initialTitle={displayTitle}
+          initialDescription={displayDescription}
+          initialCategory={displayCategory}
+          onSaved={(updated) => {
+            setDisplayTitle(updated.title);
+            setDisplayDescription(updated.description);
+            setDisplayCategory(updated.category);
+          }}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.page}>
       {/* Background image */}
-      {mediaUrl && !sealed ? (
+      {mediaUrl && !sealed && item?.media_type !== 'audio' ? (
         <Image source={{ uri: mediaUrl }} style={styles.bgImage} resizeMode="cover" />
       ) : (
         <View style={[styles.bgImage, { backgroundColor: COLORS.bg2 }]} />
@@ -361,6 +549,7 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
           </View>
           <Text style={styles.lockedTitle}>{t('capDetail.sealed')}</Text>
           {item.open_at && <Text style={styles.lockedDate}>{t('capDetail.opens', { date: formatDate(item.open_at) })}</Text>}
+          {item.open_at && <Countdown target={item.open_at} />}
         </View>
       )}
 
@@ -374,11 +563,13 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
           <Text style={styles.lockedDate}>
             {capProx.denied
               ? t('capDetail.locationNeeded')
-              : capProx.distanceM == null
-                ? t('capDetail.locating')
-                : capProx.distanceM >= 1000
-                  ? t('capDetail.kmAway', { km: (capProx.distanceM / 1000).toFixed(1) })
-                  : t('capDetail.mAway', { m: Math.round(capProx.distanceM) })}
+              : capProx.unavailable
+                ? t('capDetail.distanceUnknown')
+                : capProx.distanceM == null
+                  ? t('capDetail.locating')
+                  : capProx.distanceM >= 1000
+                    ? t('capDetail.kmAway', { km: (capProx.distanceM / 1000).toFixed(1) })
+                    : t('capDetail.mAway', { m: Math.round(capProx.distanceM) })}
           </Text>
           {!capProx.denied && (
             <Text style={styles.lockedHint}>{t('capDetail.walkWithin', { m: ARRIVE_RADIUS_M })}</Text>
@@ -408,9 +599,12 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
           <CapTypeBadge type={item?.type} size="md" />
         </View>
         <Text style={styles.title}>{displayTitle}</Text>
-        {displayDescription ? (
+        {item?.type === 'scroll' && Array.isArray(item?.body) && item.body.length ? (
+          <ScrollRenderer blocks={item.body} />
+        ) : displayDescription ? (
           <Text style={styles.description} numberOfLines={3}>{displayDescription}</Text>
         ) : null}
+        {item?.media_type === 'audio' && mediaUrl && !sealed && <AudioPlayer uri={mediaUrl} />}
 
         {/* Trail walking */}
         {item?.type === 'trail' && trailStops.length > 0 && (() => {
@@ -424,14 +618,42 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
                   : t('capDetail.trailStopProgress', { n: Math.min(currentIdx + 1, trailStops.length), count: trailStops.length })}
               </Text>
 
-              {done && (
-                <View style={[styles.trailCompleteBanner, { borderColor: gold }]}>
-                  <Ionicons name="trophy" size={20} color={gold} />
-                  <View style={styles.trailStopBody}>
-                    <Text style={[styles.trailCompleteTitle, { color: gold }]}>{t('capDetail.trailComplete')}</Text>
-                    <Text style={styles.trailStopLocation}>{t('capDetail.trailCompleteSub')}</Text>
+              {/* Opened progress bar (N of M opened) */}
+              {!done && (
+                <View style={styles.trailProgressWrap}>
+                  <View style={styles.trailProgressTrack}>
+                    <View style={[styles.trailProgressFill, { width: `${Math.round((completed.length / trailStops.length) * 100)}%`, backgroundColor: gold }]} />
                   </View>
+                  <Text style={styles.trailProgressLabel}>{t('capDetail.stopsOpened', { done: completed.length, total: trailStops.length })}</Text>
                 </View>
+              )}
+
+              {/* Completion summary */}
+              {done && (
+                <View style={[styles.trailCompleteCard, { borderColor: gold }]}>
+                  <View style={[styles.trailCompleteTrophy, { backgroundColor: `${gold}22` }]}>
+                    <Ionicons name="trophy" size={30} color={gold} />
+                  </View>
+                  <Text style={[styles.trailCompleteTitle, { color: gold }]}>{t('capDetail.trailComplete')}</Text>
+                  <Text style={styles.trailStopLocation}>{t('capDetail.trailCompleteSub')}</Text>
+                  {trailCompletions > 1 && (
+                    <Text style={styles.trailCompletedBy}>{t('capDetail.completedByOthers', { n: trailCompletions - 1 })}</Text>
+                  )}
+                </View>
+              )}
+
+              {/* Start gate — stop 1 stays locked until the walker starts */}
+              {!done && !trailStarted && (
+                <TouchableOpacity style={[styles.trailStartCard, { borderColor: gold }]} onPress={handleStartTrail} activeOpacity={0.85}>
+                  <Ionicons name="footsteps-outline" size={22} color={gold} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.trailStartTitle, { color: gold }]}>{t('capDetail.readyToStart')}</Text>
+                    <Text style={styles.trailStopLocation}>{t('capDetail.startTrailSub')}</Text>
+                  </View>
+                  <View style={[styles.trailStartBtn, { backgroundColor: gold }]}>
+                    <Text style={styles.trailStartBtnText}>{t('capDetail.startTrail')}</Text>
+                  </View>
+                </TouchableOpacity>
               )}
 
               <ScrollView style={styles.extraScroll} keyboardShouldPersistTaps="handled">
@@ -479,6 +701,22 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
                             {stop.location_name ? (
                               <Text style={styles.trailStopLocation} numberOfLines={1}>{stop.location_name}</Text>
                             ) : null}
+                            {stop.estimated_minutes ? (
+                              <Text style={styles.trailStopLocation}>{t('capDetail.estMinutes', { min: stop.estimated_minutes })}</Text>
+                            ) : null}
+                            {stop.photo_url ? (
+                              <Image source={{ uri: stop.photo_url }} style={styles.trailStopPhoto} resizeMode="cover" />
+                            ) : null}
+                            {/* Reveal the stop's payoff once it's been opened (arrived + tapped). */}
+                            {isDone && stop.content ? (
+                              <Text style={styles.trailStopContent}>{stop.content}</Text>
+                            ) : null}
+                            {isDone && stop.tip ? (
+                              <View style={styles.trailTipBox}>
+                                <Text style={styles.trailTipLabel}>{t('capDetail.proTip')}</Text>
+                                <Text style={styles.trailTipText}>{stop.tip}</Text>
+                              </View>
+                            ) : null}
                           </>
                         )}
 
@@ -488,7 +726,9 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
                               ? t('capDetail.youreHere')
                               : distanceM != null
                                 ? t('capDetail.mAwayShort', { m: Math.round(distanceM) })
-                                : t('capDetail.locating')}
+                                : (stopDenied || stopUnavailable)
+                                  ? t('capDetail.distanceUnknown')
+                                  : t('capDetail.locating')}
                           </Text>
                         )}
 
@@ -498,10 +738,10 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
                               style={[
                                 styles.trailOpenBtn,
                                 { backgroundColor: gold },
-                                !(isOwner || withinRange || !hasCoords) && styles.trailOpenBtnDisabled,
+                                !(trailStarted && (isOwner || withinRange || !hasCoords)) && styles.trailOpenBtnDisabled,
                               ]}
                               onPress={handleOpenStop}
-                              disabled={!(isOwner || withinRange || !hasCoords)}
+                              disabled={!(trailStarted && (isOwner || withinRange || !hasCoords))}
                               activeOpacity={0.8}
                             >
                               <Text style={styles.trailOpenBtnText}>{t('capDetail.openThisStop')}</Text>
@@ -531,9 +771,9 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
         {item?.type === 'gathering' && (
           <View style={styles.extraSection}>
             <Text style={styles.extraSectionTitle}>{t('capDetail.gatheringCount', { count: contributions.length })}</Text>
-            {contributions.length > 0 && (
+            {visibleContributions.length > 0 ? (
               <ScrollView style={styles.extraScroll} keyboardShouldPersistTaps="handled">
-                {contributions.map((c, idx) => (
+                {visibleContributions.map((c, idx) => (
                   <View key={c.id || idx} style={styles.contributionRow}>
                     <Text style={styles.contributionAuthor} numberOfLines={1}>
                       {c.author?.display_name || c.author?.username || t('capDetail.someone')}
@@ -549,6 +789,12 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
                   </View>
                 ))}
               </ScrollView>
+            ) : null}
+            {hiddenContributions > 0 && (
+              <View style={styles.blindNote}>
+                <Ionicons name="eye-off-outline" size={20} color={COLORS.text3} />
+                <Text style={styles.blindNoteText}>{t('capDetail.gatheringHidden', { count: hiddenContributions })}</Text>
+              </View>
             )}
             {!sealed && (
             <View style={styles.contributionInputRow}>
@@ -582,6 +828,12 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
                 <Text style={styles.contributionAddText}>{t('capDetail.add')}</Text>
               </TouchableOpacity>
             </View>
+            )}
+            {!isOwner && item?.allow_join_requests && !!currentUserId && (
+              <TouchableOpacity style={styles.joinBtn} onPress={handleRequestJoin} disabled={joinRequested} activeOpacity={0.85}>
+                <Ionicons name={joinRequested ? 'checkmark-circle' : 'person-add-outline'} size={16} color={joinRequested ? COLORS.text2 : COLORS.ember} />
+                <Text style={styles.joinBtnText}>{joinRequested ? t('capDetail.requestSent') : t('capDetail.requestToJoin')}</Text>
+              </TouchableOpacity>
             )}
           </View>
         )}
@@ -737,6 +989,8 @@ const CapsuleDetailModal: React.FC<CapsuleDetailModalProps> = ({
   const startTimer = (index: number) => {
     stopTimer();
     fillBarsUpTo(index);
+    // Scroll caps are a dedicated reader — never auto-advance off an article.
+    if (list[index]?.type === 'scroll') return;
     const anim = progressAnims.current[index];
     if (!anim) return;
 
@@ -800,6 +1054,8 @@ const CapsuleDetailModal: React.FC<CapsuleDetailModalProps> = ({
   // Tap left/right to navigate (disabled when paused/comments open)
   const handleTap = (tapX: number) => {
     if (paused) return;
+    // Don't hijack taps inside the scroll reader (links, scrolling, buttons).
+    if (list[activeIndex]?.type === 'scroll') return;
     if (tapX < width * 0.3) {
       goToPrev(activeIndex);
     } else if (tapX > width * 0.7) {
@@ -879,6 +1135,116 @@ const styles = StyleSheet.create({
   page: {
     width,
     height,
+  },
+
+  // Scroll cap — dedicated article reader
+  scrollPage: {
+    width,
+    height,
+    backgroundColor: COLORS.bg,
+  },
+  readProgressTrack: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    zIndex: 30,
+  },
+  readProgressFill: {
+    height: '100%',
+    backgroundColor: COLORS.ember,
+  },
+  scrollTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 56,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    backgroundColor: COLORS.bg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.border,
+  },
+  avatarDark: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.bg3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  scrollOwnerName: {
+    ...font('label'),
+    color: COLORS.text,
+    marginLeft: 10,
+    flexShrink: 1,
+  },
+  scrollArticle: {
+    flex: 1,
+    backgroundColor: COLORS.bg,
+  },
+  scrollArticleContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 140,
+  },
+  scrollCover: {
+    width: '100%',
+    height: 200,
+    borderRadius: 14,
+    marginBottom: 16,
+    backgroundColor: COLORS.bg2,
+  },
+  scrollTitle: {
+    ...font('display'),
+    color: COLORS.text,
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  scrollByline: {
+    ...font('caption'),
+    color: COLORS.text2,
+    marginBottom: 16,
+  },
+  aboutBox: {
+    marginTop: 24,
+    padding: 16,
+    borderRadius: 14,
+    backgroundColor: COLORS.bg2,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  aboutTitle: {
+    ...font('eyebrow'),
+    color: COLORS.text2,
+    marginBottom: 8,
+  },
+  aboutText: {
+    ...font('body'),
+    color: COLORS.text,
+    marginBottom: 8,
+  },
+  aboutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  aboutMeta: {
+    ...font('caption'),
+    color: COLORS.text2,
+  },
+  scrollActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18,
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.border,
   },
 
   // Background
@@ -1160,6 +1526,13 @@ const styles = StyleSheet.create({
     ...font('caption'),
     color: COLORS.text2,
   },
+  trailStopPhoto: { width: '100%', height: 120, borderRadius: 10, marginTop: 8, backgroundColor: COLORS.bg3 },
+  trailStopContent: { ...font('body'), color: COLORS.text, marginTop: 8, lineHeight: 20 },
+  trailTipBox: { marginTop: 8, padding: 10, borderRadius: 10, backgroundColor: 'rgba(212,162,76,0.12)', borderWidth: 1, borderColor: 'rgba(212,162,76,0.3)' },
+  trailTipLabel: { ...font('eyebrow'), color: getCapType('trail').color, marginBottom: 2 },
+  trailTipText: { ...font('caption'), color: COLORS.text, lineHeight: 17 },
+  blindNote: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 16, paddingHorizontal: 14, backgroundColor: COLORS.bg3, borderRadius: 12 },
+  blindNoteText: { ...font('caption'), color: COLORS.text2, flex: 1 },
   trailStopCurrent: {
     backgroundColor: COLORS.bg3,
     borderRadius: 12,
@@ -1224,6 +1597,51 @@ const styles = StyleSheet.create({
   trailCompleteTitle: {
     ...font('bodyBold'),
   },
+  trailProgressWrap: { marginBottom: 12 },
+  trailProgressTrack: { height: 6, borderRadius: 3, backgroundColor: COLORS.bg3, overflow: 'hidden' },
+  trailProgressFill: { height: '100%', borderRadius: 3 },
+  trailProgressLabel: { ...font('caption'), color: COLORS.text2, marginTop: 6 },
+  trailCompleteCard: {
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 12,
+    gap: 6,
+  },
+  trailCompleteTrophy: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  trailCompletedBy: { ...font('caption'), color: COLORS.text2, marginTop: 4 },
+  trailStartCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+  },
+  trailStartTitle: { ...font('bodyBold') },
+  trailStartBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999 },
+  trailStartBtnText: { ...font('label'), color: '#000', fontWeight: '700' },
+  joinBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.ember,
+  },
+  joinBtnText: { ...font('label'), color: COLORS.ember },
   contributionRow: {
     paddingVertical: 6,
     borderBottomWidth: StyleSheet.hairlineWidth,

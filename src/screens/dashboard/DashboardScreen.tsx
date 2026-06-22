@@ -1,8 +1,9 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput, Dimensions, Platform, Animated, PanResponder, Modal, Image, KeyboardAvoidingView, Share } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, Callout, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { DARK_MAP_STYLE } from '../../constants/mapStyle';
 import * as Location from 'expo-location';
 import { BlurView } from 'expo-blur';
@@ -12,10 +13,23 @@ import CapsuleDetailModal from '../../components/CapsuleDetailModal';
 import { calculateDistance } from '../../utils/geoUtils';
 import { formatDistance } from '../../utils/geoUtils';
 import { getMediaUrl } from '../../utils/mediaUtils';
-import { formatDate } from '../../utils/dateUtils';
-import { COLORS, font } from '../../constants/theme';
-import { capColor } from '../../constants/capTypes';
+import { formatDate, timeAgo } from '../../utils/dateUtils';
+import { openDirections } from '../../utils/directions';
+import { COLORS, font, SPACING, RADIUS } from '../../constants/theme';
+import { capColor, getCapType } from '../../constants/capTypes';
+import CapTypeIcon from '../../components/common/CapTypeIcon';
+import MessagesButton from '../../components/common/MessagesButton';
+import { supabase } from '../../lib/supabase';
+import { FriendService } from '../../services/friendService';
 import { useT } from '../../i18n';
+
+type FeedTab = 'all' | 'mine' | 'friends' | 'nearby' | 'new' | 'popular';
+const FEED_TABS: FeedTab[] = ['all', 'mine', 'friends', 'nearby', 'new', 'popular'];
+
+// Distance filter options in km (matches the km unit used by geoUtils throughout
+// this screen). `null` = "Any" (no distance cap).
+type DistFilter = number | null;
+const DIST_OPTIONS: number[] = [0.5, 1, 2, 5, 10];
 
 interface DashboardScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -25,6 +39,7 @@ const { width, height } = Dimensions.get('window');
 
 const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
   const t = useT();
+  const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [userLocation, setUserLocation] = useState({
     latitude: 40.9887,
@@ -32,12 +47,21 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
     latitudeDelta: 0.01,
     longitudeDelta: 0.01,
   });
-  const [activeTab, setActiveTab] = useState<'top' | 'recent'>('recent');
+  const [activeTab, setActiveTab] = useState<FeedTab>('all');
+  const [userId, setUserId] = useState<string | null>(null);
+  const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
   const [capsules, setCapsules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCapsule, setSelectedCapsule] = useState<any>(null);
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [lastTappedCapsule, setLastTappedCapsule] = useState<string | null>(null);
+  // Distance filter for both the feed rows and the map markers (default: Any).
+  const [distFilter, setDistFilter] = useState<DistFilter>(null);
+  const [distMenuOpen, setDistMenuOpen] = useState(false);
+  // Cap selected by tapping a map marker — drives the bottom-sheet popup card.
+  const [selectedMarkerCap, setSelectedMarkerCap] = useState<any>(null);
+  // Reverse-geocoded name of the user's current location (shown in the header).
+  const [locationName, setLocationName] = useState<string>(t('dashboard.yourLocation'));
   const modalOpacity = useRef(new Animated.Value(0)).current;
   const mapRef = useRef<MapView>(null);
   
@@ -230,6 +254,14 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
     try {
       // Spinner on first load and on explicit refresh (tab tap); focus-reloads stay silent.
       if (!hasLoadedRef.current || showSpinner) setLoading(true);
+      // who am I + my friends (for the My Caps / Friends feed tabs)
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setUserId(user?.id || null);
+        const fr = await FriendService.getFriends();
+        const ids = ((fr as any)?.data || []).map((f: any) => f.id || f.friend_id || f.user_id).filter(Boolean);
+        setFriendIds(new Set(ids));
+      } catch { /* ignore */ }
       // Fetch all accessible capsules (owned + public + shared)
       const { data, error } = await CapsuleService.getAllAccessibleCapsules();
       if (error) {
@@ -251,6 +283,37 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
       setLoading(false);
     }
   };
+
+  // Distance (km) from the user to a cap, using its stable display coordinates.
+  const capDistance = (cap: any): number =>
+    calculateDistance(
+      userLocation.latitude,
+      userLocation.longitude,
+      cap.displayLat || cap.lat || userLocation.latitude,
+      cap.displayLng || cap.lng || userLocation.longitude,
+    );
+
+  // Reverse-geocode the user's coordinates into a friendly place name for the
+  // nearby header. Falls back to the default "Your location" label on failure.
+  const refreshLocationName = useCallback(async (lat: number, lng: number) => {
+    try {
+      const results = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+      const a = results[0];
+      if (a) {
+        const name = [a.city || a.name || a.street, a.region].filter(Boolean).join(', ');
+        if (name) setLocationName(name);
+      }
+    } catch {
+      // keep the existing label on failure
+    }
+  }, []);
+
+  // Resolve the location name once on focus for the initial coordinates.
+  useFocusEffect(
+    useCallback(() => {
+      refreshLocationName(userLocation.latitude, userLocation.longitude);
+    }, [])
+  );
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -300,9 +363,9 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
   };
 
   const handleCapsuleMarkerPress = (capsule: any) => {
-    // First tap: show callout (handled by MapView)
-    // Track which capsule was tapped
+    // Track which capsule was tapped and surface the detail popup card.
     setLastTappedCapsule(capsule.id);
+    setSelectedMarkerCap(capsule);
   };
 
 
@@ -318,10 +381,6 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
         // Silently ignore
       }
     }
-  };
-
-  const handleCalloutPress = async (capsule: any) => {
-    openCapsuleDetail(capsule);
   };
 
   const handleMarkerPress = async (capsule: any) => {
@@ -543,6 +602,9 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
       // Update user location state
       setUserLocation(newRegion);
 
+      // Refresh the header's location name for the new coordinates
+      refreshLocationName(newRegion.latitude, newRegion.longitude);
+
       // Animate map to user location
       if (mapRef.current) {
         mapRef.current.animateToRegion(newRegion, 1000);
@@ -575,14 +637,16 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
           pitchEnabled={false}
           rotateEnabled={false}
         >
-          {/* Sample markers for capsules */}
-          {filteredCapsules.map((capsule, index) => {
+          {/* Capsule markers — filtered by the active distance filter */}
+          {filteredCapsules
+            .filter((capsule) => distFilter == null || capDistance(capsule) <= distFilter)
+            .map((capsule, index) => {
             // Use stable coordinates - prevent re-calculation on every render
             const markerCoordinate = {
               latitude: capsule.displayLat || capsule.lat || userLocation.latitude,
               longitude: capsule.displayLng || capsule.lng || userLocation.longitude,
             };
-            
+
             return (
             <Marker
                 key={`capsule-${capsule.id || index}`}
@@ -602,23 +666,86 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                     <View style={[styles.capsulePillBottom, { backgroundColor: capColor(capsule.type) }]} />
               </View>
                 </View>
-                <Callout tooltip onPress={() => handleCalloutPress(capsule)}>
-                  <View style={styles.calloutContainer}>
-                    <Text style={styles.calloutTitle} numberOfLines={2} ellipsizeMode="tail">
-                      {capsule.title}
-                    </Text>
-                    <View style={styles.infoButton}>
-                      <Ionicons name="information-circle" size={16} color={COLORS.ember} style={styles.infoIcon} />
-                      <Text style={styles.infoButtonText}>{t('dashboard.tapForDetails')}</Text>
-                    </View>
-                  </View>
-                </Callout>
             </Marker>
             );
           })}
         </MapView>
-        
+
       </View>
+
+      {/* Floating Messages button (top-right over the map) */}
+      <MessagesButton
+        glass
+        onPress={() => onNavigate('Messages')}
+        style={[styles.msgFab, { top: insets.top + SPACING.sm }]}
+      />
+
+      {/* Map marker popup card — replaces the plain Callout. Floats just above
+          the bottom sheet and offers View Details + Take me there actions. */}
+      {selectedMarkerCap && (() => {
+        const mc = selectedMarkerCap;
+        const ct = getCapType(mc.type);
+        return (
+          <Animated.View
+            style={[
+              styles.markerPopup,
+              {
+                bottom: bottomSheetHeight.interpolate({
+                  inputRange: [SNAP_POINTS.COLLAPSED, SNAP_POINTS.EXPANDED],
+                  outputRange: [SNAP_POINTS.COLLAPSED + 12, SNAP_POINTS.EXPANDED + 12],
+                  extrapolate: 'clamp',
+                }),
+              },
+            ]}
+          >
+            <View style={styles.markerPopupHeader}>
+              <View style={[styles.markerPopupIcon, { backgroundColor: `${ct.color}22` }]}>
+                <CapTypeIcon size={20} color={ct.color} filled />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.markerPopupTitle} numberOfLines={1}>{mc.title || ct.name}</Text>
+                <Text style={[styles.markerPopupType, { color: ct.color }]}>{ct.name}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.markerPopupClose}
+                onPress={() => setSelectedMarkerCap(null)}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={16} color={COLORS.text3} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.markerPopupActions}>
+              <TouchableOpacity
+                style={styles.markerPopupBtnSecondary}
+                onPress={() => {
+                  const cap = mc;
+                  setSelectedMarkerCap(null);
+                  openCapsuleDetail(cap);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.markerPopupBtnSecondaryText}>{t('dashboard.viewDetails')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.markerPopupBtnPrimary}
+                onPress={() => {
+                  setSelectedMarkerCap(null);
+                  openDirections(
+                    mc.displayLat || mc.lat || userLocation.latitude,
+                    mc.displayLng || mc.lng || userLocation.longitude,
+                    mc.title || ct.name,
+                  );
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="navigate" size={16} color={COLORS.white} style={{ marginRight: 6 }} />
+                <Text style={styles.markerPopupBtnPrimaryText}>{t('capDetail.takeMeThere')}</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        );
+      })()}
 
       {/* Navigation/Location Button - Fixed on Map, Moves with Bottom Sheet */}
       <Animated.View
@@ -684,115 +811,143 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
         >
       {/* Nearby Capsules Section (Create lives in the always-visible tab-bar "+") */}
       <View style={styles.nearbyCapsules}>
+        {/* Current location name */}
+        <View style={styles.locationRow}>
+          <Ionicons name="location" size={13} color={COLORS.ember} />
+          <Text style={styles.locationName} numberOfLines={1}>{locationName}</Text>
+        </View>
         {/* Header */}
         <View style={styles.nearbyHeader}>
-          <Text style={styles.nearbyTitle}>{t('dashboard.nearbyCaps')}</Text>
-          <Text style={styles.nearbyCount}>
-            {t('dashboard.postsCount', { count: capsules.filter(c => c.is_public).length })}
-          </Text>
+          <View style={styles.nearbyHeaderTop}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.nearbyTitle}>{t('dashboard.nearbyCaps')}</Text>
+              <Text style={styles.nearbyCount}>
+                {t('dashboard.postsCount', { count: capsules.filter(c => c.is_public).length })}
+              </Text>
+            </View>
+
+            {/* Distance filter dropdown */}
+            <View style={styles.distFilterWrap}>
+              <TouchableOpacity
+                style={[styles.distFilterBtn, distFilter != null && styles.distFilterBtnActive]}
+                onPress={() => setDistMenuOpen((o) => !o)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="options-outline" size={14} color={distFilter != null ? COLORS.ember : COLORS.text2} />
+                <Text style={[styles.distFilterText, distFilter != null && styles.distFilterTextActive]}>
+                  {distFilter == null ? t('dashboard.distanceFilter') : formatDistance(distFilter)}
+                </Text>
+                <Ionicons name={distMenuOpen ? 'chevron-up' : 'chevron-down'} size={12} color={COLORS.text3} />
+              </TouchableOpacity>
+
+              {distMenuOpen && (
+                <View style={styles.distMenu}>
+                  <TouchableOpacity
+                    style={styles.distMenuItem}
+                    onPress={() => { setDistFilter(null); setDistMenuOpen(false); }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.distMenuItemText, distFilter == null && styles.distMenuItemTextActive]}>
+                      {t('dashboard.anyDistance')}
+                    </Text>
+                    {distFilter == null && <Ionicons name="checkmark" size={14} color={COLORS.ember} />}
+                  </TouchableOpacity>
+                  {DIST_OPTIONS.map((opt) => (
+                    <TouchableOpacity
+                      key={opt}
+                      style={styles.distMenuItem}
+                      onPress={() => { setDistFilter(opt); setDistMenuOpen(false); }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.distMenuItemText, distFilter === opt && styles.distMenuItemTextActive]}>
+                        {formatDistance(opt)}
+                      </Text>
+                      {distFilter === opt && <Ionicons name="checkmark" size={14} color={COLORS.ember} />}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
       </View>
 
-        {/* Tabs: Top / Recent */}
-        <View style={styles.tabsContainer}>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'top' && styles.tabButtonActive]}
-            onPress={() => { setActiveTab('top'); loadCapsules(true); }}
-          >
-            <Text style={[styles.tabText, activeTab === 'top' && styles.tabTextActive]}>
-              {t('dashboard.tabTop')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'recent' && styles.tabButtonActive]}
-            onPress={() => { setActiveTab('recent'); loadCapsules(true); }}
-          >
-            <Text style={[styles.tabText, activeTab === 'recent' && styles.tabTextActive]}>
-              {t('dashboard.tabRecent')}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {/* Feed tabs: All / My Caps / Friends / Nearby / New / Popular */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsRow}>
+          {FEED_TABS.map((tab) => (
+            <TouchableOpacity key={tab} onPress={() => setActiveTab(tab)} style={[styles.tabChip, activeTab === tab && styles.tabChipActive]} activeOpacity={0.8}>
+              <Text style={[styles.tabChipText, activeTab === tab && styles.tabChipTextActive]}>{t('dashboard.tab_' + tab)}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
-        {/* Grid Layout - 3 columns */}
+        {/* Rich feed rows */}
         {loading ? (
           <View style={styles.feedLoadingContainer}>
             <ActivityIndicator size="large" color={COLORS.ember} />
           </View>
-        ) : capsules.length > 0 ? (
-          <View style={styles.capsuleGrid}>
-            {capsules
-              .filter(capsule => capsule.is_public)
-              .sort((a, b) => {
-                if (activeTab === 'recent') {
-                  // Recent: sort by creation date (newest first)
-                  return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-                } else {
-                  // Top: sort by view count (most viewed first)
-                  const viewsA = a.view_count || 0;
-                  const viewsB = b.view_count || 0;
-                  return viewsB - viewsA;
-                }
-              })
-              .map((capsule, index) => {
-                const distance = calculateDistance(
-                  userLocation.latitude,
-                  userLocation.longitude,
-                  capsule.displayLat || capsule.lat || userLocation.latitude,
-                  capsule.displayLng || capsule.lng || userLocation.longitude
-                );
+        ) : (() => {
+          let feed = capsules.slice();
+          if (activeTab === 'mine') feed = feed.filter((c) => c.owner_id === userId);
+          else if (activeTab === 'friends') feed = feed.filter((c) => friendIds.has(c.owner_id));
+          else feed = feed.filter((c) => c.is_public || c.owner_id === userId);
+          let withD = feed.map((c) => ({
+            cap: c,
+            d: calculateDistance(userLocation.latitude, userLocation.longitude, c.displayLat || c.lat || userLocation.latitude, c.displayLng || c.lng || userLocation.longitude),
+          }));
+          // Apply the distance filter to the feed rows (Any = no cap).
+          if (distFilter != null) withD = withD.filter((x) => x.d <= distFilter);
+          if (activeTab === 'nearby') withD.sort((a, b) => a.d - b.d);
+          else if (activeTab === 'popular') withD.sort((a, b) => (b.cap.view_count || 0) - (a.cap.view_count || 0));
+          else withD.sort((a, b) => new Date(b.cap.created_at || 0).getTime() - new Date(a.cap.created_at || 0).getTime());
 
+          if (!withD.length) {
+            return (
+              <View style={styles.feedEmptyState}>
+                <Ionicons name="time-outline" size={56} color={COLORS.ember} />
+                <Text style={styles.feedEmptyText}>{t('dashboard.emptyTitle')}</Text>
+                <Text style={styles.feedEmptySubtext}>{t('dashboard.emptySubtitle')}</Text>
+              </View>
+            );
+          }
+          return (
+            <View>
+              {withD.map(({ cap, d }, index) => {
+                const ct = getCapType(cap.type);
+                const locked = isCapsuleLocked(cap.open_at);
+                const media = getMediaUrl(cap);
+                const actor = '@' + (cap.profiles?.username || cap.profiles?.display_name || 'someone');
+                const preview = (cap.description || '').trim();
                 return (
-                  <TouchableOpacity
-                    key={capsule.id || index}
-                    style={styles.gridItem}
-                    onPress={() => handleMarkerPress(capsule)}
-                    activeOpacity={0.7}
-                  >
-                    {/* Square Image Preview */}
-                    {getMediaUrl(capsule) ? (
-                      <Image
-                        source={{ uri: getMediaUrl(capsule)! }}
-                        style={styles.gridImage}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View style={[styles.gridImage, styles.gridImagePlaceholder]}>
-                        <Ionicons name="image-outline" size={32} color={COLORS.text3} />
-        </View>
-                    )}
-                    
-                    {/* Locked Overlay */}
-                    {isCapsuleLocked(capsule.open_at) && (
-                      <View style={styles.gridLockedOverlay}>
-                        <Ionicons name="lock-closed" size={16} color={COLORS.white} />
-                      </View>
-                    )}
-
-                    {/* Distance Badge */}
-                    <View style={styles.distanceBadge}>
-                      <Ionicons name="location" size={10} color={COLORS.white} />
-                      <Text style={styles.distanceText}>{formatDistance(distance)}</Text>
+                  <TouchableOpacity key={cap.id || index} style={styles.feedRow} onPress={() => handleMarkerPress(cap)} activeOpacity={0.7}>
+                    <View style={[styles.feedAvatar, { backgroundColor: `${ct.color}22` }]}>
+                      {media ? <Image source={{ uri: media }} style={styles.feedAvatarImg} /> : <CapTypeIcon size={22} color={ct.color} />}
                     </View>
-            </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.feedActor} numberOfLines={1}>
+                        {t('dashboard.actorDropped', { user: actor, type: ct.name })}
+                      </Text>
+                      <Text style={styles.feedTitle} numberOfLines={1}>{cap.title || ct.name}</Text>
+                      {preview ? (
+                        <Text style={styles.feedPreview} numberOfLines={1}>{preview}</Text>
+                      ) : null}
+                      <Text style={styles.feedMeta} numberOfLines={1}>
+                        <Text style={{ color: ct.color }}>{ct.name}</Text>
+                        {cap.location_name ? `  ·  ${cap.location_name}` : ''}{`  ·  ${formatDistance(d)}`}
+                        {cap.created_at ? `  ·  ${timeAgo(cap.created_at)}` : ''}
+                      </Text>
+                    </View>
+                    <View style={styles.feedTrailing}>
+                      <View style={[styles.feedBadge, { backgroundColor: locked ? 'rgba(232,99,58,0.15)' : 'rgba(61,155,122,0.15)' }]}>
+                        <Text style={[styles.feedBadgeText, { color: locked ? COLORS.ember : COLORS.moss }]}>{locked ? t('dashboard.sealed') : t('dashboard.openNow')}</Text>
+                      </View>
+                      <CapTypeIcon size={16} color={ct.color} />
+                    </View>
+                  </TouchableOpacity>
                 );
               })}
-          </View>
-        ) : (
-          <View style={styles.feedEmptyState}>
-            <Ionicons name="time-outline" size={64} color={COLORS.ember} />
-            <Text style={styles.feedEmptyText}>{t('dashboard.emptyTitle')}</Text>
-            <Text style={styles.feedEmptySubtext}>
-              {t('dashboard.emptySubtitle')}
-            </Text>
-            <TouchableOpacity
-              style={styles.feedEmptyButton}
-              onPress={handleCreateCapsule}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="add-circle" size={20} color={COLORS.white} />
-              <Text style={styles.feedEmptyButtonText}>{t('dashboard.createCap')}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+            </View>
+          );
+        })()}
       </View>
         </ScrollView>
         </KeyboardAvoidingView>
@@ -964,6 +1119,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.bg,
   },
+  msgFab: {
+    position: 'absolute',
+    right: SPACING.lg,
+    zIndex: 30,
+  },
   mapContainer: {
     ...StyleSheet.absoluteFillObject,
     position: 'absolute',
@@ -1079,6 +1239,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
+  nearbyHeaderTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
   nearbyTitle: {
     ...font('subtitle'),
     color: COLORS.text,
@@ -1087,6 +1251,79 @@ const styles = StyleSheet.create({
   nearbyCount: {
     fontSize: 13,
     color: COLORS.text2,
+  },
+  // Current-location row (above the nearby header)
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 2,
+  },
+  locationName: {
+    fontSize: 11,
+    color: COLORS.text3,
+    flex: 1,
+  },
+  // Distance filter dropdown
+  distFilterWrap: {
+    position: 'relative',
+    zIndex: 50,
+  },
+  distFilterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.bg3,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  distFilterBtnActive: {
+    backgroundColor: COLORS.emberSoft,
+    borderColor: COLORS.emberGlow,
+  },
+  distFilterText: {
+    ...font('label'),
+    color: COLORS.text2,
+  },
+  distFilterTextActive: {
+    color: COLORS.ember,
+  },
+  distMenu: {
+    position: 'absolute',
+    top: 38,
+    right: 0,
+    minWidth: 120,
+    backgroundColor: COLORS.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
+    zIndex: 60,
+  },
+  distMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  distMenuItemText: {
+    fontSize: 13,
+    color: COLORS.text,
+  },
+  distMenuItemTextActive: {
+    color: COLORS.ember,
+    fontWeight: '700',
   },
   // Tabs (Top / Recent)
   tabsContainer: {
@@ -1165,6 +1402,103 @@ const styles = StyleSheet.create({
     paddingVertical: 48,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Feed tabs + rich rows (demo Home parity)
+  tabsRow: { flexDirection: 'row', gap: SPACING.sm, paddingHorizontal: SPACING.lg, paddingBottom: SPACING.md },
+  tabChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: RADIUS.pill, backgroundColor: COLORS.bg3, borderWidth: 1, borderColor: COLORS.border },
+  tabChipActive: { backgroundColor: COLORS.ember, borderColor: COLORS.ember },
+  tabChipText: { ...font('label'), color: COLORS.text2 },
+  tabChipTextActive: { color: COLORS.white },
+  feedRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.md, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border },
+  feedAvatar: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  feedAvatarImg: { width: '100%', height: '100%' },
+  feedActor: { ...font('caption'), color: COLORS.text2, marginBottom: 2 },
+  feedTitle: { ...font('bodyBold'), color: COLORS.text },
+  feedPreview: { ...font('caption'), color: COLORS.text2, fontStyle: 'italic', marginTop: 2 },
+  feedMeta: { ...font('caption'), color: COLORS.text2, marginTop: 2 },
+  feedTrailing: { alignItems: 'center', gap: 6 },
+  feedBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.pill },
+  feedBadgeText: { ...font('micro') },
+  // Map marker popup card (replaces the plain Callout)
+  markerPopup: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    zIndex: 400,
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 24,
+    elevation: 16,
+  },
+  markerPopupHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 14,
+  },
+  markerPopupIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerPopupTitle: {
+    ...font('bodyBold'),
+    color: COLORS.text,
+  },
+  markerPopupType: {
+    ...font('caption'),
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: 2,
+  },
+  markerPopupClose: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.bg3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerPopupActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  markerPopupBtnSecondary: {
+    flex: 1,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: COLORS.bg3,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerPopupBtnSecondaryText: {
+    ...font('label'),
+    color: COLORS.text,
+  },
+  markerPopupBtnPrimary: {
+    flex: 2,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: COLORS.ember,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerPopupBtnPrimaryText: {
+    ...font('label'),
+    color: COLORS.white,
+    fontWeight: '700',
   },
   feedEmptyState: {
     alignItems: 'center',

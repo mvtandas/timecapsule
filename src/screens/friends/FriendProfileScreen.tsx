@@ -59,7 +59,7 @@ type CapsuleSummary = {
   media_url?: string | null;
 };
 
-const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => {
+const FriendProfileScreen = ({ onNavigate, onGoBack, friend }: FriendProfileScreenProps) => {
   const t = useT();
   const { user } = useAuthStore();
   const [profile, setProfile] = useState<FriendProfileUser | null>(null);
@@ -298,29 +298,44 @@ const FriendProfileScreen = ({ onGoBack, friend }: FriendProfileScreenProps) => 
         break;
     }
 
+    const canMessage = friendshipStatus.status === 'friends';
     return (
-      <TouchableOpacity
-        style={[
-          styles.actionButton,
-          {
-            backgroundColor: bgColor,
-            borderWidth: outlined ? 1.5 : 0,
-            borderColor: borderColor,
-          },
-        ]}
-        onPress={handleFriendAction}
-        disabled={disabled || sendingRequest}
-        activeOpacity={0.7}
-      >
-        {sendingRequest ? (
-          <ActivityIndicator size="small" color={textColor} />
-        ) : (
-          <>
-            <Ionicons name={iconName} size={18} color={textColor} />
-            <Text style={[styles.actionButtonText, { color: textColor }]}>{label}</Text>
-          </>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            {
+              backgroundColor: bgColor,
+              borderWidth: outlined ? 1.5 : 0,
+              borderColor: borderColor,
+              flex: 1,
+            },
+          ]}
+          onPress={handleFriendAction}
+          disabled={disabled || sendingRequest}
+          activeOpacity={0.7}
+        >
+          {sendingRequest ? (
+            <ActivityIndicator size="small" color={textColor} />
+          ) : (
+            <>
+              <Ionicons name={iconName} size={18} color={textColor} />
+              <Text style={[styles.actionButtonText, { color: textColor }]}>{label}</Text>
+            </>
+          )}
+        </TouchableOpacity>
+        {canMessage && (
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: COLORS.borderLight, paddingHorizontal: 16 }]}
+            onPress={() => onNavigate('Chat', { otherUserId: viewedProfileId, title: displayName })}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('messages.send_message')}
+          >
+            <Ionicons name="chatbubble-outline" size={18} color={COLORS.text} />
+          </TouchableOpacity>
         )}
-      </TouchableOpacity>
+      </View>
     );
   };
 

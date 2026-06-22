@@ -1,15 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, Modal,
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import { Skeleton } from '../../components/common/Skeleton';
 import { TrailService, type TrailStop } from '../../services/trailService';
+import { MediaService } from '../../services/mediaService';
+import { supabase } from '../../lib/supabase';
 import { DARK_MAP_STYLE } from '../../constants/mapStyle';
 import { COLORS, SPACING, RADIUS, font } from '../../constants/theme';
 import { useT } from '../../i18n';
@@ -28,9 +31,11 @@ type Draft = {
   lat: number | null;
   lng: number | null;
   location_name: string;
+  photo_url: string | null;
+  estimated_minutes: number | null;
 };
 
-const emptyDraft = (): Draft => ({ title: '', content: '', tip: '', lat: null, lng: null, location_name: '' });
+const emptyDraft = (): Draft => ({ title: '', content: '', tip: '', lat: null, lng: null, location_name: '', photo_url: null, estimated_minutes: null });
 const FALLBACK = { latitude: 40.99, longitude: 29.02 }; // demo area fallback
 
 const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props) => {
@@ -45,6 +50,7 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
   const [editorVisible, setEditorVisible] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft());
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // Serialize auto-saves so concurrent writes can't interleave (which would
   // duplicate rows). While a save is in flight, the latest state is queued.
@@ -113,9 +119,28 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
       lat: s.lat ?? null,
       lng: s.lng ?? null,
       location_name: s.location_name || '',
+      photo_url: s.photo_url ?? null,
+      estimated_minutes: s.estimated_minutes ?? null,
     });
     setEditingIndex(i);
     setEditorVisible(true);
+  };
+
+  const pickStopPhoto = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert(t('createFlow.alert_allow_photos')); return; }
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [16, 9], quality: 0.85 });
+    if (res.canceled || !res.assets?.[0]) return;
+    setUploadingPhoto(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { Alert.alert(t('trailEditor.saveFailed')); return; }
+      const up = await MediaService.uploadMedia(res.assets[0].uri, user.id, `trailstop_${Date.now()}`);
+      if (!up) { Alert.alert(t('trailEditor.saveFailed')); return; }
+      setDraft((d) => ({ ...d, photo_url: up.url }));
+    } finally {
+      setUploadingPhoto(false);
+    }
   };
 
   const onMapPress = async (lat: number, lng: number) => {
@@ -149,6 +174,8 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
       lat: draft.lat,
       lng: draft.lng,
       location_name: draft.location_name.trim() || null,
+      photo_url: draft.photo_url || null,
+      estimated_minutes: draft.estimated_minutes,
     };
     const next = [...stops];
     if (editingIndex == null) next.push(stop);
@@ -172,17 +199,28 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
     persist(next.map((s, idx) => ({ ...s, ordinal: idx })));
   };
 
-  const done = () => { if (onGoBack) onGoBack(); else onNavigate('Dashboard'); };
+  const leave = () => { if (onGoBack) onGoBack(); else onNavigate('Dashboard'); };
+
+  const done = () => {
+    // Demo requirement: a trail needs at least 2 stops to be complete.
+    if (stops.length < 2) {
+      Alert.alert(t('trailEditor.needTwoStops', { defaultValue: 'Add at least 2 stops before finishing your trail.' }));
+      return;
+    }
+    leave();
+  };
+
+  const canFinish = stops.length >= 2;
 
   return (
     <View style={styles.container}>
       <ScreenHeader
         title={trailTitle || t('trailEditor.title')}
-        onBack={done}
+        onBack={leave}
         borderBottom
         right={(
-          <TouchableOpacity onPress={done} style={styles.doneBtn} accessibilityRole="button">
-            {saving ? <ActivityIndicator size="small" color={COLORS.ember} /> : <Ionicons name="checkmark" size={24} color={COLORS.ember} />}
+          <TouchableOpacity onPress={done} disabled={!canFinish} style={[styles.doneBtn, !canFinish && styles.doneBtnDisabled]} accessibilityRole="button" accessibilityState={{ disabled: !canFinish }}>
+            {saving ? <ActivityIndicator size="small" color={COLORS.ember} /> : <Ionicons name="checkmark" size={24} color={canFinish ? COLORS.ember : COLORS.text3} />}
           </TouchableOpacity>
         )}
       />
@@ -307,6 +345,33 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
               placeholder={t('trailEditor.tipPlaceholder')}
               placeholderTextColor={COLORS.text3}
             />
+
+            <Text style={styles.fieldLabel}>{t('trailEditor.photoLabel', { defaultValue: 'Photo (optional)' })}</Text>
+            {draft.photo_url ? (
+              <TouchableOpacity onPress={pickStopPhoto} activeOpacity={0.85} disabled={uploadingPhoto}>
+                <Image source={{ uri: draft.photo_url }} style={styles.stopPhoto} resizeMode="cover" />
+                {uploadingPhoto && <View style={styles.photoLoading}><ActivityIndicator size="small" color={COLORS.text} /></View>}
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.photoBtn} onPress={pickStopPhoto} activeOpacity={0.85} disabled={uploadingPhoto}>
+                {uploadingPhoto
+                  ? <ActivityIndicator size="small" color={COLORS.gold} />
+                  : <><Ionicons name="image-outline" size={20} color={COLORS.gold} /><Text style={styles.photoBtnText}>{t('trailEditor.addPhoto', { defaultValue: 'Add photo' })}</Text></>}
+              </TouchableOpacity>
+            )}
+
+            <Text style={styles.fieldLabel}>{t('trailEditor.estMinutesLabel', { defaultValue: 'Estimated time (minutes)' })}</Text>
+            <TextInput
+              style={styles.input}
+              value={draft.estimated_minutes != null ? String(draft.estimated_minutes) : ''}
+              onChangeText={(v) => {
+                const n = parseInt(v.replace(/[^0-9]/g, ''), 10);
+                setDraft((d) => ({ ...d, estimated_minutes: Number.isNaN(n) ? null : n }));
+              }}
+              placeholder={t('trailEditor.estMinutesPlaceholder', { defaultValue: 'e.g. 15' })}
+              placeholderTextColor={COLORS.text3}
+              keyboardType="number-pad"
+            />
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
@@ -318,6 +383,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
   subtitle: { ...font('body'), color: COLORS.text2, marginBottom: SPACING.lg },
   doneBtn: { width: 44, height: 44, alignItems: 'flex-end', justifyContent: 'center' },
+  doneBtnDisabled: { opacity: 0.4 },
   saveText: { ...font('labelBold'), fontSize: 15, color: COLORS.ember },
 
   empty: { alignItems: 'center', paddingVertical: SPACING.xl, gap: SPACING.xs },
@@ -344,6 +410,10 @@ const styles = StyleSheet.create({
   mapWrap: { height: 220, borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.md },
   myLocBtn: { position: 'absolute', bottom: SPACING.sm, right: SPACING.sm, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.overlay, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderRadius: RADIUS.pill },
   myLocText: { ...font('label'), color: COLORS.text },
+  photoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: `${COLORS.gold}66`, backgroundColor: `${COLORS.gold}14` },
+  photoBtnText: { ...font('labelBold'), color: COLORS.gold },
+  stopPhoto: { width: '100%', aspectRatio: 16 / 9, borderRadius: RADIUS.md, backgroundColor: COLORS.bg3 },
+  photoLoading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.overlay, borderRadius: RADIUS.md },
 });
 
 export default TrailStopsScreen;

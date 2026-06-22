@@ -55,4 +55,18 @@ export class GatheringService {
     const byId = new Map((profiles as any[] || []).map((p) => [p.id, p]));
     return rows.map((r) => ({ ...r, author: byId.get(r.user_id) || null }));
   }
+
+  /** Request to join a gathering (cap owner approves later). Idempotent. */
+  static async requestJoin(capsuleId: string): Promise<{ error: any }> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { error: 'Not authenticated' };
+      const { error } = await db
+        .from('join_requests')
+        .upsert({ capsule_id: capsuleId, user_id: user.id, status: 'pending' } as any, { onConflict: 'capsule_id,user_id' });
+      return { error };
+    } catch (error) {
+      return { error };
+    }
+  }
 }
