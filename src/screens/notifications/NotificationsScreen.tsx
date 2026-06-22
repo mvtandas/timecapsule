@@ -28,9 +28,26 @@ interface NotificationsScreenProps {
   onGoBack?: () => void;
 }
 
-type NotifFilter = 'All' | 'Likes' | 'Comments' | 'Friends';
+type NotifFilter = 'All' | 'Unread' | 'Likes' | 'Comments' | 'Friends';
 
-const NOTIF_FILTERS: NotifFilter[] = ['All', 'Likes', 'Comments', 'Friends'];
+const NOTIF_FILTERS: NotifFilter[] = ['All', 'Unread', 'Likes', 'Comments', 'Friends'];
+
+type TimeGroup = 'Today' | 'Yesterday' | 'This Week' | 'Earlier';
+const TIME_GROUPS: TimeGroup[] = ['Today', 'Yesterday', 'This Week', 'Earlier'];
+
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+
+/** Bucket a created_at timestamp into a Today/Yesterday/This Week/Earlier group. */
+const timeGroupFor = (createdAt: string): TimeGroup => {
+  const now = new Date();
+  const today = startOfDay(now);
+  const ts = new Date(createdAt).getTime();
+  if (Number.isNaN(ts)) return 'Earlier';
+  if (ts >= today) return 'Today';
+  if (ts >= today - 86400000) return 'Yesterday';
+  if (ts >= today - 6 * 86400000) return 'This Week';
+  return 'Earlier';
+};
 
 const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps) => {
   const t = useT();
@@ -42,8 +59,14 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
   const [selected, setSelected] = useState<any>(null);
   const [showDetail, setShowDetail] = useState(false);
 
+  const unreadCount = useMemo(
+    () => notifications.filter((n) => !n.is_read).length,
+    [notifications]
+  );
+
   const filteredNotifications = useMemo(() => {
     if (activeFilter === 'All') return notifications;
+    if (activeFilter === 'Unread') return notifications.filter((n) => !n.is_read);
     if (activeFilter === 'Likes') return notifications.filter((n) => n.type === 'like');
     if (activeFilter === 'Comments') return notifications.filter((n) => n.type === 'comment');
     if (activeFilter === 'Friends')
@@ -52,6 +75,25 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
       );
     return notifications;
   }, [notifications, activeFilter]);
+
+  // Flatten into a list of section headers + notification rows, bucketed by
+  // created_at into Today / Yesterday / This Week / Earlier.
+  type ListRow =
+    | { kind: 'section'; group: TimeGroup }
+    | { kind: 'notif'; notif: AppNotification };
+  const listData = useMemo<ListRow[]>(() => {
+    const buckets: Record<TimeGroup, AppNotification[]> = {
+      Today: [], Yesterday: [], 'This Week': [], Earlier: [],
+    };
+    filteredNotifications.forEach((n) => { buckets[timeGroupFor(n.created_at)].push(n); });
+    const rows: ListRow[] = [];
+    TIME_GROUPS.forEach((g) => {
+      if (buckets[g].length === 0) return;
+      rows.push({ kind: 'section', group: g });
+      buckets[g].forEach((notif) => rows.push({ kind: 'notif', notif }));
+    });
+    return rows;
+  }, [filteredNotifications]);
 
   useEffect(() => {
     loadNotifications();
@@ -63,10 +105,8 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
     setNotifications(data);
     TrailService.getActiveTrails().then(setActiveTrails).catch(() => {});
     setLoading(false);
-    // Mark all as read on the server, then reflect it locally so the unread
-    // accent stays consistent with the backend (no stale "unread" dots).
-    await NotificationAppService.markAllAsRead();
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    // Note: notifications stay unread until the user opens them (mark-on-tap in
+    // handleNotificationPress) so the Unread filter + count stay meaningful.
   };
 
   const onRefresh = async () => {
@@ -74,8 +114,6 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
     const { data } = await NotificationAppService.getNotifications();
     setNotifications(data);
     setRefreshing(false);
-    await NotificationAppService.markAllAsRead();
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
   };
 
   const handleDeleteNotification = async (id: string) => {
@@ -105,6 +143,15 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
     );
   };
 
+  const sectionLabel = (group: TimeGroup): string => {
+    switch (group) {
+      case 'Today': return t('notifications.groupToday', { defaultValue: 'Today' });
+      case 'Yesterday': return t('notifications.groupYesterday', { defaultValue: 'Yesterday' });
+      case 'This Week': return t('notifications.groupThisWeek', { defaultValue: 'This Week' });
+      default: return t('notifications.groupEarlier', { defaultValue: 'Earlier' });
+    }
+  };
+
   const getIcon = (type: string): { name: string; color: string } => {
     switch (type) {
       case 'like': return { name: 'heart', color: COLORS.ember };
@@ -118,6 +165,11 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
   };
 
   const handleNotificationPress = (notif: AppNotification) => {
+    // Mark just this notification read on tap (keeps the Unread filter meaningful).
+    if (!notif.is_read) {
+      setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, is_read: true } : n)));
+      NotificationAppService.markAsRead(notif.id);
+    }
     if (notif.type === 'message' && notif.from_user_id) {
       onNavigate('Chat', {
         otherUserId: notif.from_user_id,
@@ -162,26 +214,34 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
         style={styles.filterChipsContainer}
         contentContainerStyle={styles.filterChipsContent}
       >
-        {NOTIF_FILTERS.map((filter) => (
-          <TouchableOpacity
-            key={filter}
-            style={[styles.filterChip, activeFilter === filter && styles.filterChipActive]}
-            onPress={() => setActiveFilter(filter)}
-          >
-            <Text style={[styles.filterChipText, activeFilter === filter && styles.filterChipTextActive]}>
-              {t('notifications.filter' + filter)}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {NOTIF_FILTERS.map((filter) => {
+          const isActive = activeFilter === filter;
+          const label =
+            filter === 'Unread'
+              ? t('notifications.filterUnread', { defaultValue: 'Unread' }) +
+                (unreadCount > 0 ? ` (${unreadCount})` : '')
+              : t('notifications.filter' + filter);
+          return (
+            <TouchableOpacity
+              key={filter}
+              style={[styles.filterChip, isActive && styles.filterChipActive]}
+              onPress={() => setActiveFilter(filter)}
+            >
+              <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
       {loading ? (
         <SkeletonList count={7} avatar="circle" />
       ) : (
         <FlatList
-          data={filteredNotifications}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={(filteredNotifications.length === 0 && activeTrails.length === 0) ? styles.emptyContainer : styles.listContent}
+          data={listData}
+          keyExtractor={(item) => (item.kind === 'section' ? `section-${item.group}` : item.notif.id)}
+          contentContainerStyle={(listData.length === 0 && activeTrails.length === 0) ? styles.emptyContainer : styles.listContent}
           ListHeaderComponent={activeTrails.length > 0 ? (
             <View style={styles.trailsSection}>
               <Text style={styles.trailsTitle}>{t('notifications.activeTrails')}</Text>
@@ -215,17 +275,21 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
             </View>
           }
           renderItem={({ item }) => {
-            const icon = getIcon(item.type);
+            if (item.kind === 'section') {
+              return <Text style={styles.sectionHeader}>{sectionLabel(item.group)}</Text>;
+            }
+            const notif = item.notif;
+            const icon = getIcon(notif.type);
             return (
               <TouchableOpacity
-                style={[styles.notifRow, !item.is_read && styles.notifUnread]}
-                onPress={() => handleNotificationPress(item)}
+                style={[styles.notifRow, !notif.is_read && styles.notifUnread]}
+                onPress={() => handleNotificationPress(notif)}
                 activeOpacity={0.7}
               >
                 {/* Avatar or icon */}
                 <View style={styles.notifLeft}>
-                  {item.from_profile?.avatar_url ? (
-                    <Image source={{ uri: item.from_profile.avatar_url }} style={styles.notifAvatar} />
+                  {notif.from_profile?.avatar_url ? (
+                    <Image source={{ uri: notif.from_profile.avatar_url }} style={styles.notifAvatar} />
                   ) : (
                     <View style={[styles.notifIconCircle, { backgroundColor: icon.color + '20' }]}>
                       <Ionicons name={icon.name as any} size={20} color={icon.color} />
@@ -237,23 +301,42 @@ const NotificationsScreen = ({ onNavigate, onGoBack }: NotificationsScreenProps)
                 <View style={styles.notifContent}>
                   <Text style={styles.notifText}>
                     <Text style={styles.notifBold}>
-                      {item.from_profile?.display_name || item.from_profile?.username || t('notifications.someone')}
+                      {notif.from_profile?.display_name || notif.from_profile?.username || t('notifications.someone')}
                     </Text>
-                    {' '}{item.message}
+                    {' '}{notif.message}
                   </Text>
-                  <Text style={styles.notifTime}>{timeAgo(item.created_at)}</Text>
+                  <Text style={styles.notifTime}>{timeAgo(notif.created_at)}</Text>
                 </View>
 
-                {!item.is_read && <View style={styles.unreadDot} />}
+                {!notif.is_read && <View style={styles.unreadDot} />}
 
-                {/* Delete button */}
-                <TouchableOpacity
-                  style={styles.deleteBtn}
-                  onPress={() => handleDeleteNotification(item.id)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
-                </TouchableOpacity>
+                <View style={styles.notifActions}>
+                  {/* Inline View action — mirrors demo n.actionLabel */}
+                  <TouchableOpacity
+                    style={[styles.viewBtn, !notif.is_read && styles.viewBtnUnread]}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleNotificationPress(notif);
+                    }}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  >
+                    <Text style={[styles.viewBtnText, !notif.is_read && styles.viewBtnTextUnread]}>
+                      {t('notifications.view', { defaultValue: 'View' })}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Delete button */}
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleDeleteNotification(notif.id);
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
+                  </TouchableOpacity>
+                </View>
               </TouchableOpacity>
             );
           }}
@@ -403,6 +486,40 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bg3,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sectionHeader: {
+    ...font('eyebrow'),
+    color: COLORS.text3,
+    backgroundColor: COLORS.bg,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  notifActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  viewBtn: {
+    height: 28,
+    paddingHorizontal: 12,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.bg3,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLORS.border,
+  },
+  viewBtnUnread: {
+    backgroundColor: COLORS.emberSoft,
+    borderColor: COLORS.ember,
+  },
+  viewBtnText: {
+    ...font('label'),
+    color: COLORS.text2,
+  },
+  viewBtnTextUnread: {
+    color: COLORS.ember,
   },
 });
 

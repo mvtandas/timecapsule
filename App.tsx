@@ -36,6 +36,7 @@ import MessagesScreen from './src/screens/messages/MessagesScreen';
 import ChatScreen from './src/screens/messages/ChatScreen';
 import CapScreen from './src/screens/cap/CapScreen';
 import TrailStopsScreen from './src/screens/trails/TrailStopsScreen';
+import SharedCapLanding from './src/screens/shared/SharedCapLanding';
 import BottomTabBar from './src/components/common/BottomTabBar';
 
 const RootStack = createNativeStackNavigator();
@@ -95,9 +96,22 @@ function MainTabs() {
   );
 }
 
-function AuthStack() {
+function AuthStack({ pendingCap }: { pendingCap?: string | null }) {
   return (
-    <RootStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.bg } }}>
+    <RootStack.Navigator
+      // When a logged-OUT user arrives via a cap deep link, open the branded
+      // shared-cap landing first; the cap id is held in App state and the cap
+      // opens automatically once auth resolves. Otherwise start at Welcome.
+      initialRouteName={pendingCap ? 'SharedCapLanding' : 'Welcome'}
+      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.bg } }}
+    >
+      {pendingCap ? (
+        <RootStack.Screen name="SharedCapLanding" initialParams={{ capId: pendingCap }}>
+          {({ navigation, route }) => (
+            <SharedCapLanding {...makeNav(navigation)} capId={(route.params as any)?.capId} />
+          )}
+        </RootStack.Screen>
+      ) : null}
       <RootStack.Screen name="Welcome">
         {({ navigation }) => <WelcomeScreen {...makeNav(navigation)} />}
       </RootStack.Screen>
@@ -254,6 +268,19 @@ export default function App() {
     }
   }, [pendingCap, user, navReady]);
 
+  // Logged-OUT cold/warm start with a shared-cap link: show the branded landing.
+  // `initialRouteName` alone can't cover this — getInitialURL resolves after the
+  // first render, so navigate imperatively once the screen is registered.
+  // pendingCap is NOT cleared here, so it still opens the cap after auth (effect above).
+  useEffect(() => {
+    if (
+      pendingCap && !user && navReady && navigationRef.isReady() &&
+      navigationRef.getCurrentRoute()?.name !== 'SharedCapLanding'
+    ) {
+      try { (navigationRef.navigate as any)('SharedCapLanding', { capId: pendingCap }); } catch { /* screen not ready yet */ }
+    }
+  }, [pendingCap, user, navReady]);
+
   useEffect(() => {
     AsyncStorage.getItem('@timecapsule_onboarded')
       .then((v) => setShowOnboarding(v === null))
@@ -310,7 +337,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <NavigationContainer ref={navigationRef} theme={navTheme} linking={linking} onReady={() => setNavReady(true)}>
-        {user ? <AppStack /> : <AuthStack />}
+        {user ? <AppStack /> : <AuthStack pendingCap={pendingCap} />}
       </NavigationContainer>
       <StatusBar style="light" />
     </SafeAreaProvider>

@@ -14,9 +14,11 @@ import {
   ActivityIndicator,
   ScrollView,
   TextInput,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { supabase } from '../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
@@ -37,8 +39,9 @@ import Countdown from './detail/Countdown';
 import AudioPlayer from './detail/AudioPlayer';
 import { useProximity, ARRIVE_RADIUS_M } from '../hooks/useProximity';
 import { openDirections } from '../utils/directions';
-import { COLORS, font } from '../constants/theme';
+import { COLORS, font, GRADIENTS, SHADOWS } from '../constants/theme';
 import { getCapType } from '../constants/capTypes';
+import { DARK_MAP_STYLE } from '../constants/mapStyle';
 import CapTypeBadge from './common/CapTypeBadge';
 import { useT } from '../i18n';
 
@@ -91,6 +94,21 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
   const [addingPhoto, setAddingPhoto] = useState(false);
   const [submittingText, setSubmittingText] = useState(false);
   const [readProgress, setReadProgress] = useState(0);
+  // Scroll: time-locked creator preview (demo SDetail) — owner flips into the reader.
+  const [creatorPreview, setCreatorPreview] = useState(false);
+  // Gathering: creator-side join requests (demo 4048-4062).
+  const [joinRequests, setJoinRequests] = useState<any[]>([]);
+  // Trail: timeline ↔ map toggle + tapped-marker highlight (demo TDetail 6838/7099).
+  const [trailViewMode, setTrailViewMode] = useState<'timeline' | 'map'>('timeline');
+  const [highlightStopIdx, setHighlightStopIdx] = useState<number | null>(null);
+  // Trail: a freshly-opened stop reveals content before advancing (demo 6965/7324).
+  const [openedStop, setOpenedStop] = useState<number | null>(null);
+  // Gathering reveal overlay (demo "Break the Seal" 3623+) — guarded to fire once.
+  const [showReveal, setShowReveal] = useState(false);
+  const revealFiredRef = useRef(false);
+  const revealScale = useRef(new Animated.Value(0.6)).current;
+  const revealOpacity = useRef(new Animated.Value(0)).current;
+  const mapRef = useRef<MapView>(null);
 
   useEffect(() => {
     setOwner(null);
@@ -108,6 +126,13 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
     setTrailCompletions(0);
     setTrailStarted(false);
     setReadProgress(0);
+    setCreatorPreview(false);
+    setJoinRequests([]);
+    setTrailViewMode('timeline');
+    setHighlightStopIdx(null);
+    setOpenedStop(null);
+    setShowReveal(false);
+    revealFiredRef.current = false;
     if (item?.owner_id) loadOwner(item.owner_id);
     if (item?.lat && item?.lng) loadAddress(item.lat, item.lng);
     if (item?.id) loadCommentCount();
@@ -116,6 +141,46 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
     if (item?.id && item?.type === 'gathering') loadContributions();
     checkOwnership();
   }, [item?.id]);
+
+  // Creator-side join requests (demo 4048-4062): load once we know we're the owner.
+  useEffect(() => {
+    if (isOwner && item?.id && item?.type === 'gathering') loadJoinRequests();
+  }, [isOwner, item?.id]);
+
+  const loadJoinRequests = async () => {
+    try {
+      const rows = await GatheringService.listJoinRequests(item.id);
+      setJoinRequests(rows);
+    } catch (e) { if (__DEV__) console.error(e); }
+  };
+
+  const handleRespondJoin = async (requestId: string, approve: boolean) => {
+    // Optimistic removal; reload to reconcile.
+    setJoinRequests((prev) => prev.filter((r) => r.id !== requestId));
+    try {
+      await GatheringService.respondToJoinRequest(requestId, approve);
+    } catch (e) { if (__DEV__) console.error(e); }
+    loadJoinRequests();
+  };
+
+  // Gathering reveal overlay — ember glow + scale, ~2s, fires once per open cap.
+  const playReveal = useCallback(() => {
+    if (revealFiredRef.current) return;
+    revealFiredRef.current = true;
+    setShowReveal(true);
+    revealScale.setValue(0.6);
+    revealOpacity.setValue(0);
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(revealOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.spring(revealScale, { toValue: 1, friction: 5, tension: 40, useNativeDriver: true }),
+      ]),
+      Animated.delay(1300),
+      Animated.timing(revealOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+    ]).start(({ finished }) => {
+      if (finished) setShowReveal(false);
+    });
+  }, [revealScale, revealOpacity]);
 
   const loadTrailCompletions = async () => {
     try {
@@ -179,13 +244,27 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
     trailActive,
   );
 
+  // Open-to-advance (demo 6965/7324): opening reveals the stop's content + marks
+  // it completed, but stays on the same stop. A separate "Continue" advances.
   const handleOpenStop = async () => {
-    const nextCompleted = [...completed, currentIdx];
-    const nextIdx = currentIdx + 1;
+    const nextCompleted = completed.includes(currentIdx) ? completed : [...completed, currentIdx];
+    const isLast = currentIdx >= trailStops.length - 1;
     setCompleted(nextCompleted);
-    setCurrentIdx(nextIdx);
+    setOpenedStop(currentIdx);
     try {
-      await TrailService.setProgress(item.id, nextIdx, nextCompleted, nextIdx >= trailStops.length);
+      // Mark completed; advance the persisted index only on the final stop so the
+      // trail registers as finished (completed_at) without skipping the reveal.
+      await TrailService.setProgress(item.id, isLast ? trailStops.length : currentIdx, nextCompleted, isLast);
+    } catch (e) { if (__DEV__) console.error(e); }
+    if (isLast) loadTrailCompletions();
+  };
+
+  const handleAdvanceStop = async () => {
+    const nextIdx = currentIdx + 1;
+    setCurrentIdx(nextIdx);
+    setOpenedStop(null);
+    try {
+      await TrailService.setProgress(item.id, nextIdx, completed, nextIdx >= trailStops.length);
     } catch (e) { if (__DEV__) console.error(e); }
   };
 
@@ -354,10 +433,26 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
   const distanceLocked = distanceGated && !locked && !capProx.withinRange;
   const sealed = locked || distanceLocked;
 
+  // Whisper recipient gate + self-whisper (demo 8114-8181).
+  const isWhisper = item?.type === 'whisper';
+  const isSelfWhisper = isWhisper && (
+    item?.is_self_whisper ||
+    (item?.owner_id && item?.recipient_id && item.owner_id === item.recipient_id)
+  );
+  // A normal (non-self) whisper's content is only for the addressed recipient or
+  // the owner. Everyone else hits a gated state even after the cap is open.
+  const whisperRecipientGated = isWhisper && !isSelfWhisper && !!item?.recipient_id
+    && !isOwner && currentUserId !== item.recipient_id;
+
   // Record that the viewer opened this cap (powers Discover "Unopened" + profile "Opened").
   useEffect(() => {
     if (item?.id && !sealed && !isOwner) CapsuleService.recordOpen(item.id);
   }, [item?.id, sealed, isOwner]);
+
+  // Gathering reveal — play once when a gathering is open (not sealed), guarded by a ref.
+  useEffect(() => {
+    if (item?.type === 'gathering' && !sealed && item?.id) playReveal();
+  }, [item?.id, item?.type, sealed, playReveal]);
 
   // Gathering contribution visibility (mirrors the demo): open caps after seal
   // show all; while sealed, blind hides every contribution (even from the owner),
@@ -376,7 +471,11 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
   const scrollWords = isScrollCap ? countScrollWords(item.body) : 0;
   const readMin = Math.max(1, Math.round(scrollWords / 200));
 
-  if (isScrollCap && !sealed) {
+  // Scroll creator preview (demo SDetail): an owner of a time-locked scroll can
+  // flip into the reader early. `locked` here means time-locked (open_at in future).
+  const scrollCreatorPreviewing = isScrollCap && locked && isOwner && creatorPreview;
+
+  if (isScrollCap && (!sealed || scrollCreatorPreviewing)) {
     const cover = item.cover_photo_url || mediaUrl;
     return (
       <View style={styles.scrollPage}>
@@ -424,14 +523,32 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
             setReadProgress(max > 0 ? Math.min(1, Math.max(0, contentOffset.y / max)) : 0);
           }}
         >
+          {scrollCreatorPreviewing && (
+            <View style={styles.creatorPreviewBanner}>
+              <Ionicons name="eye-outline" size={14} color={COLORS.ember} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.creatorPreviewLabel}>{t('capDetail.creatorPreview', { defaultValue: 'Creator preview' })}</Text>
+                <Text style={styles.creatorPreviewSub}>
+                  {t('capDetail.creatorPreviewSub', { defaultValue: 'Only you can see this. Readers see a sealed state until it opens.' })}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setCreatorPreview(false)} style={styles.creatorPreviewExit} activeOpacity={0.8}>
+                <Text style={styles.creatorPreviewExitText}>{t('capDetail.exitPreview', { defaultValue: 'Exit preview' })}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           {cover ? <Image source={{ uri: cover }} style={styles.scrollCover} resizeMode="cover" /> : null}
           <View style={styles.typeBadgeRow}>
             <CapTypeBadge type={item?.type} size="md" />
           </View>
           <Text style={styles.scrollTitle}>{displayTitle}</Text>
           <Text style={styles.scrollByline}>
-            {(owner?.display_name || owner?.username || '')}
-            {scrollWords > 0 ? `  ·  ${t('capDetail.readTime', { min: readMin })}` : ''}
+            {[
+              owner?.display_name || owner?.username || '',
+              item?.created_at ? formatDate(item.created_at) : '',
+              scrollWords > 0 ? t('capDetail.readTime', { min: readMin }) : '',
+              item?.view_count > 0 ? t('capDetail.viewCount', { defaultValue: '%{n} reads', n: item.view_count }) : '',
+            ].filter(Boolean).join('  ·  ')}
           </Text>
           <ScrollRenderer blocks={item.body} />
 
@@ -497,7 +614,7 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
   return (
     <View style={styles.page}>
       {/* Background image */}
-      {mediaUrl && !sealed && item?.media_type !== 'audio' ? (
+      {mediaUrl && !sealed && !whisperRecipientGated && item?.media_type !== 'audio' ? (
         <Image source={{ uri: mediaUrl }} style={styles.bgImage} resizeMode="cover" />
       ) : (
         <View style={[styles.bgImage, { backgroundColor: COLORS.bg2 }]} />
@@ -550,6 +667,28 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
           <Text style={styles.lockedTitle}>{t('capDetail.sealed')}</Text>
           {item.open_at && <Text style={styles.lockedDate}>{t('capDetail.opens', { date: formatDate(item.open_at) })}</Text>}
           {item.open_at && <Countdown target={item.open_at} />}
+          {/* Owner-only note: only the creator can preview a sealed cap. */}
+          {isOwner && (
+            <View style={styles.ownerSealNote}>
+              <Ionicons name="eye-outline" size={13} color={COLORS.ember} />
+              <Text style={styles.ownerSealNoteText}>
+                {t('capDetail.ownerSealNote', { defaultValue: "You're the creator — only you can preview this sealed cap" })}
+              </Text>
+            </View>
+          )}
+          {/* Scroll creator preview: flip into the article reader early. */}
+          {isScrollCap && isOwner && (
+            <TouchableOpacity
+              style={styles.previewAsCreatorBtn}
+              onPress={() => setCreatorPreview(true)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="eye-outline" size={16} color={COLORS.ember} />
+              <Text style={styles.previewAsCreatorText}>
+                {t('capDetail.previewAsCreator', { defaultValue: 'Preview as creator' })}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -599,17 +738,50 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
           <CapTypeBadge type={item?.type} size="md" />
         </View>
         <Text style={styles.title}>{displayTitle}</Text>
-        {item?.type === 'scroll' && Array.isArray(item?.body) && item.body.length ? (
+
+        {/* Self-whisper banner — "A letter to yourself" (demo 8125-8160). */}
+        {isSelfWhisper && (
+          <View style={styles.selfWhisperBanner}>
+            <Ionicons name="time-outline" size={14} color={COLORS.ember} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.selfWhisperTo}>{t('capDetail.selfWhisperTo', { defaultValue: 'To: Future you' })}</Text>
+              <Text style={styles.selfWhisperSub}>{t('capDetail.selfWhisperSub', { defaultValue: 'A letter to yourself' })}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Whisper recipient gate — not addressed to this viewer (demo 8114-8181). */}
+        {whisperRecipientGated && !sealed ? (
+          <View style={styles.whisperGate}>
+            <Ionicons name="lock-closed" size={18} color={COLORS.text2} />
+            <Text style={styles.whisperGateText}>
+              {t('capDetail.whisperNotForYou', { defaultValue: "This whisper isn't addressed to you" })}
+            </Text>
+          </View>
+        ) : item?.type === 'scroll' && Array.isArray(item?.body) && item.body.length ? (
           <ScrollRenderer blocks={item.body} />
         ) : displayDescription ? (
           <Text style={styles.description} numberOfLines={3}>{displayDescription}</Text>
         ) : null}
-        {item?.media_type === 'audio' && mediaUrl && !sealed && <AudioPlayer uri={mediaUrl} />}
+        {item?.media_type === 'audio' && mediaUrl && !sealed && !whisperRecipientGated && <AudioPlayer uri={mediaUrl} />}
 
         {/* Trail walking */}
         {item?.type === 'trail' && trailStops.length > 0 && (() => {
           const gold = getCapType('trail').color;
           const done = currentIdx >= trailStops.length;
+          // Trail completion summary stats (demo 7446).
+          const distanceLabel = item?.total_distance_km != null
+            ? t('capDetail.kmAway', { km: Number(item.total_distance_km).toFixed(1) }).replace(/\s*away$/i, '')
+            : null;
+          const minutesValue = item?.total_minutes != null ? Number(item.total_minutes) : null;
+          const timeLabel = minutesValue != null
+            ? (minutesValue >= 60 ? `${Math.floor(minutesValue / 60)}h ${minutesValue % 60 > 0 ? `${minutesValue % 60}m` : ''}`.trim() : `${minutesValue}m`)
+            : null;
+          const stats = [
+            { label: t('capDetail.statStops', { defaultValue: 'Stops' }), value: String(trailStops.length) },
+            distanceLabel ? { label: t('capDetail.statDistance', { defaultValue: 'Distance' }), value: distanceLabel } : null,
+            timeLabel ? { label: t('capDetail.statTime', { defaultValue: 'Time' }), value: timeLabel } : null,
+          ].filter(Boolean) as { label: string; value: string }[];
           return (
             <View style={styles.extraSection}>
               <Text style={styles.extraSectionTitle}>
@@ -628,14 +800,25 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
                 </View>
               )}
 
-              {/* Completion summary */}
+              {/* Completion summary — trophy + stats + completed-by (demo 7446) */}
               {done && (
                 <View style={[styles.trailCompleteCard, { borderColor: gold }]}>
                   <View style={[styles.trailCompleteTrophy, { backgroundColor: `${gold}22` }]}>
                     <Ionicons name="trophy" size={30} color={gold} />
                   </View>
-                  <Text style={[styles.trailCompleteTitle, { color: gold }]}>{t('capDetail.trailComplete')}</Text>
+                  <Text style={styles.trailCompleteEyebrow}>{t('capDetail.trailComplete')}</Text>
+                  <Text style={[styles.trailCompleteTitle, { color: COLORS.text }]} numberOfLines={2}>{displayTitle}</Text>
                   <Text style={styles.trailStopLocation}>{t('capDetail.trailCompleteSub')}</Text>
+                  {stats.length > 0 && (
+                    <View style={styles.trailStatsRow}>
+                      {stats.map((s, i) => (
+                        <View key={s.label} style={[styles.trailStat, i < stats.length - 1 && styles.trailStatDivider]}>
+                          <Text style={styles.trailStatValue}>{s.value}</Text>
+                          <Text style={[styles.trailStatLabel, { color: gold }]}>{s.label}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                   {trailCompletions > 1 && (
                     <Text style={styles.trailCompletedBy}>{t('capDetail.completedByOthers', { n: trailCompletions - 1 })}</Text>
                   )}
@@ -656,18 +839,102 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
                 </TouchableOpacity>
               )}
 
+              {/* Timeline ↔ map toggle (demo TDetail 6838/7099) */}
+              {!done && (
+                <View style={styles.trailToggleRow}>
+                  <TouchableOpacity
+                    style={[styles.trailToggleBtn, trailViewMode === 'timeline' && { backgroundColor: gold, borderColor: gold }]}
+                    onPress={() => setTrailViewMode('timeline')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.trailToggleText, trailViewMode === 'timeline' && styles.trailToggleTextActive]}>
+                      {t('capDetail.trailTimeline', { defaultValue: 'Timeline' })}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.trailToggleBtn, trailViewMode === 'map' && { backgroundColor: gold, borderColor: gold }]}
+                    onPress={() => setTrailViewMode('map')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.trailToggleText, trailViewMode === 'map' && styles.trailToggleTextActive]}>
+                      {t('capDetail.trailMapView', { defaultValue: 'Map view' })}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Map view — numbered/colored markers per stop state (demo TrailMap 6186) */}
+              {!done && trailViewMode === 'map' && (() => {
+                const coordStops = trailStops.filter((s) => s.lat != null && s.lng != null);
+                const first = coordStops[0];
+                if (!first) {
+                  return <Text style={styles.trailProgressLabel}>{t('capDetail.noStopCoords', { defaultValue: 'No stop locations to map yet.' })}</Text>;
+                }
+                return (
+                  <MapView
+                    ref={mapRef}
+                    provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+                    customMapStyle={DARK_MAP_STYLE}
+                    style={styles.trailMap}
+                    initialRegion={{
+                      latitude: first.lat as number,
+                      longitude: first.lng as number,
+                      latitudeDelta: 0.04,
+                      longitudeDelta: 0.04,
+                    }}
+                    showsUserLocation
+                    showsMyLocationButton={false}
+                    pitchEnabled={false}
+                    rotateEnabled={false}
+                  >
+                    {trailStops.map((stop, idx) => {
+                      if (stop.lat == null || stop.lng == null) return null;
+                      const isDoneStop = completed.includes(idx);
+                      const isCurrentStop = idx === currentIdx;
+                      const markerColor = isDoneStop ? gold : isCurrentStop ? COLORS.ember : COLORS.text3;
+                      const isHighlighted = highlightStopIdx === idx;
+                      return (
+                        <Marker
+                          key={stop.id || idx}
+                          coordinate={{ latitude: stop.lat as number, longitude: stop.lng as number }}
+                          onPress={() => { setHighlightStopIdx(idx); setTrailViewMode('timeline'); }}
+                          tracksViewChanges={false}
+                        >
+                          <View style={[
+                            styles.trailMapMarker,
+                            { backgroundColor: markerColor, borderColor: isHighlighted ? COLORS.text : '#000' },
+                          ]}>
+                            {isDoneStop ? (
+                              <Ionicons name="checkmark" size={13} color="#000" />
+                            ) : (
+                              <Text style={[styles.trailMapMarkerText, isCurrentStop && { color: '#fff' }]}>{(stop.ordinal ?? idx) + 1}</Text>
+                            )}
+                          </View>
+                        </Marker>
+                      );
+                    })}
+                  </MapView>
+                );
+              })()}
+
+              {!done && trailViewMode === 'timeline' && (
               <ScrollView style={styles.extraScroll} keyboardShouldPersistTaps="handled">
                 {trailStops.map((stop, idx) => {
                   const isDone = completed.includes(idx);
                   const isCurrent = idx === currentIdx && !done;
                   const isLockedStop = idx > currentIdx;
                   const hasCoords = stop.lat != null && stop.lng != null;
+                  // A current stop just opened (content revealed, not yet advanced).
+                  const justOpened = isCurrent && openedStop === idx;
+                  const revealStop = isDone || justOpened;
+                  const isHighlighted = highlightStopIdx === idx;
                   return (
                     <View
                       key={stop.id || idx}
                       style={[
                         styles.trailStopRow,
                         isCurrent && [styles.trailStopCurrent, { borderColor: gold }],
+                        isHighlighted && { borderColor: COLORS.ember, borderWidth: 1.5, borderRadius: 12 },
                       ]}
                     >
                       <View
@@ -708,10 +975,10 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
                               <Image source={{ uri: stop.photo_url }} style={styles.trailStopPhoto} resizeMode="cover" />
                             ) : null}
                             {/* Reveal the stop's payoff once it's been opened (arrived + tapped). */}
-                            {isDone && stop.content ? (
+                            {revealStop && stop.content ? (
                               <Text style={styles.trailStopContent}>{stop.content}</Text>
                             ) : null}
-                            {isDone && stop.tip ? (
+                            {revealStop && stop.tip ? (
                               <View style={styles.trailTipBox}>
                                 <Text style={styles.trailTipLabel}>{t('capDetail.proTip')}</Text>
                                 <Text style={styles.trailTipText}>{stop.tip}</Text>
@@ -720,7 +987,7 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
                           </>
                         )}
 
-                        {isCurrent && hasCoords && (
+                        {isCurrent && !justOpened && hasCoords && (
                           <Text style={[styles.trailStopDistance, { color: withinRange ? gold : COLORS.text2 }]}>
                             {withinRange
                               ? t('capDetail.youreHere')
@@ -732,7 +999,9 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
                           </Text>
                         )}
 
-                        {isCurrent && (
+                        {/* Open-to-advance (demo 6965/7324): open reveals content,
+                            then a separate Continue button advances the trail. */}
+                        {isCurrent && !justOpened && (
                           <View style={styles.trailStopActions}>
                             <TouchableOpacity
                               style={[
@@ -758,11 +1027,26 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
                             )}
                           </View>
                         )}
+
+                        {justOpened && (
+                          <TouchableOpacity
+                            style={[styles.trailContinueBtn, { backgroundColor: gold }]}
+                            onPress={handleAdvanceStop}
+                            activeOpacity={0.85}
+                          >
+                            <Text style={styles.trailContinueText}>
+                              {idx < trailStops.length - 1
+                                ? t('capDetail.continueToNext', { defaultValue: 'Continue to next stop →' })
+                                : t('capDetail.finishTrail', { defaultValue: 'Finish trail →' })}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                     </View>
                   );
                 })}
               </ScrollView>
+              )}
             </View>
           );
         })()}
@@ -835,6 +1119,51 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
                 <Text style={styles.joinBtnText}>{joinRequested ? t('capDetail.requestSent') : t('capDetail.requestToJoin')}</Text>
               </TouchableOpacity>
             )}
+          </View>
+        )}
+
+        {/* Gathering join requests (creator side) — demo 4048-4062. */}
+        {isOwner && item?.type === 'gathering' && joinRequests.length > 0 && (
+          <View style={styles.extraSection}>
+            <Text style={styles.extraSectionTitle}>
+              {t('capDetail.joinRequestsCount', { defaultValue: 'Join requests (%{count})', count: joinRequests.length })}
+            </Text>
+            <ScrollView style={styles.extraScroll} keyboardShouldPersistTaps="handled">
+              {joinRequests.map((r, idx) => {
+                const name = r.requester?.display_name || r.requester?.username || t('capDetail.someone');
+                return (
+                  <View key={r.id || idx} style={styles.joinRequestRow}>
+                    <View style={styles.joinRequestAvatar}>
+                      {r.requester?.avatar_url ? (
+                        <Image source={{ uri: r.requester.avatar_url }} style={styles.joinRequestAvatarImg} />
+                      ) : (
+                        <Ionicons name="person" size={16} color={COLORS.purple} />
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.joinRequestName} numberOfLines={1}>{name}</Text>
+                      {r.requester?.username ? (
+                        <Text style={styles.joinRequestHandle} numberOfLines={1}>@{r.requester.username}</Text>
+                      ) : null}
+                    </View>
+                    <TouchableOpacity
+                      style={styles.joinDeclineBtn}
+                      onPress={() => handleRespondJoin(r.id, false)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.joinDeclineText}>{t('capDetail.decline', { defaultValue: 'Decline' })}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.joinApproveBtn}
+                      onPress={() => handleRespondJoin(r.id, true)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.joinApproveText}>{t('capDetail.approve', { defaultValue: 'Approve' })}</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </ScrollView>
           </View>
         )}
 
@@ -927,6 +1256,21 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
           setDisplayCategory(updated.category);
         }}
       />
+
+      {/* Gathering reveal overlay — ember glow + scale, plays once (demo 3623+). */}
+      {item?.type === 'gathering' && showReveal && (
+        <Animated.View style={[styles.revealOverlay, { opacity: revealOpacity }]} pointerEvents="none">
+          <Animated.View style={{ transform: [{ scale: revealScale }], alignItems: 'center' }}>
+            <View style={styles.revealGlow}>
+              <LinearGradient colors={GRADIENTS.gathering as any} style={styles.revealCircle}>
+                <Ionicons name="people" size={40} color="#fff" />
+              </LinearGradient>
+            </View>
+            <Text style={styles.revealEyebrow}>{t('capDetail.gatheringComplete', { defaultValue: 'The gathering is complete' })}</Text>
+            <Text style={styles.revealTitle} numberOfLines={3}>{displayTitle}</Text>
+          </Animated.View>
+        </Animated.View>
+      )}
     </View>
   );
 };
@@ -1696,6 +2040,194 @@ const styles = StyleSheet.create({
     ...font('labelBold'),
     color: '#fff',
   },
+
+  // ── Whisper recipient gate + self-whisper (demo 8114-8181) ──
+  selfWhisperBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: COLORS.emberSoft,
+    borderWidth: 1,
+    borderColor: COLORS.emberGlow,
+    marginBottom: 10,
+  },
+  selfWhisperTo: { ...font('labelBold'), color: COLORS.ember },
+  selfWhisperSub: { ...font('caption'), color: COLORS.text2 },
+  whisperGate: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    marginBottom: 10,
+  },
+  whisperGateText: { ...font('body'), color: COLORS.text2, flex: 1 },
+  ownerSealNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginTop: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: COLORS.emberSoft,
+    borderWidth: 1,
+    borderColor: COLORS.emberGlow,
+    maxWidth: width - 60,
+  },
+  ownerSealNoteText: { ...font('caption'), color: COLORS.ember, flex: 1, textAlign: 'center' },
+
+  // ── Scroll creator preview (demo SDetail) ──
+  previewAsCreatorBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginTop: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: COLORS.ember,
+  },
+  previewAsCreatorText: { ...font('label'), color: COLORS.ember },
+  creatorPreviewBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: COLORS.emberSoft,
+    borderWidth: 1,
+    borderColor: COLORS.emberGlow,
+    marginBottom: 14,
+  },
+  creatorPreviewLabel: { ...font('eyebrow'), color: COLORS.ember },
+  creatorPreviewSub: { ...font('caption'), color: COLORS.text2, marginTop: 2 },
+  creatorPreviewExit: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.emberGlow,
+  },
+  creatorPreviewExitText: { ...font('label'), color: COLORS.ember },
+
+  // ── Gathering join requests (demo 4048-4062) ──
+  joinRequestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.border,
+  },
+  joinRequestAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    backgroundColor: `${COLORS.purple}25`,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  joinRequestAvatarImg: { width: 36, height: 36, borderRadius: 11 },
+  joinRequestName: { ...font('bodyBold'), color: COLORS.text },
+  joinRequestHandle: { ...font('caption'), color: COLORS.text3 },
+  joinDeclineBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: COLORS.bg3,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  joinDeclineText: { ...font('label'), color: COLORS.text2 },
+  joinApproveBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: COLORS.purple,
+  },
+  joinApproveText: { ...font('label'), color: '#fff' },
+
+  // ── Gathering reveal overlay (demo 3623+) ──
+  revealOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 50,
+    backgroundColor: 'rgba(4,6,10,0.96)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 36,
+  },
+  revealGlow: {
+    marginBottom: 28,
+    borderRadius: 60,
+    ...SHADOWS.glow(COLORS.ember),
+  },
+  revealCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  revealEyebrow: { ...font('eyebrow'), color: COLORS.purple, textAlign: 'center', marginBottom: 10 },
+  revealTitle: { ...font('display'), color: COLORS.text, textAlign: 'center' },
+
+  // ── Trail map toggle + map + completion stats (demo 6838/7099/7446/6186) ──
+  trailToggleRow: { flexDirection: 'row', gap: 6, marginBottom: 10 },
+  trailToggleBtn: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 9,
+    backgroundColor: COLORS.bg3,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+  },
+  trailToggleText: { ...font('label'), color: COLORS.text2 },
+  trailToggleTextActive: { color: '#fff' },
+  trailMap: {
+    width: '100%',
+    height: 220,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  trailMapMarker: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trailMapMarkerText: { ...font('labelBold'), color: '#000' },
+  trailCompleteEyebrow: { ...font('eyebrow'), color: getCapType('trail').color, marginBottom: 2 },
+  trailStatsRow: {
+    flexDirection: 'row',
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(212,162,76,0.25)',
+    alignSelf: 'stretch',
+  },
+  trailStat: { flex: 1, alignItems: 'center' },
+  trailStatDivider: { borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: COLORS.border },
+  trailStatValue: { ...font('title'), color: COLORS.text },
+  trailStatLabel: { ...font('eyebrow'), marginTop: 4 },
+  trailContinueBtn: {
+    marginTop: 10,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  trailContinueText: { ...font('labelBold'), color: '#000' },
 });
 
 export default CapsuleDetailModal;

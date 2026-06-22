@@ -52,4 +52,24 @@ export class SearchService {
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count);
   }
+
+  /** Suggested people to connect with — profiles the user isn't already
+   *  connected to (no pending/accepted friend_request), excluding self. */
+  static async getSuggestedUsers(limit = 20): Promise<any[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+    // Exclude anyone already in a friend_request with me (either direction).
+    const { data: reqs } = await supabase
+      .from('friend_requests')
+      .select('sender_id, receiver_id')
+      .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+    const excluded = new Set<string>([user.id]);
+    ((reqs as any[]) || []).forEach((r) => { excluded.add(r.sender_id); excluded.add(r.receiver_id); });
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, display_name, username, avatar_url')
+      .order('created_at', { ascending: false })
+      .limit(limit + excluded.size);
+    return ((data as any[]) || []).filter((p) => !excluded.has(p.id)).slice(0, limit);
+  }
 }

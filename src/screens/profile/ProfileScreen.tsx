@@ -16,6 +16,7 @@ import { MemoriesService, type Memory } from '../../services/memoriesService';
 import { AchievementService, type AchievementSummary } from '../../services/achievementService';
 import { TrailService } from '../../services/trailService';
 import { FriendService } from '../../services/friendService';
+import { DraftService } from '../../services/draftService';
 import CapsuleDetailModal from '../../components/CapsuleDetailModal';
 import MessagesButton from '../../components/common/MessagesButton';
 import { COLORS, SPACING, font } from '../../constants/theme';
@@ -31,6 +32,7 @@ import ProfileEmptyState from './components/ProfileEmptyState';
 import PhotoPickerSheet from './components/PhotoPickerSheet';
 import CompletedTrails from './components/CompletedTrails';
 import FriendsPreview, { type FriendPreviewItem } from './components/FriendsPreview';
+import DraftsTeaser from './components/DraftsTeaser';
 
 const { width } = Dimensions.get('window');
 const PAD = SPACING.lg;
@@ -59,6 +61,7 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
   const [friends, setFriends] = useState<FriendPreviewItem[]>([]);
   const [completedTrails, setCompletedTrails] = useState<any[] | null>(null);
   const [summary, setSummary] = useState<AchievementSummary | null>(null);
+  const [drafts, setDrafts] = useState<any[] | null>(null);
 
   // Lazy tab data (null = not loaded yet)
   const [savedItems, setSavedItems] = useState<any[] | null>(null);
@@ -92,12 +95,13 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
   const loadCore = async () => {
     try {
       setLoadingCaps(true);
-      const [capsRes, friendsRes, ach, openedIds, completed] = await Promise.all([
+      const [capsRes, friendsRes, ach, openedIds, completed, draftList] = await Promise.all([
         CapsuleService.getUserCapsules(),
         FriendService.getFriends(),
         AchievementService.compute(),
         CapsuleService.getOpenedCapsuleIds(),
         TrailService.getCompletedTrails(),
+        DraftService.list(),
       ]);
       const list = capsRes?.data || [];
       setCaps(list);
@@ -106,6 +110,7 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
       setOpenedCount((openedIds || []).length);
       setCompletedTrails(completed || []);
       setSummary(ach);
+      setDrafts(draftList || []);
 
       // FriendService.getFriends() returns just the friend IDs — resolve them to
       // profiles so the inline preview can show avatars/handles.
@@ -128,6 +133,13 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
   };
 
   const loadSaved = async () => setSavedItems(await SavedService.list());
+
+  // Inline unsave from the Saved tab (optimistic; reloads on failure).
+  const unsaveCap = useCallback(async (cap: any) => {
+    setSavedItems((prev) => (prev || []).filter((c) => c.id !== cap.id));
+    const { error } = await SavedService.toggle(cap.id);
+    if (error) loadSaved();
+  }, []);
   const loadMemories = async () => {
     const [a, b] = await Promise.all([MemoriesService.getOnThisDay(), MemoriesService.getRecentMemories()]);
     const map = new Map<string, Memory>();
@@ -207,8 +219,8 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
 
   const renderItem = useCallback(({ item }: { item: any }) => {
     if (isMemories) return <View style={styles.memoryItem}><MemoryCard memory={item} onPress={openCap} /></View>;
-    return <CapGridCard capsule={item} width={CARD_WIDTH} onPress={openCap} />;
-  }, [isMemories, openCap]);
+    return <CapGridCard capsule={item} width={CARD_WIDTH} onPress={openCap} onUnsave={activeTab === 'saved' ? unsaveCap : undefined} />;
+  }, [isMemories, openCap, activeTab, unsaveCap]);
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const y = e.nativeEvent.contentOffset.y;
@@ -245,6 +257,7 @@ const ProfileScreen = ({ onNavigate }: ProfileScreenProps) => {
       <AchievementStrip summary={summary} onPress={() => onNavigate('Achievements')} />
       <CompletedTrails trails={completedTrails} onPress={openCap} />
       <FriendsPreview friends={friends} count={friendsCount} onSeeAll={() => onNavigate('Friends')} />
+      <DraftsTeaser drafts={drafts} onSeeAll={() => onNavigate('Drafts')} />
       <View
         style={[styles.tabsHolder, styles.tabsHolderSpaced]}
         onLayout={(e) => { tabY.current = e.nativeEvent.layout.y; }}

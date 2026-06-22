@@ -178,9 +178,9 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
   const openCap = (cap: any) => { setSelected(cap); setShowDetail(true); CapsuleService.incrementViewCount(cap.id); };
 
   const loading = pool === null;
-  // "Öne çıkanlar" hero strip — a fixed highlights cut (most recent), independent
-  // of the filter chips. The chips drive the single list below, not this strip.
-  const featured = (pool || []).slice(0, 8);
+  // "Öne çıkanlar" hero strip — a highlights cut of the active filter. Tapping a
+  // chip updates BOTH this carousel and the list below, keeping the single feed.
+  const featured = filtered.slice(0, 8);
   // The single feed reflects the active filter; its header label matches the chip.
   const sectionLabel = filter === 'nearby'
     ? t('discover.filter_nearby')
@@ -234,7 +234,7 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
           <>
             <ActivityTicker items={pool || []} onOpen={openCap} />
 
-            {/* Fixed highlights strip — independent of the filter chips. */}
+            {/* Highlights strip — reflects the active filter chip, same as the list. */}
             {featured.length > 0 && (
               <>
                 <View style={styles.sectionHeader}>

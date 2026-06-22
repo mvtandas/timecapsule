@@ -5,6 +5,7 @@ import { BlurView } from 'expo-blur';
 import { supabase } from '../../lib/supabase';
 import { getRecentVisits, addRecentVisit, RecentVisit } from '../../utils/recentVisits';
 import { FriendService, FriendRequest } from '../../services/friendService';
+import { SearchService } from '../../services/searchService';
 import { timeAgo } from '../../utils/dateUtils';
 import { StreakService, Streak } from '../../services/streakService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,6 +39,14 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
   const [friends, setFriends] = useState<FriendWithActivity[]>([]);
   const [loadingFriends, setLoadingFriends] = useState(true);
   const [streaks, setStreaks] = useState<Map<string, number>>(new Map());
+
+  // Tab + suggested users ("Find people")
+  const [activeTab, setActiveTab] = useState<'friends' | 'discover'>('friends');
+  const [suggested, setSuggested] = useState<any[]>([]);
+  const [loadingSuggested, setLoadingSuggested] = useState(false);
+  const [suggestedLoaded, setSuggestedLoaded] = useState(false);
+  // user id -> 'sending' | 'sent'
+  const [requestStates, setRequestStates] = useState<Record<string, 'sending' | 'sent'>>({});
 
   // Refresh state
   const [refreshing, setRefreshing] = useState(false);
@@ -77,9 +86,62 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
     setStreaks(map);
   };
 
+  // Load suggested users ("Find people")
+  const loadSuggested = async () => {
+    try {
+      setLoadingSuggested(true);
+      const data = await SearchService.getSuggestedUsers(20);
+      setSuggested(data || []);
+    } catch (error) {
+      if (__DEV__) console.error('Error loading suggested users:', error);
+      setSuggested([]);
+    } finally {
+      setLoadingSuggested(false);
+      setSuggestedLoaded(true);
+    }
+  };
+
+  // Switch tabs; lazy-load suggestions the first time the discover tab opens
+  const handleTabChange = (tab: 'friends' | 'discover') => {
+    setActiveTab(tab);
+    if (tab === 'discover' && !suggestedLoaded) {
+      loadSuggested();
+    }
+  };
+
+  // Send a friend request to a suggested user (optimistic)
+  const handleSendRequest = async (suggestedUser: any) => {
+    if (requestStates[suggestedUser.id]) return;
+    setRequestStates(prev => ({ ...prev, [suggestedUser.id]: 'sending' }));
+    const { error } = await FriendService.sendFriendRequest(suggestedUser.id);
+    if (error) {
+      setRequestStates(prev => {
+        const next = { ...prev };
+        delete next[suggestedUser.id];
+        return next;
+      });
+      return;
+    }
+    setRequestStates(prev => ({ ...prev, [suggestedUser.id]: 'sent' }));
+  };
+
+  // Open a suggested user's profile
+  const handleSuggestedPress = async (suggestedUser: any) => {
+    await addRecentVisit({
+      id: suggestedUser.id,
+      username: suggestedUser.username || '',
+      display_name: suggestedUser.display_name || '',
+      avatar_url: suggestedUser.avatar_url || undefined,
+    });
+    await loadRecentVisits();
+    onNavigate('FriendProfile', { friend: suggestedUser });
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadFriends(), loadPendingRequests(), loadStreaks()]);
+    const tasks: Promise<any>[] = [loadFriends(), loadPendingRequests(), loadStreaks()];
+    if (activeTab === 'discover') tasks.push(loadSuggested());
+    await Promise.all(tasks);
     setRefreshing(false);
   };
 
@@ -466,6 +528,28 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
         </View>
       )}
 
+      {/* Segmented control: Friends | Find people */}
+      <View style={styles.segmentRow}>
+        <TouchableOpacity
+          style={[styles.segment, activeTab === 'friends' && styles.segmentActive]}
+          onPress={() => handleTabChange('friends')}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.segmentText, activeTab === 'friends' && styles.segmentTextActive]}>
+            {t('friends.tab_friends', { defaultValue: 'Friends' })}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.segment, activeTab === 'discover' && styles.segmentActive]}
+          onPress={() => handleTabChange('discover')}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.segmentText, activeTab === 'discover' && styles.segmentTextActive]}>
+            {t('friends.tab_discover', { defaultValue: 'Find people' })}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
@@ -473,6 +557,92 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.ember} />
         }
       >
+        {activeTab === 'discover' ? (
+          <View style={styles.suggestedSection}>
+            {loadingSuggested ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={COLORS.ember} />
+                <Text style={styles.loadingText}>{t('friends.loading_suggested', { defaultValue: 'Finding people…' })}</Text>
+              </View>
+            ) : suggested.length > 0 ? (
+              <>
+                <Text style={styles.suggestedHeader}>
+                  {t('friends.suggested_title', { defaultValue: 'Suggested for you' })}
+                </Text>
+                {suggested.map((sUser, index) => {
+                  const state = requestStates[sUser.id];
+                  return (
+                    <TouchableOpacity
+                      key={sUser.id}
+                      style={styles.friendRow}
+                      onPress={() => handleSuggestedPress(sUser)}
+                      activeOpacity={0.6}
+                    >
+                      {sUser.avatar_url ? (
+                        <Image source={{ uri: sUser.avatar_url }} style={styles.friendAvatar} />
+                      ) : (
+                        <View style={[styles.friendAvatar, styles.avatarPlaceholder]}>
+                          <Ionicons name="person" size={22} color={COLORS.text3} />
+                        </View>
+                      )}
+
+                      <View style={styles.friendInfo}>
+                        <Text style={styles.friendName} numberOfLines={1}>
+                          {sUser.display_name || sUser.username}
+                        </Text>
+                        {!!sUser.username && (
+                          <Text style={styles.friendUsername} numberOfLines={1}>
+                            @{sUser.username}
+                          </Text>
+                        )}
+                      </View>
+
+                      <TouchableOpacity
+                        style={[styles.addButton, state === 'sent' && styles.addButtonSent]}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleSendRequest(sUser);
+                        }}
+                        disabled={!!state}
+                        activeOpacity={0.7}
+                      >
+                        {state === 'sending' ? (
+                          <ActivityIndicator size="small" color={COLORS.white} />
+                        ) : state === 'sent' ? (
+                          <>
+                            <Ionicons name="checkmark" size={15} color={COLORS.text3} />
+                            <Text style={styles.addButtonSentText}>
+                              {t('friends.request_sent', { defaultValue: 'Sent' })}
+                            </Text>
+                          </>
+                        ) : (
+                          <>
+                            <Ionicons name="person-add" size={15} color={COLORS.white} />
+                            <Text style={styles.addButtonText}>
+                              {t('friends.add', { defaultValue: 'Add' })}
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+
+                      {index < suggested.length - 1 && <View style={styles.separator} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </>
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="sparkles-outline" size={52} color={COLORS.text3} />
+                <Text style={styles.emptyTitle}>{t('friends.suggested_empty_title', { defaultValue: 'No suggestions right now' })}</Text>
+                <Text style={styles.emptySubtitle}>
+                  {t('friends.suggested_empty_subtitle', { defaultValue: 'Check back later or search for people by username.' })}
+                </Text>
+              </View>
+            )}
+            <View style={{ height: 100 }} />
+          </View>
+        ) : (
+        <>
         {/* Stories Row */}
         <View style={styles.storiesSection}>
           <ScrollView
@@ -642,6 +812,8 @@ const FriendsScreen: React.FC<FriendsScreenProps> = ({ onNavigate }) => {
 
         {/* Bottom padding for tab bar */}
         <View style={{ height: 100 }} />
+        </>
+        )}
       </ScrollView>
 
       {/* Friend Requests Modal */}
@@ -1101,6 +1273,74 @@ const styles = StyleSheet.create({
   // Content
   content: {
     flex: 1,
+  },
+
+  // Segmented control
+  segmentRow: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.bg3,
+    borderRadius: 12,
+    padding: 3,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  segment: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 9,
+  },
+  segmentActive: {
+    backgroundColor: COLORS.card,
+  },
+  segmentText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text3,
+  },
+  segmentTextActive: {
+    color: COLORS.text,
+  },
+
+  // Suggested ("Find people")
+  suggestedSection: {
+    backgroundColor: COLORS.bg2,
+    marginTop: 4,
+  },
+  suggestedHeader: {
+    ...font('subtitle'),
+    color: COLORS.text2,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 4,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: COLORS.ember,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    minWidth: 76,
+  },
+  addButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  addButtonSent: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: COLORS.borderLight,
+  },
+  addButtonSentText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.text3,
   },
 
   // Friends List

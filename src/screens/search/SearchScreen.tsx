@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SearchService, type PlaceResult } from '../../services/searchService';
+import { FriendService, type FriendshipStatus } from '../../services/friendService';
 
 const RECENT_KEY = 'voorcap.recentSearches';
 const TRENDING = ['Coffee', 'Sunset', 'Street art', 'Hidden gems', 'Food', 'Nature'];
@@ -34,6 +35,9 @@ const SearchScreen = ({ onNavigate, onGoBack }: SearchScreenProps) => {
   const [selected, setSelected] = useState<any>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
+  // Friendship status per person id, for the inline friend-request button.
+  const [friendStatus, setFriendStatus] = useState<Record<string, FriendshipStatus['status']>>({});
+  const [friendBusy, setFriendBusy] = useState<Record<string, boolean>>({});
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -74,6 +78,46 @@ const SearchScreen = ({ onNavigate, onGoBack }: SearchScreenProps) => {
     };
   }, [query]);
 
+  // Resolve friendship status for any people results we don't yet know about.
+  useEffect(() => {
+    let cancelled = false;
+    const unknown = people.filter((p) => p?.id && friendStatus[p.id] === undefined);
+    if (unknown.length === 0) return;
+    (async () => {
+      const entries = await Promise.all(
+        unknown.map(async (p) => {
+          try {
+            const s = await FriendService.getFriendshipStatus(p.id);
+            return [p.id, s.status] as const;
+          } catch {
+            return [p.id, 'none'] as const;
+          }
+        })
+      );
+      if (cancelled) return;
+      setFriendStatus((prev) => {
+        const next = { ...prev };
+        entries.forEach(([id, status]) => { next[id] = status; });
+        return next;
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [people]);
+
+  const handleSendRequest = async (personId: string) => {
+    if (!personId || friendBusy[personId]) return;
+    setFriendBusy((b) => ({ ...b, [personId]: true }));
+    const prev = friendStatus[personId];
+    // Optimistically reflect the pending state.
+    setFriendStatus((s) => ({ ...s, [personId]: 'pending_sent' }));
+    const { error } = await FriendService.sendFriendRequest(personId);
+    if (error) {
+      // Roll back on failure.
+      setFriendStatus((s) => ({ ...s, [personId]: prev ?? 'none' }));
+    }
+    setFriendBusy((b) => ({ ...b, [personId]: false }));
+  };
+
   const showCaps = tab === 'all' || tab === 'caps';
   const showPeople = tab === 'all' || tab === 'people';
   const showPlaces = tab === 'all' || tab === 'places';
@@ -96,6 +140,57 @@ const SearchScreen = ({ onNavigate, onGoBack }: SearchScreenProps) => {
     rows.push({ kind: 'header', label: t('search.header_caps') });
     caps.forEach((c) => rows.push({ kind: 'cap', data: c }));
   }
+
+  const renderFriendButton = (p: any) => {
+    if (!p?.id) return <Ionicons name="chevron-forward" size={18} color={COLORS.text3} />;
+    const status = friendStatus[p.id];
+    const busy = !!friendBusy[p.id];
+    // While the status is still resolving, keep the row visually stable.
+    if (status === undefined) {
+      return <ActivityIndicator size="small" color={COLORS.text3} style={styles.friendBtnSpinner} />;
+    }
+    if (status === 'friends') {
+      return (
+        <View style={[styles.friendBtn, styles.friendBtnGhost]}>
+          <Ionicons name="checkmark" size={13} color={COLORS.text2} />
+          <Text style={[font('label'), { color: COLORS.text2 }]}>
+            {t('search.friends', { defaultValue: 'Friends' })}
+          </Text>
+        </View>
+      );
+    }
+    if (status === 'pending_sent' || status === 'pending_received') {
+      return (
+        <View style={[styles.friendBtn, styles.friendBtnGhost]}>
+          <Text style={[font('label'), { color: COLORS.text2 }]}>
+            {t('search.pending', { defaultValue: 'Pending' })}
+          </Text>
+        </View>
+      );
+    }
+    return (
+      <TouchableOpacity
+        style={[styles.friendBtn, styles.friendBtnActive]}
+        activeOpacity={0.8}
+        disabled={busy}
+        onPress={(e) => {
+          e.stopPropagation();
+          handleSendRequest(p.id);
+        }}
+      >
+        {busy ? (
+          <ActivityIndicator size="small" color={COLORS.white} />
+        ) : (
+          <>
+            <Ionicons name="person-add" size={13} color={COLORS.white} />
+            <Text style={[font('label'), { color: COLORS.white }]}>
+              {t('search.add', { defaultValue: 'Add' })}
+            </Text>
+          </>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   const renderRow = ({ item }: { item: Row }) => {
     if (item.kind === 'header') {
@@ -127,7 +222,7 @@ const SearchScreen = ({ onNavigate, onGoBack }: SearchScreenProps) => {
               <Text style={[font('caption'), { color: COLORS.text3 }]}>@{p.username}</Text>
             )}
           </View>
-          <Ionicons name="chevron-forward" size={18} color={COLORS.text3} />
+          {renderFriendButton(p)}
         </TouchableOpacity>
       );
     }
@@ -235,10 +330,26 @@ const SearchScreen = ({ onNavigate, onGoBack }: SearchScreenProps) => {
       ) : empty ? (
         <View style={styles.center}>
           <Ionicons name="search-outline" size={44} color={COLORS.text3} />
-          <Text style={[font('subtitle'), { color: COLORS.text2, marginTop: 10 }]}>{t('search.no_results')}</Text>
+          <Text style={[font('subtitle'), { color: COLORS.text, marginTop: 10 }]}>
+            {t('search.no_results_for', { q: query.trim(), defaultValue: 'No results for "%{q}"' })}
+          </Text>
+          <Text style={[font('caption'), { color: COLORS.text3, marginTop: 4 }]}>
+            {t('search.try_different', { defaultValue: 'Try a different search' })}
+          </Text>
         </View>
       ) : !hasQuery ? (
         <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+          {recent.length === 0 && (
+            <View style={styles.startSearching}>
+              <Ionicons name="search-outline" size={42} color={COLORS.text3} style={{ opacity: 0.6 }} />
+              <Text style={[font('subtitle'), { color: COLORS.text, marginTop: 12 }]}>
+                {t('search.start_title', { defaultValue: 'Start searching' })}
+              </Text>
+              <Text style={[font('caption'), { color: COLORS.text3, marginTop: 6, textAlign: 'center', maxWidth: 240 }]}>
+                {t('search.start_subtitle', { defaultValue: 'Type above to find caps, people, or places.' })}
+              </Text>
+            </View>
+          )}
           {recent.length > 0 && (
             <>
               <View style={styles.recentHead}>
@@ -323,6 +434,20 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   avatarImg: { width: 38, height: 38 },
+  startSearching: { alignItems: 'center', justifyContent: 'center', paddingVertical: 56 },
+  friendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    height: 30,
+    minWidth: 64,
+    paddingHorizontal: 12,
+    borderRadius: 9,
+  },
+  friendBtnActive: { backgroundColor: COLORS.ember },
+  friendBtnGhost: { backgroundColor: COLORS.bg3, borderWidth: StyleSheet.hairlineWidth, borderColor: COLORS.border },
+  friendBtnSpinner: { width: 64, height: 30 },
 });
 
 export default SearchScreen;

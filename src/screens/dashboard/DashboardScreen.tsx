@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import Svg, { Path } from 'react-native-svg';
 import { DARK_MAP_STYLE } from '../../constants/mapStyle';
 import * as Location from 'expo-location';
 import { BlurView } from 'expo-blur';
@@ -16,7 +17,7 @@ import { getMediaUrl } from '../../utils/mediaUtils';
 import { formatDate, timeAgo } from '../../utils/dateUtils';
 import { openDirections } from '../../utils/directions';
 import { COLORS, font, SPACING, RADIUS } from '../../constants/theme';
-import { capColor, getCapType } from '../../constants/capTypes';
+import { capColor, getCapType, LAUNCH_CAP_TYPES } from '../../constants/capTypes';
 import CapTypeIcon from '../../components/common/CapTypeIcon';
 import MessagesButton from '../../components/common/MessagesButton';
 import { supabase } from '../../lib/supabase';
@@ -30,6 +31,13 @@ const FEED_TABS: FeedTab[] = ['all', 'mine', 'friends', 'nearby', 'new', 'popula
 // this screen). `null` = "Any" (no distance cap).
 type DistFilter = number | null;
 const DIST_OPTIONS: number[] = [0.5, 1, 2, 5, 10];
+
+// Cap-type filter for the map markers + nearby feed. `null` = "All types".
+type TypeFilter = string | null;
+
+// Teardrop pin path (mirrors src/components/common/CapTypeIcon.tsx — the
+// voorcap.com brand mark, viewBox 200x280). Used for the map markers.
+const PIN_PATH = 'M 100 18 C 55 18, 22 52, 22 98 C 22 148, 66 190, 100 235 C 134 190, 178 148, 178 98 C 178 52, 145 18, 100 18 Z';
 
 interface DashboardScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -58,6 +66,11 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
   // Distance filter for both the feed rows and the map markers (default: Any).
   const [distFilter, setDistFilter] = useState<DistFilter>(null);
   const [distMenuOpen, setDistMenuOpen] = useState(false);
+  // Cap-TYPE filter (on-map control) for both map markers and the nearby feed.
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>(null);
+  const [typeMenuOpen, setTypeMenuOpen] = useState(false);
+  // Live map region — tracked so the +/- zoom buttons can scale the deltas.
+  const regionRef = useRef(userLocation);
   // Cap selected by tapping a map marker — drives the bottom-sheet popup card.
   const [selectedMarkerCap, setSelectedMarkerCap] = useState<any>(null);
   // Reverse-geocoded name of the user's current location (shown in the header).
@@ -619,6 +632,29 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
     }
   };
 
+  // +/- zoom buttons. react-native-maps has no zoomIn/zoomOut, so we scale the
+  // tracked region's deltas (smaller = zoomed in) and animate to it.
+  const handleZoom = (factor: number) => {
+    const r = regionRef.current;
+    const next = {
+      latitude: r.latitude,
+      longitude: r.longitude,
+      latitudeDelta: Math.max(r.latitudeDelta * factor, 0.0005),
+      longitudeDelta: Math.max(r.longitudeDelta * factor, 0.0005),
+    };
+    // Track immediately so rapid consecutive taps compound off the new zoom
+    // (onRegionChangeComplete also updates this, but only after the animation).
+    regionRef.current = next;
+    mapRef.current?.animateToRegion(next, 250);
+  };
+
+  // Caps shown on the map after both the distance and the cap-type filters.
+  const visibleCaps = filteredCapsules.filter(
+    (capsule) =>
+      (distFilter == null || capDistance(capsule) <= distFilter) &&
+      (typeFilter == null || capsule.type === typeFilter),
+  );
+
   return (
     <View style={styles.container}>
       {/* Map Section - Full Screen Background */}
@@ -628,7 +664,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
           provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
           customMapStyle={DARK_MAP_STYLE}
           style={styles.map}
-          region={userLocation}
+          initialRegion={userLocation}
           showsUserLocation={true}
           showsMyLocationButton={false}
           moveOnMarkerPress={false}
@@ -636,10 +672,10 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
           scrollEnabled={true}
           pitchEnabled={false}
           rotateEnabled={false}
+          onRegionChangeComplete={(r) => { regionRef.current = r; }}
         >
-          {/* Capsule markers — filtered by the active distance filter */}
-          {filteredCapsules
-            .filter((capsule) => distFilter == null || capDistance(capsule) <= distFilter)
+          {/* Capsule markers — filtered by the active distance + type filters */}
+          {visibleCaps
             .map((capsule, index) => {
             // Use stable coordinates - prevent re-calculation on every render
             const markerCoordinate = {
@@ -656,22 +692,103 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                   e.stopPropagation();
                   handleCapsuleMarkerPress(capsule);
                 }}
-                tracksViewChanges={false}
+                // SVG children render async, so let the marker track changes
+                // (otherwise the teardrop can snapshot blank on first paint).
+                tracksViewChanges={true}
                 stopPropagation={true}
                 flat={true}
             >
               <View style={styles.capsuleMarker}>
-                  <View style={[styles.capsulePill, { borderColor: capColor(capsule.type) }]}>
-                    <View style={[styles.capsulePillTop, { backgroundColor: capColor(capsule.type) }]} />
-                    <View style={[styles.capsulePillBottom, { backgroundColor: capColor(capsule.type) }]} />
+                <Svg width={26} height={36} viewBox="0 0 200 280">
+                  <Path
+                    d={PIN_PATH}
+                    fill={capColor(capsule.type)}
+                    stroke={COLORS.bg}
+                    strokeWidth={14}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                </Svg>
               </View>
-                </View>
             </Marker>
             );
           })}
         </MapView>
 
       </View>
+
+      {/* "N nearby" overlay chip (top-left) — live count of shown caps */}
+      <View style={[styles.nearbyChip, { top: insets.top + SPACING.sm }]} pointerEvents="none">
+        <Text style={styles.nearbyChipText}>
+          {t('dashboard.nearbyChip', { defaultValue: '%{n} nearby', n: visibleCaps.length })}
+        </Text>
+      </View>
+
+      {/* On-map cap-TYPE filter control + dropdown (top, left of the message FAB) */}
+      <View style={[styles.typeFilterWrap, { top: insets.top + SPACING.sm }]}>
+        <TouchableOpacity
+          style={[styles.typeFilterBtn, (typeMenuOpen || typeFilter != null) && styles.typeFilterBtnActive]}
+          onPress={() => setTypeMenuOpen((o) => !o)}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name="funnel-outline"
+            size={13}
+            color={typeFilter != null ? capColor(typeFilter) : COLORS.text2}
+          />
+          <Text
+            style={[
+              styles.typeFilterText,
+              typeFilter != null && { color: capColor(typeFilter) },
+            ]}
+          >
+            {typeFilter == null
+              ? t('dashboard.filterTypes', { defaultValue: 'Filter' })
+              : getCapType(typeFilter).name}
+          </Text>
+          <Ionicons name={typeMenuOpen ? 'chevron-up' : 'chevron-down'} size={11} color={COLORS.text3} />
+        </TouchableOpacity>
+
+        {typeMenuOpen && (
+          <View style={styles.typeMenu}>
+            <TouchableOpacity
+              style={styles.typeMenuItem}
+              onPress={() => { setTypeFilter(null); setTypeMenuOpen(false); }}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.typeDot, { backgroundColor: typeFilter == null ? COLORS.ember : COLORS.text3 }]} />
+              <Text style={[styles.typeMenuItemText, typeFilter == null && styles.typeMenuItemTextActive]}>
+                {t('dashboard.allTypes', { defaultValue: 'All types' })}
+              </Text>
+              {typeFilter == null && <Ionicons name="checkmark" size={14} color={COLORS.ember} style={{ marginLeft: 'auto' }} />}
+            </TouchableOpacity>
+            <View style={styles.typeMenuDivider} />
+            {LAUNCH_CAP_TYPES.map((c) => (
+              <TouchableOpacity
+                key={c.id}
+                style={styles.typeMenuItem}
+                onPress={() => { setTypeFilter(c.id); setTypeMenuOpen(false); }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.typeDot, { backgroundColor: c.color }]} />
+                <Text style={[styles.typeMenuItemText, typeFilter === c.id && { color: c.color, fontWeight: '700' }]}>
+                  {c.name}
+                </Text>
+                {typeFilter === c.id && <Ionicons name="checkmark" size={14} color={c.color} style={{ marginLeft: 'auto' }} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* Tap-away scrim that closes the type dropdown */}
+      {typeMenuOpen && (
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={() => setTypeMenuOpen(false)}
+        />
+      )}
 
       {/* Floating Messages button (top-right over the map) */}
       <MessagesButton
@@ -760,7 +877,25 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
           },
         ]}
       >
-        <TouchableOpacity 
+        {/* +/- zoom buttons (stacked above the center-on-location button) */}
+        <TouchableOpacity
+          style={[styles.zoomControl, styles.zoomControlTop]}
+          onPress={() => handleZoom(0.5)}
+          activeOpacity={0.7}
+          accessibilityLabel={t('dashboard.zoomIn', { defaultValue: 'Zoom in' })}
+        >
+          <Ionicons name="add" size={24} color={COLORS.text} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.zoomControl, styles.zoomControlBottom]}
+          onPress={() => handleZoom(2)}
+          activeOpacity={0.7}
+          accessibilityLabel={t('dashboard.zoomOut', { defaultValue: 'Zoom out' })}
+        >
+          <Ionicons name="remove" size={24} color={COLORS.text} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={styles.mapControl}
           onPress={handleCenterOnLocation}
           activeOpacity={0.7}
@@ -890,6 +1025,8 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
           if (activeTab === 'mine') feed = feed.filter((c) => c.owner_id === userId);
           else if (activeTab === 'friends') feed = feed.filter((c) => friendIds.has(c.owner_id));
           else feed = feed.filter((c) => c.is_public || c.owner_id === userId);
+          // Apply the on-map cap-type filter to the feed rows too.
+          if (typeFilter != null) feed = feed.filter((c) => c.type === typeFilter);
           let withD = feed.map((c) => ({
             cap: c,
             d: calculateDistance(userLocation.latitude, userLocation.longitude, c.displayLat || c.lat || userLocation.latitude, c.displayLng || c.lng || userLocation.longitude),
@@ -1156,34 +1293,121 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 5,
   },
-  capsuleMarker: {
+  // Stacked +/- zoom buttons (sit above the center-on-location control)
+  zoomControl: {
     backgroundColor: COLORS.card,
-    borderRadius: 20,
     width: 44,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignSelf: 'flex-end',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.18,
     shadowRadius: 6,
-    elevation: 4,
+    elevation: 5,
   },
-  capsulePill: {
-    width: 28,
-    height: 28,
+  zoomControlTop: {
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    borderBottomWidth: 0,
+  },
+  zoomControlBottom: {
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    marginBottom: 12,
+  },
+  // "N nearby" overlay chip (top-left over the map)
+  nearbyChip: {
+    position: 'absolute',
+    left: SPACING.lg,
+    zIndex: 30,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+    backgroundColor: 'rgba(20,20,22,0.8)',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  nearbyChipText: {
+    ...font('micro'),
+    color: COLORS.text,
+    fontWeight: '700',
+  },
+  // On-map cap-type filter control + dropdown (top, left of the message FAB)
+  typeFilterWrap: {
+    position: 'absolute',
+    right: SPACING.lg + 56, // sits left of the round message FAB
+    zIndex: 40,
+    alignItems: 'flex-end',
+  },
+  typeFilterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    height: 36,
+    paddingHorizontal: 12,
+    borderRadius: RADIUS.pill,
+    backgroundColor: 'rgba(20,20,22,0.85)',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  typeFilterBtnActive: {
+    borderColor: COLORS.emberGlow,
+  },
+  typeFilterText: {
+    ...font('label'),
+    color: COLORS.text2,
+  },
+  typeMenu: {
+    marginTop: 6,
+    minWidth: 150,
+    backgroundColor: COLORS.card,
     borderRadius: 14,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: COLORS.ember,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
   },
-  capsulePillTop: {
-    flex: 1,
-    backgroundColor: COLORS.ember,
+  typeMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
   },
-  capsulePillBottom: {
-    flex: 1,
-    backgroundColor: COLORS.emberDark,
+  typeMenuItemText: {
+    fontSize: 13,
+    color: COLORS.text,
+  },
+  typeMenuItemTextActive: {
+    color: COLORS.ember,
+    fontWeight: '700',
+  },
+  typeMenuDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: COLORS.border,
+    marginVertical: 4,
+  },
+  typeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  capsuleMarker: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   calloutContainer: {
     width: 220,

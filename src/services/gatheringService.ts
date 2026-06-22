@@ -69,4 +69,34 @@ export class GatheringService {
       return { error };
     }
   }
+
+  /** Pending join requests for a cap (creator view), with requester profiles attached. */
+  static async listJoinRequests(capsuleId: string): Promise<any[]> {
+    const { data } = await db
+      .from('join_requests')
+      .select('*')
+      .eq('capsule_id', capsuleId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true });
+    const rows = (data as any[]) || [];
+    if (rows.length === 0) return rows;
+    const ids = Array.from(new Set(rows.map((r) => r.user_id)));
+    const { data: profiles } = await supabase
+      .from('profiles').select('id, display_name, username, avatar_url').in('id', ids);
+    const byId = new Map((profiles as any[] || []).map((p) => [p.id, p]));
+    return rows.map((r) => ({ ...r, requester: byId.get(r.user_id) || null }));
+  }
+
+  /** Approve or decline a join request (creator action). */
+  static async respondToJoinRequest(requestId: string, approve: boolean): Promise<{ error: any }> {
+    try {
+      const { error } = await db
+        .from('join_requests')
+        .update({ status: approve ? 'approved' : 'declined' } as any)
+        .eq('id', requestId);
+      return { error };
+    } catch (error) {
+      return { error };
+    }
+  }
 }

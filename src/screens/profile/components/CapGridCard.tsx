@@ -12,10 +12,12 @@ interface Props {
   capsule: any;
   width: number;
   onPress: (capsule: any) => void;
+  /** When provided, shows an inline "×" unsave button (used in the Saved tab). */
+  onUnsave?: (capsule: any) => void;
 }
 
 /** A single cap thumbnail in the 2-column grid (type-colored, lock badge). */
-const CapGridCard: React.FC<Props> = ({ capsule, width, onPress }) => {
+const CapGridCard: React.FC<Props> = ({ capsule, width, onPress, onUnsave }) => {
   const ct = getCapType(capsule.type);
   const mediaUrl = getMediaUrl(capsule);
   const locked = !!capsule.open_at && new Date(capsule.open_at).getTime() > Date.now();
@@ -33,7 +35,16 @@ const CapGridCard: React.FC<Props> = ({ capsule, width, onPress }) => {
         <View style={[styles.typeDot, { backgroundColor: ct.color }]}>
           <CapTypeIcon size={11} color={COLORS.white} filled />
         </View>
-        {locked && (
+        {onUnsave ? (
+          <TouchableOpacity
+            style={styles.unsaveBadge}
+            onPress={(e) => { e.stopPropagation(); onUnsave(capsule); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+          >
+            <Ionicons name="close" size={13} color={COLORS.white} />
+          </TouchableOpacity>
+        ) : locked && (
           <View style={styles.lockBadge}>
             <Ionicons name="lock-closed" size={11} color={COLORS.white} />
           </View>
@@ -62,6 +73,11 @@ const styles = StyleSheet.create({
   lockBadge: {
     position: 'absolute', top: 7, right: 7, width: 22, height: 22, borderRadius: 11,
     backgroundColor: COLORS.overlay, alignItems: 'center', justifyContent: 'center',
+  },
+  unsaveBadge: {
+    position: 'absolute', top: 7, right: 7, width: 24, height: 24, borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: COLORS.border,
   },
   info: { padding: SPACING.sm },
   title: { ...font('bodyBold'), color: COLORS.text },

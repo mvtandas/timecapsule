@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Video, ResizeMode } from 'expo-av';
 import { COLORS, RADIUS, SPACING, font } from '../../constants/theme';
 import { useT } from '../../i18n';
 
@@ -36,11 +37,19 @@ const ScrollRenderer: React.FC<{ blocks: any }> = ({ blocks }) => {
           );
           case 'photo': return b.uri ? <Image key={k} source={{ uri: b.uri }} style={styles.photo} resizeMode="cover" /> : null;
           case 'video': return b.uri ? (
-            <TouchableOpacity key={k} style={styles.video} activeOpacity={0.85} onPress={() => openUrl(b.uri)}>
+            <Video
+              key={k}
+              style={styles.video}
+              source={{ uri: b.uri }}
+              useNativeControls
+              resizeMode={ResizeMode.CONTAIN}
+            />
+          ) : (
+            <TouchableOpacity key={k} style={styles.video} activeOpacity={0.85} onPress={() => openUrl(b.url)}>
               <View style={styles.playBadge}><Ionicons name="play" size={22} color={COLORS.text} /></View>
               <Text style={styles.videoLabel}>{t('createFlow.block_video', { defaultValue: 'Video' })}</Text>
             </TouchableOpacity>
-          ) : null;
+          );
           case 'link': return (b.url || b.text) ? (
             <TouchableOpacity key={k} style={styles.link} activeOpacity={0.7} onPress={() => openUrl(b.url || b.text)}>
               <Ionicons name="link" size={16} color={COLORS.blue} />

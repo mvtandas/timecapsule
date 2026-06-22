@@ -210,7 +210,28 @@
       "requestSent": "Request sent",
       "aboutScroll": "About this scroll",
       "readTime": "%{min} min read",
-      "wordCount": "%{n} words"
+      "wordCount": "%{n} words",
+      "creatorPreview": "Creator preview",
+      "creatorPreviewSub": "Only you can see this. Readers see a sealed state until it opens.",
+      "exitPreview": "Exit preview",
+      "viewCount": "%{n} reads",
+      "ownerSealNote": "You're the creator — only you can preview this sealed cap",
+      "previewAsCreator": "Preview as creator",
+      "selfWhisperTo": "To: Future you",
+      "selfWhisperSub": "A letter to yourself",
+      "whisperNotForYou": "This whisper isn't addressed to you",
+      "statStops": "Stops",
+      "statDistance": "Distance",
+      "statTime": "Time",
+      "trailTimeline": "Timeline",
+      "trailMapView": "Map view",
+      "noStopCoords": "No stop locations to map yet.",
+      "continueToNext": "Continue to next stop →",
+      "joinRequestsCount": "Join requests (%{count})",
+      "decline": "Decline",
+      "approve": "Approve",
+      "gatheringComplete": "The gathering is complete",
+      "finishTrail": "Finish trail →"
     },
     "comments": {
       "title": "Comments",
@@ -475,7 +496,12 @@
       "viewDetails": "View Details",
       "distanceFilter": "Distance",
       "anyDistance": "Any",
-      "yourLocation": "Your location"
+      "yourLocation": "Your location",
+      "nearbyChip": "%{n} nearby",
+      "filterTypes": "Filter",
+      "allTypes": "All types",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out"
     },
     "datePicker": {
       "title": "When should it open?",
@@ -612,7 +638,8 @@
       "statDays": "Days",
       "publicCaps": "Public Caps",
       "emptyTitle": "No Public Caps",
-      "emptyText": "This user hasn't shared any public caps yet"
+      "emptyText": "This user hasn't shared any public caps yet",
+      "mutualFriends": "%{count} mutual"
     },
     "friends": {
       "title": "Friends",
@@ -635,7 +662,15 @@
       "loading_requests": "Loading requests...",
       "requests_empty_title": "No new friend requests",
       "requests_empty_subtitle": "When someone sends you a friend request, it will appear here",
-      "accept": "Accept"
+      "accept": "Accept",
+      "tab_friends": "Friends",
+      "tab_discover": "Find people",
+      "loading_suggested": "Finding people…",
+      "suggested_title": "Suggested for you",
+      "request_sent": "Sent",
+      "add": "Add",
+      "suggested_empty_title": "No suggestions right now",
+      "suggested_empty_subtitle": "Check back later or search for people by username."
     },
     "memories": {
       "header_title": "Memories",
@@ -686,7 +721,13 @@
       "emptyText": "You're all caught up!",
       "someone": "Someone",
       "activeTrails": "Active trails",
-      "trailStop": "Stop %{n}"
+      "trailStop": "Stop %{n}",
+      "groupToday": "Today",
+      "groupYesterday": "Yesterday",
+      "groupThisWeek": "This Week",
+      "groupEarlier": "Earlier",
+      "filterUnread": "Unread",
+      "view": "View"
     },
     "profile": {
       "title": "Profile",
@@ -729,13 +770,15 @@
       "byUser": "by @%{name}",
       "findFriends": "Find friends",
       "someone": "someone",
-      "untitled": "Untitled"
+      "untitled": "Untitled",
+      "draftsTitle": "Drafts"
     },
     "saved": {
       "untitled_cap": "Untitled cap",
       "header_title": "Saved caps",
       "empty_title": "No saved caps yet",
-      "empty_subtitle": "Tap the bookmark on any cap to keep it here."
+      "empty_subtitle": "Tap the bookmark on any cap to keep it here.",
+      "remove": "Remove from saved"
     },
     "search": {
       "header_people": "People",
@@ -753,7 +796,14 @@
       "trending": "Trending",
       "tab_places": "Places",
       "header_places": "Places",
-      "place_caps": "%{n} caps"
+      "place_caps": "%{n} caps",
+      "friends": "Friends",
+      "pending": "Pending",
+      "add": "Add",
+      "no_results_for": "No results for \"%{q}\"",
+      "try_different": "Try a different search",
+      "start_title": "Start searching",
+      "start_subtitle": "Type above to find caps, people, or places."
     },
     "settingsMore": {
       "header_title": "Settings",
@@ -821,7 +871,24 @@
       "label_bio": "Bio",
       "placeholder_bio": "Tell people about yourself",
       "label_location": "Location",
-      "placeholder_location": "City, Country"
+      "placeholder_location": "City, Country",
+      "section_notifications": "Notifications",
+      "notif_push_label": "Push notifications",
+      "notif_push_desc": "Get notified when caps unlock",
+      "notif_email_label": "Email notifications",
+      "notif_email_desc": "Weekly digest of activity",
+      "notif_marketing_label": "Marketing emails",
+      "notif_marketing_desc": "News and product updates",
+      "section_privacy": "Privacy",
+      "privacy_public_label": "Public profile",
+      "privacy_public_desc": "Anyone can find and view your profile",
+      "privacy_location_label": "Share location",
+      "privacy_location_desc": "Allow location features",
+      "privacy_messages_label": "Messages from anyone",
+      "privacy_messages_desc": "Strangers can message you",
+      "section_home_layout": "Default home layout",
+      "menu_terms": "Terms of Service",
+      "menu_privacy": "Privacy Policy"
     },
     "share": {
       "title": "Share this cap",
@@ -831,7 +898,24 @@
       "label_copy_link": "Copy link",
       "label_more": "More",
       "copied_title": "Copied",
-      "copied_message": "Link copied to clipboard."
+      "copied_message": "Link copied to clipboard.",
+      "sent_title": "Sent",
+      "send_failed_title": "Couldn't send",
+      "send_failed_message": "Something went wrong. Please try again.",
+      "label_instagram": "Instagram Stories",
+      "send_to": "Send to",
+      "no_friends": "Add friends to send caps directly.",
+      "or_publicly": "or share publicly",
+      "ig_cta": "Find caps near you",
+      "ig_download": "Download Voorcap",
+      "ig_save": "Save / Share image",
+      "ig_to_stories": "Share to Stories  →",
+      "x_tag": "Discovered on #voorcap",
+      "x_confirm": "Post on X",
+      "wa_tag": "Discovered on Voorcap",
+      "wa_open": "Open in Voorcap  →",
+      "wa_now": "just now",
+      "wa_confirm": "Send on WhatsApp"
     },
     "capture": {
       "permission_title": "Camera access",
@@ -953,6 +1037,22 @@
     "drafts": {
       "title": "Drafts",
       "empty": "No drafts yet. Saved drafts appear here when you exit a cap mid-way."
+    },
+    "sharedLanding": {
+      "notFoundTitle": "This moment isn’t available",
+      "notFoundBody": "The cap may have been removed, or the link is no longer valid. Sign in to explore other sealed moments near you.",
+      "ctaSignup": "Sign up to open",
+      "haveAccount": "I already have an account",
+      "someone": "someone",
+      "untitled": "A sealed moment",
+      "typeSealed": "%{type} · Sealed",
+      "by": "by %{name}",
+      "sealedEyebrow": "Sealed moment",
+      "waitingEyebrow": "A moment is waiting",
+      "ctaTitle": "Open this moment",
+      "ctaBody": "Log in or create a free account to unlock what %{name} sealed here.",
+      "ctaLogin": "Log in to open",
+      "tagline": "Location-based stories, sealed in time"
     }
   },
   "tr": {
@@ -1166,7 +1266,28 @@
       "requestSent": "İstek gönderildi",
       "aboutScroll": "Bu yazı hakkında",
       "readTime": "%{min} dk okuma",
-      "wordCount": "%{n} kelime"
+      "wordCount": "%{n} kelime",
+      "approve": "Onayla",
+      "viewCount": "%{n} okuma",
+      "creatorPreviewSub": "Bunu yalnızca sen görebilirsin. Okuyucular açılana kadar mühürlü hâlini görür.",
+      "gatheringComplete": "Buluşma tamamlandı",
+      "whisperNotForYou": "Bu fısıltı sana yazılmamış",
+      "decline": "Reddet",
+      "statDistance": "Mesafe",
+      "previewAsCreator": "Oluşturan olarak önizle",
+      "selfWhisperTo": "Kime: Gelecekteki sen",
+      "exitPreview": "Önizlemeden çık",
+      "noStopCoords": "Henüz haritalanacak durak konumu yok.",
+      "joinRequestsCount": "Katılma istekleri (%{count})",
+      "trailTimeline": "Zaman tüneli",
+      "trailMapView": "Harita görünümü",
+      "ownerSealNote": "Bunu sen oluşturdun — bu mühürlü cap'i yalnızca sen önizleyebilirsin",
+      "statStops": "Duraklar",
+      "continueToNext": "Sonraki durağa devam et →",
+      "statTime": "Süre",
+      "selfWhisperSub": "Kendine bir mektup",
+      "creatorPreview": "Oluşturan önizlemesi",
+      "finishTrail": "Rotayı bitir →"
     },
     "comments": {
       "title": "Yorumlar",
@@ -1431,7 +1552,12 @@
       "viewDetails": "Detaylar",
       "distanceFilter": "Mesafe",
       "anyDistance": "Hepsi",
-      "yourLocation": "Konumun"
+      "yourLocation": "Konumun",
+      "allTypes": "Tüm türler",
+      "nearbyChip": "%{n} yakında",
+      "zoomOut": "Uzaklaştır",
+      "filterTypes": "Filtrele",
+      "zoomIn": "Yakınlaştır"
     },
     "datePicker": {
       "title": "Ne zaman açılsın?",
@@ -1568,7 +1694,8 @@
       "statDays": "Gün",
       "publicCaps": "Herkese Açık Capler",
       "emptyTitle": "Herkese Açık Cap Yok",
-      "emptyText": "Bu kullanıcı henüz herkese açık bir cap paylaşmadı"
+      "emptyText": "Bu kullanıcı henüz herkese açık bir cap paylaşmadı",
+      "mutualFriends": "%{count} ortak"
     },
     "friends": {
       "title": "Arkadaşlar",
@@ -1591,7 +1718,15 @@
       "loading_requests": "İstekler yükleniyor...",
       "requests_empty_title": "Yeni arkadaşlık isteği yok",
       "requests_empty_subtitle": "Biri sana arkadaşlık isteği gönderdiğinde burada görünecek",
-      "accept": "Kabul Et"
+      "accept": "Kabul Et",
+      "add": "Ekle",
+      "suggested_empty_title": "Şu an öneri yok",
+      "suggested_title": "Senin için önerilenler",
+      "tab_discover": "Kişi bul",
+      "loading_suggested": "Kişiler bulunuyor…",
+      "request_sent": "Gönderildi",
+      "suggested_empty_subtitle": "Daha sonra tekrar bak ya da kullanıcı adıyla kişi ara.",
+      "tab_friends": "Arkadaşlar"
     },
     "memories": {
       "header_title": "Anılar",
@@ -1642,7 +1777,13 @@
       "emptyText": "Hepsi bu kadar!",
       "someone": "Biri",
       "activeTrails": "Aktif rotalar",
-      "trailStop": "Durak %{n}"
+      "trailStop": "Durak %{n}",
+      "view": "Gör",
+      "groupYesterday": "Dün",
+      "filterUnread": "Okunmamış",
+      "groupToday": "Bugün",
+      "groupThisWeek": "Bu Hafta",
+      "groupEarlier": "Daha önce"
     },
     "profile": {
       "title": "Profil",
@@ -1685,13 +1826,15 @@
       "byUser": "@%{name} tarafından",
       "findFriends": "Arkadaş bul",
       "someone": "biri",
-      "untitled": "Başlıksız"
+      "untitled": "Başlıksız",
+      "draftsTitle": "Taslaklar"
     },
     "saved": {
       "untitled_cap": "İsimsiz cap",
       "header_title": "Kaydedilenler",
       "empty_title": "Henüz kaydedilen cap yok",
-      "empty_subtitle": "Burada tutmak için herhangi bir capteki yer imine dokun."
+      "empty_subtitle": "Burada tutmak için herhangi bir capteki yer imine dokun.",
+      "remove": "Kayıtlılardan çıkar"
     },
     "search": {
       "header_people": "Kişiler",
@@ -1709,7 +1852,14 @@
       "trending": "Trend",
       "tab_places": "Yerler",
       "header_places": "Yerler",
-      "place_caps": "%{n} cap"
+      "place_caps": "%{n} cap",
+      "add": "Ekle",
+      "friends": "Arkadaşlar",
+      "no_results_for": "\"%{q}\" için sonuç yok",
+      "try_different": "Farklı bir arama dene",
+      "pending": "Beklemede",
+      "start_subtitle": "Cap, kişi ya da yer bulmak için yukarıya yaz.",
+      "start_title": "Aramaya başla"
     },
     "settingsMore": {
       "header_title": "Ayarlar",
@@ -1777,7 +1927,24 @@
       "label_bio": "Hakkında",
       "placeholder_bio": "Kendinden bahset",
       "label_location": "Konum",
-      "placeholder_location": "Şehir, Ülke"
+      "placeholder_location": "Şehir, Ülke",
+      "privacy_location_desc": "Konum özelliklerine izin ver",
+      "notif_push_desc": "Cap'ler açıldığında haberdar ol",
+      "notif_email_desc": "Haftalık etkinlik özeti",
+      "privacy_messages_desc": "Yabancılar sana mesaj atabilir",
+      "privacy_messages_label": "Herkesten mesaj",
+      "notif_marketing_desc": "Haberler ve ürün güncellemeleri",
+      "privacy_public_desc": "Herkes profilini bulup görebilir",
+      "notif_push_label": "Anlık bildirimler",
+      "privacy_location_label": "Konumu paylaş",
+      "menu_terms": "Hizmet Şartları",
+      "section_home_layout": "Varsayılan ana ekran düzeni",
+      "notif_marketing_label": "Pazarlama e-postaları",
+      "section_notifications": "Bildirimler",
+      "section_privacy": "Gizlilik",
+      "menu_privacy": "Gizlilik Politikası",
+      "privacy_public_label": "Herkese açık profil",
+      "notif_email_label": "E-posta bildirimleri"
     },
     "share": {
       "title": "Bu capi paylaş",
@@ -1787,7 +1954,24 @@
       "label_copy_link": "Bağlantıyı kopyala",
       "label_more": "Daha fazla",
       "copied_title": "Kopyalandı",
-      "copied_message": "Bağlantı panoya kopyalandı."
+      "copied_message": "Bağlantı panoya kopyalandı.",
+      "ig_to_stories": "Hikâyelerde paylaş  →",
+      "wa_tag": "Voorcap'te keşfedildi",
+      "send_failed_title": "Gönderilemedi",
+      "wa_confirm": "WhatsApp'ta gönder",
+      "wa_now": "az önce",
+      "wa_open": "Voorcap'te aç  →",
+      "sent_title": "Gönderildi",
+      "send_failed_message": "Bir şeyler ters gitti. Lütfen tekrar dene.",
+      "x_tag": "#voorcap ile keşfedildi",
+      "or_publicly": "ya da herkese açık paylaş",
+      "send_to": "Şuna gönder",
+      "no_friends": "Cap'leri doğrudan göndermek için arkadaş ekle.",
+      "ig_download": "Voorcap'i indir",
+      "ig_save": "Görseli kaydet / paylaş",
+      "ig_cta": "Yakınındaki cap'leri bul",
+      "x_confirm": "X'te paylaş",
+      "label_instagram": "Instagram Hikâyeleri"
     },
     "capture": {
       "permission_title": "Kamera erişimi",
@@ -1909,6 +2093,22 @@
     "drafts": {
       "title": "Taslaklar",
       "empty": "Henüz taslak yok. Bir cap'i yarıda bırakınca taslakların burada görünür."
+    },
+    "sharedLanding": {
+      "notFoundBody": "Cap kaldırılmış ya da bağlantı artık geçerli değil olabilir. Yakınındaki diğer mühürlü anları keşfetmek için giriş yap.",
+      "ctaSignup": "Açmak için kaydol",
+      "haveAccount": "Zaten hesabım var",
+      "notFoundTitle": "Bu an kullanılamıyor",
+      "waitingEyebrow": "Bir an bekliyor",
+      "by": "%{name} tarafından",
+      "typeSealed": "%{type} · Mühürlü",
+      "ctaBody": "%{name} kişisinin burada mühürlediğini açmak için giriş yap ya da ücretsiz hesap oluştur.",
+      "tagline": "Konum tabanlı hikâyeler, zamanda mühürlü",
+      "someone": "biri",
+      "ctaLogin": "Açmak için giriş yap",
+      "sealedEyebrow": "Mühürlü an",
+      "ctaTitle": "Bu anı aç",
+      "untitled": "Mühürlü bir an"
     }
   },
   "es": {
@@ -2122,7 +2322,28 @@
       "stopsOpened": "%{done} de %{total} paradas abiertas",
       "completedByOthers": "Completado por %{n} más",
       "wordCount": "%{n} palabras",
-      "proTip": "Consejo"
+      "proTip": "Consejo",
+      "approve": "Aprobar",
+      "viewCount": "%{n} lecturas",
+      "creatorPreviewSub": "Solo tú puedes ver esto. Los lectores ven un estado sellado hasta que se abre.",
+      "gatheringComplete": "El encuentro está completo",
+      "whisperNotForYou": "Este susurro no está dirigido a ti",
+      "decline": "Rechazar",
+      "statDistance": "Distancia",
+      "previewAsCreator": "Previsualizar como creador",
+      "selfWhisperTo": "Para: Tu yo del futuro",
+      "exitPreview": "Salir de la vista previa",
+      "noStopCoords": "Aún no hay ubicaciones de paradas para el mapa.",
+      "joinRequestsCount": "Solicitudes para unirse (%{count})",
+      "trailTimeline": "Cronología",
+      "trailMapView": "Vista de mapa",
+      "ownerSealNote": "Eres el creador: solo tú puedes previsualizar este cap sellado",
+      "statStops": "Paradas",
+      "continueToNext": "Continuar a la siguiente parada →",
+      "statTime": "Tiempo",
+      "selfWhisperSub": "Una carta para ti",
+      "creatorPreview": "Vista previa del creador",
+      "finishTrail": "Terminar ruta →"
     },
     "comments": {
       "title": "Comentarios",
@@ -2387,7 +2608,12 @@
       "openNow": "Abierto ahora",
       "tab_popular": "Populares",
       "distanceFilter": "Distancia",
-      "sealed": "Sellado"
+      "sealed": "Sellado",
+      "allTypes": "Todos los tipos",
+      "nearbyChip": "%{n} cerca",
+      "zoomOut": "Alejar",
+      "filterTypes": "Filtrar",
+      "zoomIn": "Acercar"
     },
     "datePicker": {
       "title": "¿Cuándo debería abrirse?",
@@ -2524,7 +2750,8 @@
       "statDays": "Días",
       "publicCaps": "Cápsulas públicas",
       "emptyTitle": "Sin cápsulas públicas",
-      "emptyText": "Este usuario aún no ha compartido ninguna cápsula pública"
+      "emptyText": "Este usuario aún no ha compartido ninguna cápsula pública",
+      "mutualFriends": "%{count} en común"
     },
     "friends": {
       "title": "Amigos",
@@ -2547,7 +2774,15 @@
       "loading_requests": "Cargando solicitudes...",
       "requests_empty_title": "No hay nuevas solicitudes de amistad",
       "requests_empty_subtitle": "Cuando alguien te envíe una solicitud de amistad, aparecerá aquí",
-      "accept": "Aceptar"
+      "accept": "Aceptar",
+      "add": "Agregar",
+      "suggested_empty_title": "No hay sugerencias por ahora",
+      "suggested_title": "Sugeridos para ti",
+      "tab_discover": "Buscar personas",
+      "loading_suggested": "Buscando personas…",
+      "request_sent": "Enviada",
+      "suggested_empty_subtitle": "Vuelve más tarde o busca personas por nombre de usuario.",
+      "tab_friends": "Amigos"
     },
     "memories": {
       "header_title": "Recuerdos",
@@ -2598,7 +2833,13 @@
       "emptyText": "¡Estás al día!",
       "someone": "Alguien",
       "trailStop": "Parada %{n}",
-      "activeTrails": "Rutas activas"
+      "activeTrails": "Rutas activas",
+      "view": "Ver",
+      "groupYesterday": "Ayer",
+      "filterUnread": "No leídas",
+      "groupToday": "Hoy",
+      "groupThisWeek": "Esta semana",
+      "groupEarlier": "Anteriores"
     },
     "profile": {
       "title": "Perfil",
@@ -2641,13 +2882,15 @@
       "statGatherings": "Encuentros",
       "findFriends": "Buscar amigos",
       "untitled": "Sin título",
-      "friendsTitle": "Amigos"
+      "friendsTitle": "Amigos",
+      "draftsTitle": "Borradores"
     },
     "saved": {
       "untitled_cap": "Cápsula sin título",
       "header_title": "Cápsulas guardadas",
       "empty_title": "Aún no hay cápsulas guardadas",
-      "empty_subtitle": "Toca el marcador de cualquier cápsula para guardarla aquí."
+      "empty_subtitle": "Toca el marcador de cualquier cápsula para guardarla aquí.",
+      "remove": "Quitar de guardados"
     },
     "search": {
       "header_people": "Personas",
@@ -2665,7 +2908,14 @@
       "header_places": "Lugares",
       "place_caps": "%{n} caps",
       "trending": "Tendencia",
-      "tab_places": "Lugares"
+      "tab_places": "Lugares",
+      "add": "Agregar",
+      "friends": "Amigos",
+      "no_results_for": "Sin resultados para \"%{q}\"",
+      "try_different": "Prueba otra búsqueda",
+      "pending": "Pendiente",
+      "start_subtitle": "Escribe arriba para buscar caps, personas o lugares.",
+      "start_title": "Empezar a buscar"
     },
     "settingsMore": {
       "header_title": "Ajustes",
@@ -2733,7 +2983,24 @@
       "label_bio": "Biografía",
       "placeholder_bio": "Cuéntale a la gente sobre ti",
       "label_location": "Ubicación",
-      "placeholder_location": "Ciudad, País"
+      "placeholder_location": "Ciudad, País",
+      "privacy_location_desc": "Permitir funciones de ubicación",
+      "notif_push_desc": "Recibe avisos cuando los caps se abran",
+      "notif_email_desc": "Resumen semanal de actividad",
+      "privacy_messages_desc": "Los desconocidos pueden enviarte mensajes",
+      "privacy_messages_label": "Mensajes de cualquiera",
+      "notif_marketing_desc": "Novedades y actualizaciones del producto",
+      "privacy_public_desc": "Cualquiera puede encontrar y ver tu perfil",
+      "notif_push_label": "Notificaciones push",
+      "privacy_location_label": "Compartir ubicación",
+      "menu_terms": "Términos del servicio",
+      "section_home_layout": "Diseño de inicio predeterminado",
+      "notif_marketing_label": "Correos de marketing",
+      "section_notifications": "Notificaciones",
+      "section_privacy": "Privacidad",
+      "menu_privacy": "Política de privacidad",
+      "privacy_public_label": "Perfil público",
+      "notif_email_label": "Notificaciones por correo"
     },
     "share": {
       "title": "Compartir esta cápsula",
@@ -2743,7 +3010,24 @@
       "label_copy_link": "Copiar enlace",
       "label_more": "Más",
       "copied_title": "Copiado",
-      "copied_message": "Enlace copiado al portapapeles."
+      "copied_message": "Enlace copiado al portapapeles.",
+      "ig_to_stories": "Compartir en Historias  →",
+      "wa_tag": "Descubierto en Voorcap",
+      "send_failed_title": "No se pudo enviar",
+      "wa_confirm": "Enviar por WhatsApp",
+      "wa_now": "ahora mismo",
+      "wa_open": "Abrir en Voorcap  →",
+      "sent_title": "Enviado",
+      "send_failed_message": "Algo salió mal. Inténtalo de nuevo.",
+      "x_tag": "Descubierto en #voorcap",
+      "or_publicly": "o compartir públicamente",
+      "send_to": "Enviar a",
+      "no_friends": "Agrega amigos para enviar caps directamente.",
+      "ig_download": "Descarga Voorcap",
+      "ig_save": "Guardar / Compartir imagen",
+      "ig_cta": "Encuentra caps cerca de ti",
+      "x_confirm": "Publicar en X",
+      "label_instagram": "Historias de Instagram"
     },
     "capture": {
       "permission_title": "Acceso a la cámara",
@@ -2865,6 +3149,22 @@
       "empty_text": "Escribe a un amigo para iniciar una conversación.",
       "new_message": "%{user} te envió un mensaje",
       "input_placeholder": "Mensaje…"
+    },
+    "sharedLanding": {
+      "notFoundBody": "Es posible que el cap se haya eliminado o que el enlace ya no sea válido. Inicia sesión para explorar otros momentos sellados cerca de ti.",
+      "ctaSignup": "Regístrate para abrir",
+      "haveAccount": "Ya tengo una cuenta",
+      "notFoundTitle": "Este momento no está disponible",
+      "waitingEyebrow": "Un momento te espera",
+      "by": "de %{name}",
+      "typeSealed": "%{type} · Sellado",
+      "ctaBody": "Inicia sesión o crea una cuenta gratis para descubrir lo que %{name} selló aquí.",
+      "tagline": "Historias basadas en ubicación, selladas en el tiempo",
+      "someone": "alguien",
+      "ctaLogin": "Inicia sesión para abrir",
+      "sealedEyebrow": "Momento sellado",
+      "ctaTitle": "Abre este momento",
+      "untitled": "Un momento sellado"
     }
   },
   "fr": {
@@ -3078,7 +3378,28 @@
       "stopsOpened": "%{done} arrêts ouverts sur %{total}",
       "completedByOthers": "Complété par %{n} autres",
       "wordCount": "%{n} mots",
-      "proTip": "Astuce"
+      "proTip": "Astuce",
+      "approve": "Approuver",
+      "viewCount": "%{n} lectures",
+      "creatorPreviewSub": "Vous seul voyez ceci. Les lecteurs voient un état scellé jusqu'à l'ouverture.",
+      "gatheringComplete": "Le rassemblement est terminé",
+      "whisperNotForYou": "Ce murmure ne vous est pas adressé",
+      "decline": "Refuser",
+      "statDistance": "Distance",
+      "previewAsCreator": "Prévisualiser en tant que créateur",
+      "selfWhisperTo": "À : Vous, plus tard",
+      "exitPreview": "Quitter l'aperçu",
+      "noStopCoords": "Aucun lieu d'étape à afficher pour le moment.",
+      "joinRequestsCount": "Demandes d'adhésion (%{count})",
+      "trailTimeline": "Chronologie",
+      "trailMapView": "Vue carte",
+      "ownerSealNote": "Vous êtes le créateur — vous seul pouvez prévisualiser ce cap scellé",
+      "statStops": "Étapes",
+      "continueToNext": "Continuer vers l'étape suivante →",
+      "statTime": "Durée",
+      "selfWhisperSub": "Une lettre à vous-même",
+      "creatorPreview": "Aperçu créateur",
+      "finishTrail": "Terminer le parcours →"
     },
     "comments": {
       "title": "Commentaires",
@@ -3343,7 +3664,12 @@
       "openNow": "Ouvert",
       "tab_popular": "Populaire",
       "distanceFilter": "Distance",
-      "sealed": "Scellé"
+      "sealed": "Scellé",
+      "allTypes": "Tous les types",
+      "nearbyChip": "%{n} à proximité",
+      "zoomOut": "Zoom arrière",
+      "filterTypes": "Filtrer",
+      "zoomIn": "Zoom avant"
     },
     "datePicker": {
       "title": "Quand doit-elle s'ouvrir ?",
@@ -3480,7 +3806,8 @@
       "statDays": "Jours",
       "publicCaps": "Capsules publiques",
       "emptyTitle": "Aucune capsule publique",
-      "emptyText": "Cet utilisateur n'a encore partagé aucune capsule publique"
+      "emptyText": "Cet utilisateur n'a encore partagé aucune capsule publique",
+      "mutualFriends": "%{count} en commun"
     },
     "friends": {
       "title": "Amis",
@@ -3503,7 +3830,15 @@
       "loading_requests": "Chargement des demandes...",
       "requests_empty_title": "Aucune nouvelle demande d'ami",
       "requests_empty_subtitle": "Lorsque quelqu'un vous envoie une demande d'ami, elle apparaît ici",
-      "accept": "Accepter"
+      "accept": "Accepter",
+      "add": "Ajouter",
+      "suggested_empty_title": "Aucune suggestion pour l'instant",
+      "suggested_title": "Suggéré pour vous",
+      "tab_discover": "Trouver des personnes",
+      "loading_suggested": "Recherche de personnes…",
+      "request_sent": "Envoyée",
+      "suggested_empty_subtitle": "Revenez plus tard ou recherchez des personnes par nom d'utilisateur.",
+      "tab_friends": "Amis"
     },
     "memories": {
       "header_title": "Souvenirs",
@@ -3554,7 +3889,13 @@
       "emptyText": "Vous êtes à jour !",
       "someone": "Quelqu'un",
       "trailStop": "Arrêt %{n}",
-      "activeTrails": "Parcours actifs"
+      "activeTrails": "Parcours actifs",
+      "view": "Voir",
+      "groupYesterday": "Hier",
+      "filterUnread": "Non lues",
+      "groupToday": "Aujourd'hui",
+      "groupThisWeek": "Cette semaine",
+      "groupEarlier": "Plus tôt"
     },
     "profile": {
       "title": "Profil",
@@ -3597,13 +3938,15 @@
       "statGatherings": "Rencontres",
       "findFriends": "Trouver des amis",
       "untitled": "Sans titre",
-      "friendsTitle": "Amis"
+      "friendsTitle": "Amis",
+      "draftsTitle": "Brouillons"
     },
     "saved": {
       "untitled_cap": "Capsule sans titre",
       "header_title": "Capsules enregistrées",
       "empty_title": "Aucune capsule enregistrée pour l'instant",
-      "empty_subtitle": "Touchez le marque-page sur une capsule pour la garder ici."
+      "empty_subtitle": "Touchez le marque-page sur une capsule pour la garder ici.",
+      "remove": "Retirer des enregistrements"
     },
     "search": {
       "header_people": "Personnes",
@@ -3621,7 +3964,14 @@
       "header_places": "Lieux",
       "place_caps": "%{n} caps",
       "trending": "Tendance",
-      "tab_places": "Lieux"
+      "tab_places": "Lieux",
+      "add": "Ajouter",
+      "friends": "Amis",
+      "no_results_for": "Aucun résultat pour « %{q} »",
+      "try_different": "Essayez une autre recherche",
+      "pending": "En attente",
+      "start_subtitle": "Saisissez ci-dessus pour trouver des caps, des personnes ou des lieux.",
+      "start_title": "Lancer la recherche"
     },
     "settingsMore": {
       "header_title": "Réglages",
@@ -3689,7 +4039,24 @@
       "label_bio": "Bio",
       "placeholder_bio": "Parlez de vous",
       "label_location": "Lieu",
-      "placeholder_location": "Ville, Pays"
+      "placeholder_location": "Ville, Pays",
+      "privacy_location_desc": "Autoriser les fonctions de localisation",
+      "notif_push_desc": "Soyez averti quand des caps s'ouvrent",
+      "notif_email_desc": "Résumé hebdomadaire de l'activité",
+      "privacy_messages_desc": "Les inconnus peuvent vous écrire",
+      "privacy_messages_label": "Messages de tout le monde",
+      "notif_marketing_desc": "Actualités et nouveautés produit",
+      "privacy_public_desc": "Tout le monde peut trouver et voir votre profil",
+      "notif_push_label": "Notifications push",
+      "privacy_location_label": "Partager la localisation",
+      "menu_terms": "Conditions d'utilisation",
+      "section_home_layout": "Disposition d'accueil par défaut",
+      "notif_marketing_label": "E-mails marketing",
+      "section_notifications": "Notifications",
+      "section_privacy": "Confidentialité",
+      "menu_privacy": "Politique de confidentialité",
+      "privacy_public_label": "Profil public",
+      "notif_email_label": "Notifications par e-mail"
     },
     "share": {
       "title": "Partager cette capsule",
@@ -3699,7 +4066,24 @@
       "label_copy_link": "Copier le lien",
       "label_more": "Plus",
       "copied_title": "Copié",
-      "copied_message": "Lien copié dans le presse-papiers."
+      "copied_message": "Lien copié dans le presse-papiers.",
+      "ig_to_stories": "Partager dans les Stories  →",
+      "wa_tag": "Découvert sur Voorcap",
+      "send_failed_title": "Envoi impossible",
+      "wa_confirm": "Envoyer sur WhatsApp",
+      "wa_now": "à l'instant",
+      "wa_open": "Ouvrir dans Voorcap  →",
+      "sent_title": "Envoyé",
+      "send_failed_message": "Une erreur s'est produite. Veuillez réessayer.",
+      "x_tag": "Découvert sur #voorcap",
+      "or_publicly": "ou partager publiquement",
+      "send_to": "Envoyer à",
+      "no_friends": "Ajoutez des amis pour envoyer des caps directement.",
+      "ig_download": "Télécharger Voorcap",
+      "ig_save": "Enregistrer / Partager l'image",
+      "ig_cta": "Trouvez des caps près de vous",
+      "x_confirm": "Publier sur X",
+      "label_instagram": "Stories Instagram"
     },
     "capture": {
       "permission_title": "Accès à l’appareil photo",
@@ -3821,6 +4205,22 @@
       "empty_text": "Écris à un ami pour démarrer une conversation.",
       "new_message": "%{user} t'a envoyé un message",
       "input_placeholder": "Message…"
+    },
+    "sharedLanding": {
+      "notFoundBody": "Le cap a peut-être été supprimé, ou le lien n'est plus valide. Connectez-vous pour explorer d'autres moments scellés près de vous.",
+      "ctaSignup": "S'inscrire pour ouvrir",
+      "haveAccount": "J'ai déjà un compte",
+      "notFoundTitle": "Ce moment n'est pas disponible",
+      "waitingEyebrow": "Un moment vous attend",
+      "by": "par %{name}",
+      "typeSealed": "%{type} · Scellé",
+      "ctaBody": "Connectez-vous ou créez un compte gratuit pour découvrir ce que %{name} a scellé ici.",
+      "tagline": "Des histoires géolocalisées, scellées dans le temps",
+      "someone": "quelqu'un",
+      "ctaLogin": "Se connecter pour ouvrir",
+      "sealedEyebrow": "Moment scellé",
+      "ctaTitle": "Ouvrir ce moment",
+      "untitled": "Un moment scellé"
     }
   },
   "de": {
@@ -4034,7 +4434,28 @@
       "stopsOpened": "%{done} von %{total} Stopps geöffnet",
       "completedByOthers": "Von %{n} anderen abgeschlossen",
       "wordCount": "%{n} Wörter",
-      "proTip": "Profi-Tipp"
+      "proTip": "Profi-Tipp",
+      "approve": "Annehmen",
+      "viewCount": "%{n} Aufrufe",
+      "creatorPreviewSub": "Nur du siehst das. Leser sehen einen versiegelten Zustand, bis er sich öffnet.",
+      "gatheringComplete": "Das Treffen ist abgeschlossen",
+      "whisperNotForYou": "Dieses Whisper ist nicht an dich gerichtet",
+      "decline": "Ablehnen",
+      "statDistance": "Distanz",
+      "previewAsCreator": "Als Ersteller ansehen",
+      "selfWhisperTo": "An: Dein zukünftiges Ich",
+      "exitPreview": "Vorschau beenden",
+      "noStopCoords": "Noch keine Stopp-Orte zum Anzeigen.",
+      "joinRequestsCount": "Beitrittsanfragen (%{count})",
+      "trailTimeline": "Zeitleiste",
+      "trailMapView": "Kartenansicht",
+      "ownerSealNote": "Du bist der Ersteller – nur du kannst diesen versiegelten Cap in der Vorschau sehen",
+      "statStops": "Stopps",
+      "continueToNext": "Weiter zum nächsten Stopp →",
+      "statTime": "Zeit",
+      "selfWhisperSub": "Ein Brief an dich selbst",
+      "creatorPreview": "Ersteller-Vorschau",
+      "finishTrail": "Trail beenden →"
     },
     "comments": {
       "title": "Kommentare",
@@ -4299,7 +4720,12 @@
       "openNow": "Jetzt offen",
       "tab_popular": "Beliebt",
       "distanceFilter": "Entfernung",
-      "sealed": "Versiegelt"
+      "sealed": "Versiegelt",
+      "allTypes": "Alle Typen",
+      "nearbyChip": "%{n} in der Nähe",
+      "zoomOut": "Verkleinern",
+      "filterTypes": "Filter",
+      "zoomIn": "Vergrößern"
     },
     "datePicker": {
       "title": "Wann soll sie sich öffnen?",
@@ -4436,7 +4862,8 @@
       "statDays": "Tage",
       "publicCaps": "Öffentliche Caps",
       "emptyTitle": "Keine öffentlichen Caps",
-      "emptyText": "Dieser Nutzer hat noch keine öffentlichen Caps geteilt"
+      "emptyText": "Dieser Nutzer hat noch keine öffentlichen Caps geteilt",
+      "mutualFriends": "%{count} gemeinsame"
     },
     "friends": {
       "title": "Freunde",
@@ -4459,7 +4886,15 @@
       "loading_requests": "Anfragen werden geladen...",
       "requests_empty_title": "Keine neuen Freundschaftsanfragen",
       "requests_empty_subtitle": "Wenn dir jemand eine Freundschaftsanfrage sendet, erscheint sie hier",
-      "accept": "Annehmen"
+      "accept": "Annehmen",
+      "add": "Hinzufügen",
+      "suggested_empty_title": "Aktuell keine Vorschläge",
+      "suggested_title": "Für dich vorgeschlagen",
+      "tab_discover": "Personen finden",
+      "loading_suggested": "Personen werden gesucht…",
+      "request_sent": "Gesendet",
+      "suggested_empty_subtitle": "Schau später wieder vorbei oder suche Personen per Benutzername.",
+      "tab_friends": "Freunde"
     },
     "memories": {
       "header_title": "Erinnerungen",
@@ -4510,7 +4945,13 @@
       "emptyText": "Du bist auf dem neuesten Stand!",
       "someone": "Jemand",
       "trailStop": "Stopp %{n}",
-      "activeTrails": "Aktive Trails"
+      "activeTrails": "Aktive Trails",
+      "view": "Ansehen",
+      "groupYesterday": "Gestern",
+      "filterUnread": "Ungelesen",
+      "groupToday": "Heute",
+      "groupThisWeek": "Diese Woche",
+      "groupEarlier": "Früher"
     },
     "profile": {
       "title": "Profil",
@@ -4553,13 +4994,15 @@
       "statGatherings": "Treffen",
       "findFriends": "Freunde finden",
       "untitled": "Ohne Titel",
-      "friendsTitle": "Freunde"
+      "friendsTitle": "Freunde",
+      "draftsTitle": "Entwürfe"
     },
     "saved": {
       "untitled_cap": "Cap ohne Titel",
       "header_title": "Gespeicherte Caps",
       "empty_title": "Noch keine gespeicherten Caps",
-      "empty_subtitle": "Tippe bei einer Cap auf das Lesezeichen, um sie hier zu behalten."
+      "empty_subtitle": "Tippe bei einer Cap auf das Lesezeichen, um sie hier zu behalten.",
+      "remove": "Aus Gespeichertem entfernen"
     },
     "search": {
       "header_people": "Personen",
@@ -4577,7 +5020,14 @@
       "header_places": "Orte",
       "place_caps": "%{n} Caps",
       "trending": "Im Trend",
-      "tab_places": "Orte"
+      "tab_places": "Orte",
+      "add": "Hinzufügen",
+      "friends": "Freunde",
+      "no_results_for": "Keine Ergebnisse für \"%{q}\"",
+      "try_different": "Versuche eine andere Suche",
+      "pending": "Ausstehend",
+      "start_subtitle": "Tippe oben, um Caps, Personen oder Orte zu finden.",
+      "start_title": "Suche starten"
     },
     "settingsMore": {
       "header_title": "Einstellungen",
@@ -4645,7 +5095,24 @@
       "label_bio": "Bio",
       "placeholder_bio": "Erzähle etwas über dich",
       "label_location": "Ort",
-      "placeholder_location": "Stadt, Land"
+      "placeholder_location": "Stadt, Land",
+      "privacy_location_desc": "Standortfunktionen erlauben",
+      "notif_push_desc": "Werde benachrichtigt, wenn Caps freigeschaltet werden",
+      "notif_email_desc": "Wöchentliche Zusammenfassung der Aktivitäten",
+      "privacy_messages_desc": "Fremde können dir Nachrichten senden",
+      "privacy_messages_label": "Nachrichten von allen",
+      "notif_marketing_desc": "Neuigkeiten und Produkt-Updates",
+      "privacy_public_desc": "Jeder kann dein Profil finden und ansehen",
+      "notif_push_label": "Push-Benachrichtigungen",
+      "privacy_location_label": "Standort teilen",
+      "menu_terms": "Nutzungsbedingungen",
+      "section_home_layout": "Standard-Startlayout",
+      "notif_marketing_label": "Marketing-E-Mails",
+      "section_notifications": "Benachrichtigungen",
+      "section_privacy": "Datenschutz",
+      "menu_privacy": "Datenschutzrichtlinie",
+      "privacy_public_label": "Öffentliches Profil",
+      "notif_email_label": "E-Mail-Benachrichtigungen"
     },
     "share": {
       "title": "Diese Cap teilen",
@@ -4655,7 +5122,24 @@
       "label_copy_link": "Link kopieren",
       "label_more": "Mehr",
       "copied_title": "Kopiert",
-      "copied_message": "Link in die Zwischenablage kopiert."
+      "copied_message": "Link in die Zwischenablage kopiert.",
+      "ig_to_stories": "In Stories teilen  →",
+      "wa_tag": "Entdeckt auf Voorcap",
+      "send_failed_title": "Senden fehlgeschlagen",
+      "wa_confirm": "Über WhatsApp senden",
+      "wa_now": "gerade eben",
+      "wa_open": "In Voorcap öffnen  →",
+      "sent_title": "Gesendet",
+      "send_failed_message": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+      "x_tag": "Entdeckt auf #voorcap",
+      "or_publicly": "oder öffentlich teilen",
+      "send_to": "Senden an",
+      "no_friends": "Füge Freunde hinzu, um Caps direkt zu senden.",
+      "ig_download": "Voorcap herunterladen",
+      "ig_save": "Bild speichern / teilen",
+      "ig_cta": "Finde Caps in deiner Nähe",
+      "x_confirm": "Auf X posten",
+      "label_instagram": "Instagram Stories"
     },
     "capture": {
       "permission_title": "Kamerazugriff",
@@ -4777,6 +5261,22 @@
       "empty_text": "Schreibe einem Freund, um ein Gespräch zu beginnen.",
       "new_message": "%{user} hat dir eine Nachricht gesendet",
       "input_placeholder": "Nachricht…"
+    },
+    "sharedLanding": {
+      "notFoundBody": "Der Cap wurde möglicherweise entfernt oder der Link ist nicht mehr gültig. Melde dich an, um andere versiegelte Momente in deiner Nähe zu entdecken.",
+      "ctaSignup": "Zum Öffnen registrieren",
+      "haveAccount": "Ich habe bereits ein Konto",
+      "notFoundTitle": "Dieser Moment ist nicht verfügbar",
+      "waitingEyebrow": "Ein Moment wartet",
+      "by": "von %{name}",
+      "typeSealed": "%{type} · Versiegelt",
+      "ctaBody": "Melde dich an oder erstelle ein kostenloses Konto, um zu entsperren, was %{name} hier versiegelt hat.",
+      "tagline": "Standortbasierte Geschichten, in der Zeit versiegelt",
+      "someone": "jemand",
+      "ctaLogin": "Zum Öffnen anmelden",
+      "sealedEyebrow": "Versiegelter Moment",
+      "ctaTitle": "Diesen Moment öffnen",
+      "untitled": "Ein versiegelter Moment"
     }
   },
   "pt": {
@@ -4990,7 +5490,28 @@
       "stopsOpened": "%{done} de %{total} paragens abertas",
       "completedByOthers": "Concluído por mais %{n}",
       "wordCount": "%{n} palavras",
-      "proTip": "Dica"
+      "proTip": "Dica",
+      "approve": "Aprovar",
+      "viewCount": "%{n} leituras",
+      "creatorPreviewSub": "Só você vê isto. Os leitores veem o estado selado até abrir.",
+      "gatheringComplete": "O encontro está completo",
+      "whisperNotForYou": "Este sussurro não é endereçado a você",
+      "decline": "Recusar",
+      "statDistance": "Distância",
+      "previewAsCreator": "Pré-visualizar como criador",
+      "selfWhisperTo": "Para: O você do futuro",
+      "exitPreview": "Sair da pré-visualização",
+      "noStopCoords": "Nenhuma parada para mapear ainda.",
+      "joinRequestsCount": "Pedidos para participar (%{count})",
+      "trailTimeline": "Linha do tempo",
+      "trailMapView": "Ver mapa",
+      "ownerSealNote": "Você é o criador — só você pode pré-visualizar este cap selado",
+      "statStops": "Paradas",
+      "continueToNext": "Continuar para a próxima parada →",
+      "statTime": "Tempo",
+      "selfWhisperSub": "Uma carta para você mesmo",
+      "creatorPreview": "Pré-visualização do criador",
+      "finishTrail": "Terminar trilho →"
     },
     "comments": {
       "title": "Comentários",
@@ -5255,7 +5776,12 @@
       "openNow": "Aberto",
       "tab_popular": "Populares",
       "distanceFilter": "Distância",
-      "sealed": "Selado"
+      "sealed": "Selado",
+      "allTypes": "Todos os tipos",
+      "nearbyChip": "%{n} por perto",
+      "zoomOut": "Afastar",
+      "filterTypes": "Filtrar",
+      "zoomIn": "Aproximar"
     },
     "datePicker": {
       "title": "Quando deve abrir?",
@@ -5392,7 +5918,8 @@
       "statDays": "Dias",
       "publicCaps": "Cápsulas públicas",
       "emptyTitle": "Sem cápsulas públicas",
-      "emptyText": "Este utilizador ainda não partilhou cápsulas públicas"
+      "emptyText": "Este utilizador ainda não partilhou cápsulas públicas",
+      "mutualFriends": "%{count} em comum"
     },
     "friends": {
       "title": "Amigos",
@@ -5415,7 +5942,15 @@
       "loading_requests": "A carregar pedidos...",
       "requests_empty_title": "Sem novos pedidos de amizade",
       "requests_empty_subtitle": "Quando alguém te enviar um pedido de amizade, ele aparece aqui",
-      "accept": "Aceitar"
+      "accept": "Aceitar",
+      "add": "Adicionar",
+      "suggested_empty_title": "Nenhuma sugestão no momento",
+      "suggested_title": "Sugeridos para você",
+      "tab_discover": "Buscar pessoas",
+      "loading_suggested": "Encontrando pessoas…",
+      "request_sent": "Enviado",
+      "suggested_empty_subtitle": "Volte mais tarde ou busque pessoas por nome de usuário.",
+      "tab_friends": "Amigos"
     },
     "memories": {
       "header_title": "Memórias",
@@ -5466,7 +6001,13 @@
       "emptyText": "Estás em dia!",
       "someone": "Alguém",
       "trailStop": "Paragem %{n}",
-      "activeTrails": "Trilhos ativos"
+      "activeTrails": "Trilhos ativos",
+      "view": "Ver",
+      "groupYesterday": "Ontem",
+      "filterUnread": "Não lidas",
+      "groupToday": "Hoje",
+      "groupThisWeek": "Esta semana",
+      "groupEarlier": "Antes"
     },
     "profile": {
       "title": "Perfil",
@@ -5509,13 +6050,15 @@
       "statGatherings": "Encontros",
       "findFriends": "Encontrar amigos",
       "untitled": "Sem título",
-      "friendsTitle": "Amigos"
+      "friendsTitle": "Amigos",
+      "draftsTitle": "Rascunhos"
     },
     "saved": {
       "untitled_cap": "Cápsula sem título",
       "header_title": "Cápsulas guardadas",
       "empty_title": "Ainda não há cápsulas guardadas",
-      "empty_subtitle": "Toca no marcador de qualquer cápsula para a guardares aqui."
+      "empty_subtitle": "Toca no marcador de qualquer cápsula para a guardares aqui.",
+      "remove": "Remover dos salvos"
     },
     "search": {
       "header_people": "Pessoas",
@@ -5533,7 +6076,14 @@
       "header_places": "Locais",
       "place_caps": "%{n} caps",
       "trending": "Em tendência",
-      "tab_places": "Locais"
+      "tab_places": "Locais",
+      "add": "Adicionar",
+      "friends": "Amigos",
+      "no_results_for": "Nenhum resultado para \"%{q}\"",
+      "try_different": "Tente uma busca diferente",
+      "pending": "Pendente",
+      "start_subtitle": "Digite acima para encontrar caps, pessoas ou lugares.",
+      "start_title": "Começar a buscar"
     },
     "settingsMore": {
       "header_title": "Definições",
@@ -5601,7 +6151,24 @@
       "label_bio": "Biografia",
       "placeholder_bio": "Fale sobre você",
       "label_location": "Localização",
-      "placeholder_location": "Cidade, País"
+      "placeholder_location": "Cidade, País",
+      "privacy_location_desc": "Permitir recursos de localização",
+      "notif_push_desc": "Seja avisado quando os caps abrirem",
+      "notif_email_desc": "Resumo semanal de atividades",
+      "privacy_messages_desc": "Desconhecidos podem te enviar mensagens",
+      "privacy_messages_label": "Mensagens de qualquer pessoa",
+      "notif_marketing_desc": "Novidades e atualizações do produto",
+      "privacy_public_desc": "Qualquer pessoa pode encontrar e ver seu perfil",
+      "notif_push_label": "Notificações push",
+      "privacy_location_label": "Compartilhar localização",
+      "menu_terms": "Termos de Serviço",
+      "section_home_layout": "Layout inicial padrão",
+      "notif_marketing_label": "E-mails de marketing",
+      "section_notifications": "Notificações",
+      "section_privacy": "Privacidade",
+      "menu_privacy": "Política de Privacidade",
+      "privacy_public_label": "Perfil público",
+      "notif_email_label": "Notificações por e-mail"
     },
     "share": {
       "title": "Partilhar esta cápsula",
@@ -5611,7 +6178,24 @@
       "label_copy_link": "Copiar link",
       "label_more": "Mais",
       "copied_title": "Copiado",
-      "copied_message": "Link copiado para a área de transferência."
+      "copied_message": "Link copiado para a área de transferência.",
+      "ig_to_stories": "Compartilhar nos Stories  →",
+      "wa_tag": "Descoberto no Voorcap",
+      "send_failed_title": "Não foi possível enviar",
+      "wa_confirm": "Enviar no WhatsApp",
+      "wa_now": "agora mesmo",
+      "wa_open": "Abrir no Voorcap  →",
+      "sent_title": "Enviado",
+      "send_failed_message": "Algo deu errado. Tente novamente.",
+      "x_tag": "Descoberto no #voorcap",
+      "or_publicly": "ou compartilhe publicamente",
+      "send_to": "Enviar para",
+      "no_friends": "Adicione amigos para enviar caps diretamente.",
+      "ig_download": "Baixar o Voorcap",
+      "ig_save": "Salvar / Compartilhar imagem",
+      "ig_cta": "Encontre caps perto de você",
+      "x_confirm": "Publicar no X",
+      "label_instagram": "Stories do Instagram"
     },
     "capture": {
       "permission_title": "Acesso à câmera",
@@ -5733,6 +6317,22 @@
       "empty_text": "Escreve a um amigo para iniciar uma conversa.",
       "new_message": "%{user} enviou-te uma mensagem",
       "input_placeholder": "Mensagem…"
+    },
+    "sharedLanding": {
+      "notFoundBody": "O cap pode ter sido removido, ou o link não é mais válido. Entre para explorar outros momentos selados perto de você.",
+      "ctaSignup": "Cadastre-se para abrir",
+      "haveAccount": "Já tenho uma conta",
+      "notFoundTitle": "Este momento não está disponível",
+      "waitingEyebrow": "Um momento está esperando",
+      "by": "por %{name}",
+      "typeSealed": "%{type} · Selado",
+      "ctaBody": "Entre ou crie uma conta gratuita para abrir o que %{name} selou aqui.",
+      "tagline": "Histórias baseadas em localização, seladas no tempo",
+      "someone": "alguém",
+      "ctaLogin": "Entrar para abrir",
+      "sealedEyebrow": "Momento selado",
+      "ctaTitle": "Abra este momento",
+      "untitled": "Um momento selado"
     }
   },
   "it": {
@@ -5946,7 +6546,28 @@
       "stopsOpened": "%{done} di %{total} tappe aperte",
       "completedByOthers": "Completato da altri %{n}",
       "wordCount": "%{n} parole",
-      "proTip": "Consiglio"
+      "proTip": "Consiglio",
+      "approve": "Approva",
+      "viewCount": "%{n} letture",
+      "creatorPreviewSub": "Solo tu puoi vederlo. I lettori vedono uno stato sigillato finché non si apre.",
+      "gatheringComplete": "Il raduno è completo",
+      "whisperNotForYou": "Questo sussurro non è indirizzato a te",
+      "decline": "Rifiuta",
+      "statDistance": "Distanza",
+      "previewAsCreator": "Anteprima come creatore",
+      "selfWhisperTo": "A: Il te del futuro",
+      "exitPreview": "Esci dall'anteprima",
+      "noStopCoords": "Nessuna tappa da mostrare sulla mappa.",
+      "joinRequestsCount": "Richieste di partecipazione (%{count})",
+      "trailTimeline": "Cronologia",
+      "trailMapView": "Vista mappa",
+      "ownerSealNote": "Sei il creatore: solo tu puoi vedere l'anteprima di questo cap sigillato",
+      "statStops": "Tappe",
+      "continueToNext": "Continua alla prossima tappa →",
+      "statTime": "Tempo",
+      "selfWhisperSub": "Una lettera a te stesso",
+      "creatorPreview": "Anteprima creatore",
+      "finishTrail": "Termina percorso →"
     },
     "comments": {
       "title": "Commenti",
@@ -6211,7 +6832,12 @@
       "openNow": "Aperto ora",
       "tab_popular": "Popolari",
       "distanceFilter": "Distanza",
-      "sealed": "Sigillato"
+      "sealed": "Sigillato",
+      "allTypes": "Tutti i tipi",
+      "nearbyChip": "%{n} nelle vicinanze",
+      "zoomOut": "Riduci",
+      "filterTypes": "Filtra",
+      "zoomIn": "Ingrandisci"
     },
     "datePicker": {
       "title": "Quando dovrebbe aprirsi?",
@@ -6348,7 +6974,8 @@
       "statDays": "Giorni",
       "publicCaps": "Capsule pubbliche",
       "emptyTitle": "Nessuna capsula pubblica",
-      "emptyText": "Questo utente non ha ancora condiviso capsule pubbliche"
+      "emptyText": "Questo utente non ha ancora condiviso capsule pubbliche",
+      "mutualFriends": "%{count} in comune"
     },
     "friends": {
       "title": "Amici",
@@ -6371,7 +6998,15 @@
       "loading_requests": "Caricamento richieste...",
       "requests_empty_title": "Nessuna nuova richiesta di amicizia",
       "requests_empty_subtitle": "Quando qualcuno ti invierà una richiesta di amicizia, comparirà qui",
-      "accept": "Accetta"
+      "accept": "Accetta",
+      "add": "Aggiungi",
+      "suggested_empty_title": "Nessun suggerimento al momento",
+      "suggested_title": "Suggeriti per te",
+      "tab_discover": "Trova persone",
+      "loading_suggested": "Ricerca persone…",
+      "request_sent": "Inviata",
+      "suggested_empty_subtitle": "Torna più tardi o cerca persone per nome utente.",
+      "tab_friends": "Amici"
     },
     "memories": {
       "header_title": "Ricordi",
@@ -6422,7 +7057,13 @@
       "emptyText": "Sei al passo con tutto!",
       "someone": "Qualcuno",
       "trailStop": "Tappa %{n}",
-      "activeTrails": "Percorsi attivi"
+      "activeTrails": "Percorsi attivi",
+      "view": "Visualizza",
+      "groupYesterday": "Ieri",
+      "filterUnread": "Non lette",
+      "groupToday": "Oggi",
+      "groupThisWeek": "Questa settimana",
+      "groupEarlier": "Prima"
     },
     "profile": {
       "title": "Profilo",
@@ -6465,13 +7106,15 @@
       "statGatherings": "Raduni",
       "findFriends": "Trova amici",
       "untitled": "Senza titolo",
-      "friendsTitle": "Amici"
+      "friendsTitle": "Amici",
+      "draftsTitle": "Bozze"
     },
     "saved": {
       "untitled_cap": "Capsula senza titolo",
       "header_title": "Capsule salvate",
       "empty_title": "Ancora nessuna capsula salvata",
-      "empty_subtitle": "Tocca il segnalibro su una capsula per conservarla qui."
+      "empty_subtitle": "Tocca il segnalibro su una capsula per conservarla qui.",
+      "remove": "Rimuovi dai salvati"
     },
     "search": {
       "header_people": "Persone",
@@ -6489,7 +7132,14 @@
       "header_places": "Luoghi",
       "place_caps": "%{n} cap",
       "trending": "Di tendenza",
-      "tab_places": "Luoghi"
+      "tab_places": "Luoghi",
+      "add": "Aggiungi",
+      "friends": "Amici",
+      "no_results_for": "Nessun risultato per \"%{q}\"",
+      "try_different": "Prova una ricerca diversa",
+      "pending": "In attesa",
+      "start_subtitle": "Scrivi sopra per trovare cap, persone o luoghi.",
+      "start_title": "Inizia a cercare"
     },
     "settingsMore": {
       "header_title": "Impostazioni",
@@ -6557,7 +7207,24 @@
       "label_bio": "Bio",
       "placeholder_bio": "Racconta qualcosa di te",
       "label_location": "Posizione",
-      "placeholder_location": "Città, Paese"
+      "placeholder_location": "Città, Paese",
+      "privacy_location_desc": "Consenti le funzioni di localizzazione",
+      "notif_push_desc": "Ricevi una notifica quando i cap si aprono",
+      "notif_email_desc": "Riepilogo settimanale dell'attività",
+      "privacy_messages_desc": "Gli sconosciuti possono scriverti",
+      "privacy_messages_label": "Messaggi da chiunque",
+      "notif_marketing_desc": "Novità e aggiornamenti del prodotto",
+      "privacy_public_desc": "Chiunque può trovare e vedere il tuo profilo",
+      "notif_push_label": "Notifiche push",
+      "privacy_location_label": "Condividi posizione",
+      "menu_terms": "Termini di servizio",
+      "section_home_layout": "Layout home predefinito",
+      "notif_marketing_label": "Email di marketing",
+      "section_notifications": "Notifiche",
+      "section_privacy": "Privacy",
+      "menu_privacy": "Informativa sulla privacy",
+      "privacy_public_label": "Profilo pubblico",
+      "notif_email_label": "Notifiche email"
     },
     "share": {
       "title": "Condividi questa capsula",
@@ -6567,7 +7234,24 @@
       "label_copy_link": "Copia link",
       "label_more": "Altro",
       "copied_title": "Copiato",
-      "copied_message": "Link copiato negli appunti."
+      "copied_message": "Link copiato negli appunti.",
+      "ig_to_stories": "Condividi nelle Storie  →",
+      "wa_tag": "Scoperto su Voorcap",
+      "send_failed_title": "Invio non riuscito",
+      "wa_confirm": "Invia su WhatsApp",
+      "wa_now": "proprio ora",
+      "wa_open": "Apri in Voorcap  →",
+      "sent_title": "Inviato",
+      "send_failed_message": "Qualcosa è andato storto. Riprova.",
+      "x_tag": "Scoperto su #voorcap",
+      "or_publicly": "o condividi pubblicamente",
+      "send_to": "Invia a",
+      "no_friends": "Aggiungi amici per inviare cap direttamente.",
+      "ig_download": "Scarica Voorcap",
+      "ig_save": "Salva / Condividi immagine",
+      "ig_cta": "Trova cap vicino a te",
+      "x_confirm": "Pubblica su X",
+      "label_instagram": "Storie di Instagram"
     },
     "capture": {
       "permission_title": "Accesso alla fotocamera",
@@ -6689,6 +7373,22 @@
       "empty_text": "Scrivi a un amico per iniziare una conversazione.",
       "new_message": "%{user} ti ha inviato un messaggio",
       "input_placeholder": "Messaggio…"
+    },
+    "sharedLanding": {
+      "notFoundBody": "Il cap potrebbe essere stato rimosso o il link non è più valido. Accedi per esplorare altri momenti sigillati vicino a te.",
+      "ctaSignup": "Registrati per aprire",
+      "haveAccount": "Ho già un account",
+      "notFoundTitle": "Questo momento non è disponibile",
+      "waitingEyebrow": "Un momento ti aspetta",
+      "by": "di %{name}",
+      "typeSealed": "%{type} · Sigillato",
+      "ctaBody": "Accedi o crea un account gratuito per scoprire ciò che %{name} ha sigillato qui.",
+      "tagline": "Storie basate sul luogo, sigillate nel tempo",
+      "someone": "qualcuno",
+      "ctaLogin": "Accedi per aprire",
+      "sealedEyebrow": "Momento sigillato",
+      "ctaTitle": "Apri questo momento",
+      "untitled": "Un momento sigillato"
     }
   },
   "ru": {
@@ -6902,7 +7602,28 @@
       "stopsOpened": "Открыто %{done} из %{total} точек",
       "completedByOthers": "Прошли ещё %{n} человек",
       "wordCount": "%{n} слов",
-      "proTip": "Совет"
+      "proTip": "Совет",
+      "approve": "Принять",
+      "viewCount": "%{n} прочтений",
+      "creatorPreviewSub": "Видно только вам. Читатели видят запечатанное состояние до открытия.",
+      "gatheringComplete": "Сбор завершён",
+      "whisperNotForYou": "Этот шёпот адресован не вам",
+      "decline": "Отклонить",
+      "statDistance": "Расстояние",
+      "previewAsCreator": "Смотреть как создатель",
+      "selfWhisperTo": "Кому: будущему тебе",
+      "exitPreview": "Выйти из предпросмотра",
+      "noStopCoords": "Пока нет точек для карты.",
+      "joinRequestsCount": "Заявки на участие (%{count})",
+      "trailTimeline": "Хронология",
+      "trailMapView": "Карта",
+      "ownerSealNote": "Вы создатель — только вы можете посмотреть этот запечатанный cap",
+      "statStops": "Точки",
+      "continueToNext": "К следующей точке →",
+      "statTime": "Время",
+      "selfWhisperSub": "Письмо самому себе",
+      "creatorPreview": "Предпросмотр создателя",
+      "finishTrail": "Завершить маршрут →"
     },
     "comments": {
       "title": "Комментарии",
@@ -7167,7 +7888,12 @@
       "openNow": "Открыто",
       "tab_popular": "Популярные",
       "distanceFilter": "Расстояние",
-      "sealed": "Запечатано"
+      "sealed": "Запечатано",
+      "allTypes": "Все типы",
+      "nearbyChip": "%{n} рядом",
+      "zoomOut": "Отдалить",
+      "filterTypes": "Фильтр",
+      "zoomIn": "Приблизить"
     },
     "datePicker": {
       "title": "Когда она должна открыться?",
@@ -7304,7 +8030,8 @@
       "statDays": "Дни",
       "publicCaps": "Публичные капсулы",
       "emptyTitle": "Нет публичных капсул",
-      "emptyText": "Этот пользователь пока не поделился публичными капсулами"
+      "emptyText": "Этот пользователь пока не поделился публичными капсулами",
+      "mutualFriends": "%{count} общих"
     },
     "friends": {
       "title": "Друзья",
@@ -7327,7 +8054,15 @@
       "loading_requests": "Загрузка заявок...",
       "requests_empty_title": "Нет новых заявок в друзья",
       "requests_empty_subtitle": "Когда кто-то отправит вам заявку в друзья, она появится здесь",
-      "accept": "Принять"
+      "accept": "Принять",
+      "add": "Добавить",
+      "suggested_empty_title": "Сейчас нет рекомендаций",
+      "suggested_title": "Рекомендации для вас",
+      "tab_discover": "Найти людей",
+      "loading_suggested": "Ищем людей…",
+      "request_sent": "Отправлено",
+      "suggested_empty_subtitle": "Загляните позже или найдите людей по имени пользователя.",
+      "tab_friends": "Друзья"
     },
     "memories": {
       "header_title": "Воспоминания",
@@ -7378,7 +8113,13 @@
       "emptyText": "Вы всё просмотрели!",
       "someone": "Кто-то",
       "trailStop": "Точка %{n}",
-      "activeTrails": "Активные маршруты"
+      "activeTrails": "Активные маршруты",
+      "view": "Открыть",
+      "groupYesterday": "Вчера",
+      "filterUnread": "Непрочитанные",
+      "groupToday": "Сегодня",
+      "groupThisWeek": "На этой неделе",
+      "groupEarlier": "Ранее"
     },
     "profile": {
       "title": "Профиль",
@@ -7421,13 +8162,15 @@
       "statGatherings": "Встречи",
       "findFriends": "Найти друзей",
       "untitled": "Без названия",
-      "friendsTitle": "Друзья"
+      "friendsTitle": "Друзья",
+      "draftsTitle": "Черновики"
     },
     "saved": {
       "untitled_cap": "Капсула без названия",
       "header_title": "Сохранённые капсулы",
       "empty_title": "Пока нет сохранённых капсул",
-      "empty_subtitle": "Нажмите на закладку у любой капсулы, чтобы сохранить её здесь."
+      "empty_subtitle": "Нажмите на закладку у любой капсулы, чтобы сохранить её здесь.",
+      "remove": "Убрать из сохранённого"
     },
     "search": {
       "header_people": "Люди",
@@ -7445,7 +8188,14 @@
       "header_places": "Места",
       "place_caps": "%{n} caps",
       "trending": "В тренде",
-      "tab_places": "Места"
+      "tab_places": "Места",
+      "add": "Добавить",
+      "friends": "Друзья",
+      "no_results_for": "Нет результатов по запросу «%{q}»",
+      "try_different": "Попробуйте другой запрос",
+      "pending": "Ожидает",
+      "start_subtitle": "Введите запрос выше, чтобы найти cap'ы, людей или места.",
+      "start_title": "Начните поиск"
     },
     "settingsMore": {
       "header_title": "Настройки",
@@ -7513,7 +8263,24 @@
       "label_bio": "О себе",
       "placeholder_bio": "Расскажите о себе",
       "label_location": "Местоположение",
-      "placeholder_location": "Город, страна"
+      "placeholder_location": "Город, страна",
+      "privacy_location_desc": "Разрешить функции геолокации",
+      "notif_push_desc": "Уведомлять, когда cap'ы открываются",
+      "notif_email_desc": "Еженедельная сводка активности",
+      "privacy_messages_desc": "Незнакомцы могут писать вам",
+      "privacy_messages_label": "Сообщения от всех",
+      "notif_marketing_desc": "Новости и обновления продукта",
+      "privacy_public_desc": "Любой может найти и посмотреть ваш профиль",
+      "notif_push_label": "Push-уведомления",
+      "privacy_location_label": "Делиться геопозицией",
+      "menu_terms": "Условия использования",
+      "section_home_layout": "Вид главной по умолчанию",
+      "notif_marketing_label": "Маркетинговые письма",
+      "section_notifications": "Уведомления",
+      "section_privacy": "Конфиденциальность",
+      "menu_privacy": "Политика конфиденциальности",
+      "privacy_public_label": "Открытый профиль",
+      "notif_email_label": "Уведомления по эл. почте"
     },
     "share": {
       "title": "Поделиться капсулой",
@@ -7523,7 +8290,24 @@
       "label_copy_link": "Копировать ссылку",
       "label_more": "Ещё",
       "copied_title": "Скопировано",
-      "copied_message": "Ссылка скопирована в буфер обмена."
+      "copied_message": "Ссылка скопирована в буфер обмена.",
+      "ig_to_stories": "Поделиться в Stories  →",
+      "wa_tag": "Найдено в Voorcap",
+      "send_failed_title": "Не удалось отправить",
+      "wa_confirm": "Отправить в WhatsApp",
+      "wa_now": "только что",
+      "wa_open": "Открыть в Voorcap  →",
+      "sent_title": "Отправлено",
+      "send_failed_message": "Что-то пошло не так. Попробуйте ещё раз.",
+      "x_tag": "Найдено в #voorcap",
+      "or_publicly": "или поделиться публично",
+      "send_to": "Отправить",
+      "no_friends": "Добавьте друзей, чтобы отправлять cap'ы напрямую.",
+      "ig_download": "Скачать Voorcap",
+      "ig_save": "Сохранить / поделиться",
+      "ig_cta": "Найдите cap'ы рядом",
+      "x_confirm": "Опубликовать в X",
+      "label_instagram": "Instagram Stories"
     },
     "capture": {
       "permission_title": "Доступ к камере",
@@ -7645,6 +8429,22 @@
       "empty_text": "Напишите другу, чтобы начать разговор.",
       "new_message": "%{user} отправил вам сообщение",
       "input_placeholder": "Сообщение…"
+    },
+    "sharedLanding": {
+      "notFoundBody": "Возможно, cap был удалён или ссылка больше не действительна. Войдите, чтобы найти другие запечатанные моменты рядом.",
+      "ctaSignup": "Зарегистрироваться, чтобы открыть",
+      "haveAccount": "У меня уже есть аккаунт",
+      "notFoundTitle": "Этот момент недоступен",
+      "waitingEyebrow": "Момент ждёт",
+      "by": "от %{name}",
+      "typeSealed": "%{type} · Запечатано",
+      "ctaBody": "Войдите или создайте бесплатный аккаунт, чтобы открыть то, что %{name} запечатал здесь.",
+      "tagline": "Истории с привязкой к месту, запечатанные во времени",
+      "someone": "кто-то",
+      "ctaLogin": "Войти, чтобы открыть",
+      "sealedEyebrow": "Запечатанный момент",
+      "ctaTitle": "Откройте этот момент",
+      "untitled": "Запечатанный момент"
     }
   },
   "hi": {
@@ -7858,7 +8658,28 @@
       "stopsOpened": "%{total} में से %{done} पड़ाव खुले",
       "completedByOthers": "%{n} और लोगों ने पूरा किया",
       "wordCount": "%{n} शब्द",
-      "proTip": "प्रो टिप"
+      "proTip": "प्रो टिप",
+      "approve": "स्वीकारें",
+      "viewCount": "%{n} बार पढ़ा गया",
+      "creatorPreviewSub": "यह सिर्फ़ आपको दिखता है। पाठकों को खुलने तक सील्ड स्थिति दिखती है।",
+      "gatheringComplete": "जमावड़ा पूरा हुआ",
+      "whisperNotForYou": "यह व्हिस्पर आपके नाम नहीं है",
+      "decline": "अस्वीकारें",
+      "statDistance": "दूरी",
+      "previewAsCreator": "क्रिएटर के रूप में प्रीव्यू करें",
+      "selfWhisperTo": "प्रति: भविष्य का आप",
+      "exitPreview": "प्रीव्यू से बाहर",
+      "noStopCoords": "अभी मैप पर दिखाने के लिए कोई पड़ाव नहीं है।",
+      "joinRequestsCount": "जुड़ने के अनुरोध (%{count})",
+      "trailTimeline": "टाइमलाइन",
+      "trailMapView": "मैप व्यू",
+      "ownerSealNote": "आप क्रिएटर हैं — यह सील्ड cap सिर्फ़ आप ही प्रीव्यू कर सकते हैं",
+      "statStops": "पड़ाव",
+      "continueToNext": "अगले पड़ाव पर जाएं →",
+      "statTime": "समय",
+      "selfWhisperSub": "ख़ुद के नाम एक चिट्ठी",
+      "creatorPreview": "क्रिएटर प्रीव्यू",
+      "finishTrail": "ट्रेल पूरा करें →"
     },
     "comments": {
       "title": "टिप्पणियाँ",
@@ -8123,7 +8944,12 @@
       "openNow": "अभी खुला",
       "tab_popular": "लोकप्रिय",
       "distanceFilter": "दूरी",
-      "sealed": "सील"
+      "sealed": "सील",
+      "allTypes": "सभी प्रकार",
+      "nearbyChip": "%{n} पास में",
+      "zoomOut": "ज़ूम आउट",
+      "filterTypes": "फ़िल्टर",
+      "zoomIn": "ज़ूम इन"
     },
     "datePicker": {
       "title": "यह कब खुलना चाहिए?",
@@ -8260,7 +9086,8 @@
       "statDays": "दिन",
       "publicCaps": "सार्वजनिक कैप",
       "emptyTitle": "कोई सार्वजनिक कैप नहीं",
-      "emptyText": "इस उपयोगकर्ता ने अभी तक कोई सार्वजनिक कैप साझा नहीं किया है"
+      "emptyText": "इस उपयोगकर्ता ने अभी तक कोई सार्वजनिक कैप साझा नहीं किया है",
+      "mutualFriends": "%{count} साझा"
     },
     "friends": {
       "title": "दोस्त",
@@ -8283,7 +9110,15 @@
       "loading_requests": "अनुरोध लोड हो रहे हैं...",
       "requests_empty_title": "कोई नया दोस्ती अनुरोध नहीं",
       "requests_empty_subtitle": "जब कोई आपको दोस्ती अनुरोध भेजेगा, तो वह यहाँ दिखेगा",
-      "accept": "स्वीकारें"
+      "accept": "स्वीकारें",
+      "add": "जोड़ें",
+      "suggested_empty_title": "अभी कोई सुझाव नहीं",
+      "suggested_title": "आपके लिए सुझाव",
+      "tab_discover": "लोग खोजें",
+      "loading_suggested": "लोग खोजे जा रहे हैं…",
+      "request_sent": "भेजा गया",
+      "suggested_empty_subtitle": "बाद में देखें या यूज़रनेम से लोगों को खोजें।",
+      "tab_friends": "दोस्त"
     },
     "memories": {
       "header_title": "यादें",
@@ -8334,7 +9169,13 @@
       "emptyText": "आपने सब देख लिया है!",
       "someone": "कोई",
       "trailStop": "पड़ाव %{n}",
-      "activeTrails": "सक्रिय ट्रेल"
+      "activeTrails": "सक्रिय ट्रेल",
+      "view": "देखें",
+      "groupYesterday": "कल",
+      "filterUnread": "अपठित",
+      "groupToday": "आज",
+      "groupThisWeek": "इस हफ़्ते",
+      "groupEarlier": "इससे पहले"
     },
     "profile": {
       "title": "प्रोफ़ाइल",
@@ -8377,13 +9218,15 @@
       "statGatherings": "गैदरिंग",
       "findFriends": "दोस्त खोजें",
       "untitled": "बिना शीर्षक",
-      "friendsTitle": "दोस्त"
+      "friendsTitle": "दोस्त",
+      "draftsTitle": "ड्राफ़्ट"
     },
     "saved": {
       "untitled_cap": "बिना शीर्षक कैप",
       "header_title": "सहेजे गए कैप",
       "empty_title": "अभी कोई सहेजा हुआ कैप नहीं",
-      "empty_subtitle": "किसी भी कैप को यहाँ रखने के लिए उस पर बुकमार्क दबाएँ।"
+      "empty_subtitle": "किसी भी कैप को यहाँ रखने के लिए उस पर बुकमार्क दबाएँ।",
+      "remove": "सेव से हटाएं"
     },
     "search": {
       "header_people": "लोग",
@@ -8401,7 +9244,14 @@
       "header_places": "स्थान",
       "place_caps": "%{n} caps",
       "trending": "ट्रेंडिंग",
-      "tab_places": "स्थान"
+      "tab_places": "स्थान",
+      "add": "जोड़ें",
+      "friends": "दोस्त",
+      "no_results_for": "\"%{q}\" के लिए कोई परिणाम नहीं",
+      "try_different": "कोई और खोज आज़माएं",
+      "pending": "लंबित",
+      "start_subtitle": "caps, लोग या जगहें खोजने के लिए ऊपर टाइप करें।",
+      "start_title": "खोजना शुरू करें"
     },
     "settingsMore": {
       "header_title": "सेटिंग",
@@ -8469,7 +9319,24 @@
       "label_bio": "बायो",
       "placeholder_bio": "अपने बारे में बताएं",
       "label_location": "स्थान",
-      "placeholder_location": "शहर, देश"
+      "placeholder_location": "शहर, देश",
+      "privacy_location_desc": "लोकेशन सुविधाओं की अनुमति दें",
+      "notif_push_desc": "caps खुलने पर सूचना पाएं",
+      "notif_email_desc": "गतिविधि का साप्ताहिक सारांश",
+      "privacy_messages_desc": "अजनबी आपको संदेश भेज सकते हैं",
+      "privacy_messages_label": "किसी से भी संदेश",
+      "notif_marketing_desc": "ख़बरें और प्रोडक्ट अपडेट",
+      "privacy_public_desc": "कोई भी आपकी प्रोफ़ाइल खोज और देख सकता है",
+      "notif_push_label": "पुश सूचनाएं",
+      "privacy_location_label": "लोकेशन साझा करें",
+      "menu_terms": "सेवा की शर्तें",
+      "section_home_layout": "डिफ़ॉल्ट होम लेआउट",
+      "notif_marketing_label": "मार्केटिंग ईमेल",
+      "section_notifications": "सूचनाएं",
+      "section_privacy": "गोपनीयता",
+      "menu_privacy": "गोपनीयता नीति",
+      "privacy_public_label": "सार्वजनिक प्रोफ़ाइल",
+      "notif_email_label": "ईमेल सूचनाएं"
     },
     "share": {
       "title": "यह कैप साझा करें",
@@ -8479,7 +9346,24 @@
       "label_copy_link": "लिंक कॉपी करें",
       "label_more": "और",
       "copied_title": "कॉपी किया गया",
-      "copied_message": "लिंक क्लिपबोर्ड पर कॉपी हो गया।"
+      "copied_message": "लिंक क्लिपबोर्ड पर कॉपी हो गया।",
+      "ig_to_stories": "Stories पर साझा करें  →",
+      "wa_tag": "Voorcap पर खोजा गया",
+      "send_failed_title": "भेजा नहीं जा सका",
+      "wa_confirm": "WhatsApp पर भेजें",
+      "wa_now": "अभी-अभी",
+      "wa_open": "Voorcap में खोलें  →",
+      "sent_title": "भेजा गया",
+      "send_failed_message": "कुछ गड़बड़ हो गई। कृपया फिर कोशिश करें।",
+      "x_tag": "#voorcap पर खोजा गया",
+      "or_publicly": "या सार्वजनिक रूप से साझा करें",
+      "send_to": "भेजें",
+      "no_friends": "caps सीधे भेजने के लिए दोस्त जोड़ें।",
+      "ig_download": "Voorcap डाउनलोड करें",
+      "ig_save": "इमेज सेव / साझा करें",
+      "ig_cta": "अपने पास caps खोजें",
+      "x_confirm": "X पर पोस्ट करें",
+      "label_instagram": "Instagram Stories"
     },
     "capture": {
       "permission_title": "कैमरा एक्सेस",
@@ -8601,6 +9485,22 @@
       "empty_text": "बातचीत शुरू करने के लिए किसी दोस्त को संदेश भेजें।",
       "new_message": "%{user} ने आपको एक संदेश भेजा",
       "input_placeholder": "संदेश…"
+    },
+    "sharedLanding": {
+      "notFoundBody": "हो सकता है cap हटा दिया गया हो, या लिंक अब मान्य न हो। अपने पास के अन्य सील्ड पल देखने के लिए साइन इन करें।",
+      "ctaSignup": "खोलने के लिए साइन अप करें",
+      "haveAccount": "मेरा पहले से अकाउंट है",
+      "notFoundTitle": "यह पल उपलब्ध नहीं है",
+      "waitingEyebrow": "एक पल इंतज़ार में है",
+      "by": "%{name} द्वारा",
+      "typeSealed": "%{type} · सील्ड",
+      "ctaBody": "%{name} ने यहां जो सील किया है उसे खोलने के लिए लॉग इन करें या मुफ़्त अकाउंट बनाएं।",
+      "tagline": "लोकेशन-आधारित कहानियां, समय में सील्ड",
+      "someone": "कोई",
+      "ctaLogin": "खोलने के लिए लॉग इन करें",
+      "sealedEyebrow": "सील्ड पल",
+      "ctaTitle": "यह पल खोलें",
+      "untitled": "एक सील्ड पल"
     }
   },
   "zh": {
@@ -8814,7 +9714,28 @@
       "stopsOpened": "已开启 %{total} 站中的 %{done} 站",
       "completedByOthers": "另有 %{n} 人完成",
       "wordCount": "%{n} 字",
-      "proTip": "小贴士"
+      "proTip": "小贴士",
+      "approve": "通过",
+      "viewCount": "%{n} 次阅读",
+      "creatorPreviewSub": "仅你可见。读者在开启前只会看到封存状态。",
+      "gatheringComplete": "聚会已完成",
+      "whisperNotForYou": "这条私语不是写给你的",
+      "decline": "拒绝",
+      "statDistance": "距离",
+      "previewAsCreator": "以创建者身份预览",
+      "selfWhisperTo": "致：未来的你",
+      "exitPreview": "退出预览",
+      "noStopCoords": "暂无可显示的站点位置。",
+      "joinRequestsCount": "加入请求（%{count}）",
+      "trailTimeline": "时间线",
+      "trailMapView": "地图视图",
+      "ownerSealNote": "你是创建者——只有你能预览这个封存的 cap",
+      "statStops": "站点",
+      "continueToNext": "前往下一站 →",
+      "statTime": "时间",
+      "selfWhisperSub": "写给自己的信",
+      "creatorPreview": "创建者预览",
+      "finishTrail": "完成路线 →"
     },
     "comments": {
       "title": "评论",
@@ -9079,7 +10000,12 @@
       "openNow": "现已开启",
       "tab_popular": "热门",
       "distanceFilter": "距离",
-      "sealed": "已封存"
+      "sealed": "已封存",
+      "allTypes": "全部类型",
+      "nearbyChip": "附近 %{n} 个",
+      "zoomOut": "缩小",
+      "filterTypes": "筛选",
+      "zoomIn": "放大"
     },
     "datePicker": {
       "title": "何时开启？",
@@ -9216,7 +10142,8 @@
       "statDays": "天数",
       "publicCaps": "公开胶囊",
       "emptyTitle": "暂无公开胶囊",
-      "emptyText": "该用户尚未分享任何公开胶囊"
+      "emptyText": "该用户尚未分享任何公开胶囊",
+      "mutualFriends": "%{count} 位共同好友"
     },
     "friends": {
       "title": "好友",
@@ -9239,7 +10166,15 @@
       "loading_requests": "正在加载请求…",
       "requests_empty_title": "暂无新的好友请求",
       "requests_empty_subtitle": "当有人向你发送好友请求时，会显示在这里",
-      "accept": "接受"
+      "accept": "接受",
+      "add": "添加",
+      "suggested_empty_title": "暂无推荐",
+      "suggested_title": "为你推荐",
+      "tab_discover": "寻找用户",
+      "loading_suggested": "正在寻找用户…",
+      "request_sent": "已发送",
+      "suggested_empty_subtitle": "稍后再来看看，或按用户名搜索用户。",
+      "tab_friends": "好友"
     },
     "memories": {
       "header_title": "回忆",
@@ -9290,7 +10225,13 @@
       "emptyText": "你已查看全部内容！",
       "someone": "某人",
       "trailStop": "第 %{n} 站",
-      "activeTrails": "进行中的路线"
+      "activeTrails": "进行中的路线",
+      "view": "查看",
+      "groupYesterday": "昨天",
+      "filterUnread": "未读",
+      "groupToday": "今天",
+      "groupThisWeek": "本周",
+      "groupEarlier": "更早"
     },
     "profile": {
       "title": "我的",
@@ -9333,13 +10274,15 @@
       "statGatherings": "聚会",
       "findFriends": "查找好友",
       "untitled": "无标题",
-      "friendsTitle": "好友"
+      "friendsTitle": "好友",
+      "draftsTitle": "草稿"
     },
     "saved": {
       "untitled_cap": "无标题胶囊",
       "header_title": "已收藏的胶囊",
       "empty_title": "暂无收藏的胶囊",
-      "empty_subtitle": "点击任意胶囊上的书签，即可收藏到这里。"
+      "empty_subtitle": "点击任意胶囊上的书签，即可收藏到这里。",
+      "remove": "从收藏中移除"
     },
     "search": {
       "header_people": "用户",
@@ -9357,7 +10300,14 @@
       "header_places": "地点",
       "place_caps": "%{n} 个 cap",
       "trending": "热门",
-      "tab_places": "地点"
+      "tab_places": "地点",
+      "add": "添加",
+      "friends": "好友",
+      "no_results_for": "没有“%{q}”的结果",
+      "try_different": "换个搜索词试试",
+      "pending": "待处理",
+      "start_subtitle": "在上方输入以查找 cap、用户或地点。",
+      "start_title": "开始搜索"
     },
     "settingsMore": {
       "header_title": "设置",
@@ -9425,7 +10375,24 @@
       "label_bio": "简介",
       "placeholder_bio": "介绍一下你自己",
       "label_location": "位置",
-      "placeholder_location": "城市，国家"
+      "placeholder_location": "城市，国家",
+      "privacy_location_desc": "允许使用位置功能",
+      "notif_push_desc": "cap 开启时收到通知",
+      "notif_email_desc": "每周动态摘要",
+      "privacy_messages_desc": "陌生人可以给你发消息",
+      "privacy_messages_label": "接收任何人的消息",
+      "notif_marketing_desc": "新闻和产品更新",
+      "privacy_public_desc": "任何人都能找到并查看你的资料",
+      "notif_push_label": "推送通知",
+      "privacy_location_label": "共享位置",
+      "menu_terms": "服务条款",
+      "section_home_layout": "默认主页布局",
+      "notif_marketing_label": "营销邮件",
+      "section_notifications": "通知",
+      "section_privacy": "隐私",
+      "menu_privacy": "隐私政策",
+      "privacy_public_label": "公开资料",
+      "notif_email_label": "邮件通知"
     },
     "share": {
       "title": "分享这个胶囊",
@@ -9435,7 +10402,24 @@
       "label_copy_link": "复制链接",
       "label_more": "更多",
       "copied_title": "已复制",
-      "copied_message": "链接已复制到剪贴板。"
+      "copied_message": "链接已复制到剪贴板。",
+      "ig_to_stories": "分享到 Stories  →",
+      "wa_tag": "在 Voorcap 上发现",
+      "send_failed_title": "发送失败",
+      "wa_confirm": "通过 WhatsApp 发送",
+      "wa_now": "刚刚",
+      "wa_open": "在 Voorcap 中打开  →",
+      "sent_title": "已发送",
+      "send_failed_message": "出错了，请重试。",
+      "x_tag": "在 #voorcap 上发现",
+      "or_publicly": "或公开分享",
+      "send_to": "发送给",
+      "no_friends": "添加好友以直接发送 cap。",
+      "ig_download": "下载 Voorcap",
+      "ig_save": "保存 / 分享图片",
+      "ig_cta": "发现你附近的 cap",
+      "x_confirm": "发布到 X",
+      "label_instagram": "Instagram Stories"
     },
     "capture": {
       "permission_title": "相机权限",
@@ -9557,6 +10541,22 @@
       "empty_text": "给好友发消息，开始聊天吧。",
       "new_message": "%{user} 给你发来一条消息",
       "input_placeholder": "发消息…"
+    },
+    "sharedLanding": {
+      "notFoundBody": "该 cap 可能已被删除，或链接已失效。登录以探索你附近其他封存的瞬间。",
+      "ctaSignup": "注册以开启",
+      "haveAccount": "我已有账户",
+      "notFoundTitle": "此瞬间不可用",
+      "waitingEyebrow": "有一个瞬间正在等待",
+      "by": "来自 %{name}",
+      "typeSealed": "%{type} · 已封存",
+      "ctaBody": "登录或免费注册，解锁 %{name} 在此封存的内容。",
+      "tagline": "基于位置的故事，封存于时光之中",
+      "someone": "某人",
+      "ctaLogin": "登录以开启",
+      "sealedEyebrow": "封存的瞬间",
+      "ctaTitle": "开启这一刻",
+      "untitled": "一个封存的瞬间"
     }
   },
   "ja": {
@@ -9770,7 +10770,28 @@
       "stopsOpened": "%{total}地点中%{done}地点を開封",
       "completedByOthers": "他%{n}人が達成",
       "wordCount": "%{n}語",
-      "proTip": "ヒント"
+      "proTip": "ヒント",
+      "approve": "承認",
+      "viewCount": "%{n} 回閲覧",
+      "creatorPreviewSub": "これはあなただけに表示されます。読者には開封されるまで封印状態が表示されます。",
+      "gatheringComplete": "集まりが完了しました",
+      "whisperNotForYou": "このささやきはあなた宛てではありません",
+      "decline": "辞退",
+      "statDistance": "距離",
+      "previewAsCreator": "作成者としてプレビュー",
+      "selfWhisperTo": "宛先: 未来のあなた",
+      "exitPreview": "プレビューを終了",
+      "noStopCoords": "まだ地図に表示できるスポットがありません。",
+      "joinRequestsCount": "参加リクエスト (%{count})",
+      "trailTimeline": "タイムライン",
+      "trailMapView": "地図表示",
+      "ownerSealNote": "あなたが作成者です — この封印されたcapをプレビューできるのはあなただけです",
+      "statStops": "スポット",
+      "continueToNext": "次のスポットへ →",
+      "statTime": "時間",
+      "selfWhisperSub": "自分への手紙",
+      "creatorPreview": "作成者プレビュー",
+      "finishTrail": "トレイルを終える →"
     },
     "comments": {
       "title": "コメント",
@@ -10035,7 +11056,12 @@
       "openNow": "開封可能",
       "tab_popular": "人気",
       "distanceFilter": "距離",
-      "sealed": "封印中"
+      "sealed": "封印中",
+      "allTypes": "すべての種類",
+      "nearbyChip": "近くに %{n} 件",
+      "zoomOut": "縮小",
+      "filterTypes": "絞り込み",
+      "zoomIn": "拡大"
     },
     "datePicker": {
       "title": "いつ開きますか？",
@@ -10172,7 +11198,8 @@
       "statDays": "日数",
       "publicCaps": "公開カプセル",
       "emptyTitle": "公開カプセルはありません",
-      "emptyText": "このユーザーはまだ公開カプセルをシェアしていません"
+      "emptyText": "このユーザーはまだ公開カプセルをシェアしていません",
+      "mutualFriends": "共通 %{count} 人"
     },
     "friends": {
       "title": "友達",
@@ -10195,7 +11222,15 @@
       "loading_requests": "リクエストを読み込み中...",
       "requests_empty_title": "新しい友達リクエストはありません",
       "requests_empty_subtitle": "友達リクエストが届くとここに表示されます",
-      "accept": "承認"
+      "accept": "承認",
+      "add": "追加",
+      "suggested_empty_title": "今は候補がありません",
+      "suggested_title": "あなたへのおすすめ",
+      "tab_discover": "ユーザーを探す",
+      "loading_suggested": "ユーザーを検索中…",
+      "request_sent": "送信済み",
+      "suggested_empty_subtitle": "後でもう一度確認するか、ユーザー名で検索してください。",
+      "tab_friends": "フレンド"
     },
     "memories": {
       "header_title": "思い出",
@@ -10246,7 +11281,13 @@
       "emptyText": "すべて確認済みです！",
       "someone": "誰か",
       "trailStop": "地点%{n}",
-      "activeTrails": "進行中のトレイル"
+      "activeTrails": "進行中のトレイル",
+      "view": "表示",
+      "groupYesterday": "昨日",
+      "filterUnread": "未読",
+      "groupToday": "今日",
+      "groupThisWeek": "今週",
+      "groupEarlier": "それ以前"
     },
     "profile": {
       "title": "プロフィール",
@@ -10289,13 +11330,15 @@
       "statGatherings": "集まり",
       "findFriends": "友達を探す",
       "untitled": "無題",
-      "friendsTitle": "友達"
+      "friendsTitle": "友達",
+      "draftsTitle": "下書き"
     },
     "saved": {
       "untitled_cap": "無題のカプセル",
       "header_title": "保存したカプセル",
       "empty_title": "まだ保存したカプセルはありません",
-      "empty_subtitle": "カプセルのブックマークをタップするとここに保存できます。"
+      "empty_subtitle": "カプセルのブックマークをタップするとここに保存できます。",
+      "remove": "保存から削除"
     },
     "search": {
       "header_people": "人",
@@ -10313,7 +11356,14 @@
       "header_places": "場所",
       "place_caps": "%{n}件のcap",
       "trending": "急上昇",
-      "tab_places": "場所"
+      "tab_places": "場所",
+      "add": "追加",
+      "friends": "フレンド",
+      "no_results_for": "「%{q}」の結果はありません",
+      "try_different": "別のキーワードで検索",
+      "pending": "保留中",
+      "start_subtitle": "上に入力して、cap・人・場所を探しましょう。",
+      "start_title": "検索を始める"
     },
     "settingsMore": {
       "header_title": "設定",
@@ -10381,7 +11431,24 @@
       "label_bio": "自己紹介",
       "placeholder_bio": "自己紹介を書く",
       "label_location": "場所",
-      "placeholder_location": "市区町村、国"
+      "placeholder_location": "市区町村、国",
+      "privacy_location_desc": "位置情報機能を許可する",
+      "notif_push_desc": "capが開封されたら通知を受け取る",
+      "notif_email_desc": "アクティビティの週間まとめ",
+      "privacy_messages_desc": "知らない人からもメッセージを受け取れます",
+      "privacy_messages_label": "誰からでもメッセージを受け取る",
+      "notif_marketing_desc": "ニュースと製品アップデート",
+      "privacy_public_desc": "誰でもあなたのプロフィールを見つけて閲覧できます",
+      "notif_push_label": "プッシュ通知",
+      "privacy_location_label": "位置情報を共有",
+      "menu_terms": "利用規約",
+      "section_home_layout": "デフォルトのホームレイアウト",
+      "notif_marketing_label": "マーケティングメール",
+      "section_notifications": "通知",
+      "section_privacy": "プライバシー",
+      "menu_privacy": "プライバシーポリシー",
+      "privacy_public_label": "公開プロフィール",
+      "notif_email_label": "メール通知"
     },
     "share": {
       "title": "このカプセルをシェア",
@@ -10391,7 +11458,24 @@
       "label_copy_link": "リンクをコピー",
       "label_more": "その他",
       "copied_title": "コピーしました",
-      "copied_message": "リンクをクリップボードにコピーしました。"
+      "copied_message": "リンクをクリップボードにコピーしました。",
+      "ig_to_stories": "ストーリーズに共有  →",
+      "wa_tag": "Voorcapで発見",
+      "send_failed_title": "送信できませんでした",
+      "wa_confirm": "WhatsAppで送信",
+      "wa_now": "たった今",
+      "wa_open": "Voorcapで開く  →",
+      "sent_title": "送信済み",
+      "send_failed_message": "問題が発生しました。もう一度お試しください。",
+      "x_tag": "#voorcap で発見",
+      "or_publicly": "または公開で共有",
+      "send_to": "送信先",
+      "no_friends": "フレンドを追加してcapを直接送りましょう。",
+      "ig_download": "Voorcapをダウンロード",
+      "ig_save": "画像を保存 / 共有",
+      "ig_cta": "近くのcapを探す",
+      "x_confirm": "Xに投稿",
+      "label_instagram": "Instagramストーリーズ"
     },
     "capture": {
       "permission_title": "カメラへのアクセス",
@@ -10513,6 +11597,22 @@
       "empty_text": "友達にメッセージを送って会話を始めましょう。",
       "new_message": "%{user}からメッセージが届きました",
       "input_placeholder": "メッセージ…"
+    },
+    "sharedLanding": {
+      "notFoundBody": "このcapは削除されたか、リンクが無効になった可能性があります。ログインして、近くの他の封印された瞬間を探しましょう。",
+      "ctaSignup": "登録して開く",
+      "haveAccount": "すでにアカウントを持っています",
+      "notFoundTitle": "この瞬間は利用できません",
+      "waitingEyebrow": "ある瞬間が待っています",
+      "by": "%{name} より",
+      "typeSealed": "%{type} · 封印済み",
+      "ctaBody": "ログインまたは無料アカウントを作成して、%{name} がここに封印したものを開きましょう。",
+      "tagline": "位置情報で紡ぐ、時を封じたストーリー",
+      "someone": "誰か",
+      "ctaLogin": "ログインして開く",
+      "sealedEyebrow": "封印された瞬間",
+      "ctaTitle": "この瞬間を開く",
+      "untitled": "封印された瞬間"
     }
   }
 }

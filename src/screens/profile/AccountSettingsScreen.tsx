@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, TextInput, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, TextInput, Image, Switch, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/authStore';
 import { AuthService } from '../../lib/auth';
 import { COLORS, font } from '../../constants/theme';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import { useT, useLanguage, LANGUAGES } from '../../i18n';
+import { PreferencesService, UserPreferences, DEFAULT_PREFERENCES } from '../../services/preferencesService';
+
+const HOME_LAYOUTS: { value: UserPreferences['home_layout']; labelKey: string; defaultValue: string }[] = [
+  { value: 'map', labelKey: 'settingsMore.layout_map', defaultValue: 'Map' },
+  { value: 'split', labelKey: 'settingsMore.layout_split', defaultValue: 'Split' },
+  { value: 'feed', labelKey: 'settingsMore.layout_feed', defaultValue: 'Feed' },
+];
 
 interface AccountSettingsScreenProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -33,6 +40,30 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
+
+  // Notification / privacy / layout preferences
+  const [prefs, setPrefs] = useState<UserPreferences>(DEFAULT_PREFERENCES);
+
+  useEffect(() => {
+    let active = true;
+    PreferencesService.get().then((p) => {
+      if (active) setPrefs(p);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const updatePref = async <K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => {
+    const previous = prefs[key];
+    // Optimistic update
+    setPrefs((p) => ({ ...p, [key]: value }));
+    const { error } = await PreferencesService.update({ [key]: value } as Partial<UserPreferences>);
+    if (error) {
+      // Roll back on failure
+      setPrefs((p) => ({ ...p, [key]: previous }));
+    }
+  };
 
   // Track original values to detect changes
   const [originalValues, setOriginalValues] = useState({
@@ -244,6 +275,28 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
       { text: t('settingsMore.logout'), onPress: onLogout, style: 'destructive' },
     ]);
   };
+
+  const renderToggleRow = (
+    label: string,
+    desc: string,
+    value: boolean,
+    onValueChange: (v: boolean) => void,
+    options?: { isLast?: boolean }
+  ) => (
+    <View style={[styles.toggleRow, options?.isLast && styles.toggleRowLast]}>
+      <View style={styles.toggleRowText}>
+        <Text style={styles.toggleRowLabel}>{label}</Text>
+        <Text style={styles.toggleRowDesc}>{desc}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: COLORS.bg4, true: COLORS.ember }}
+        thumbColor={COLORS.white}
+        ios_backgroundColor={COLORS.bg4}
+      />
+    </View>
+  );
 
   const renderMenuItem = (
     icon: string,
@@ -494,6 +547,76 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
           )}
         </View>
 
+        {/* Notifications Section */}
+        <Text style={styles.sectionHeader}>{t('settingsMore.section_notifications', { defaultValue: 'Notifications' }).toUpperCase()}</Text>
+        <View style={styles.card}>
+          {renderToggleRow(
+            t('settingsMore.notif_push_label', { defaultValue: 'Push notifications' }),
+            t('settingsMore.notif_push_desc', { defaultValue: 'Get notified when caps unlock' }),
+            prefs.notif_push,
+            (v) => updatePref('notif_push', v)
+          )}
+          {renderToggleRow(
+            t('settingsMore.notif_email_label', { defaultValue: 'Email notifications' }),
+            t('settingsMore.notif_email_desc', { defaultValue: 'Weekly digest of activity' }),
+            prefs.notif_email,
+            (v) => updatePref('notif_email', v)
+          )}
+          {renderToggleRow(
+            t('settingsMore.notif_marketing_label', { defaultValue: 'Marketing emails' }),
+            t('settingsMore.notif_marketing_desc', { defaultValue: 'News and product updates' }),
+            prefs.notif_marketing,
+            (v) => updatePref('notif_marketing', v),
+            { isLast: true }
+          )}
+        </View>
+
+        {/* Privacy Section */}
+        <Text style={styles.sectionHeader}>{t('settingsMore.section_privacy', { defaultValue: 'Privacy' }).toUpperCase()}</Text>
+        <View style={styles.card}>
+          {renderToggleRow(
+            t('settingsMore.privacy_public_label', { defaultValue: 'Public profile' }),
+            t('settingsMore.privacy_public_desc', { defaultValue: 'Anyone can find and view your profile' }),
+            prefs.privacy_public,
+            (v) => updatePref('privacy_public', v)
+          )}
+          {renderToggleRow(
+            t('settingsMore.privacy_location_label', { defaultValue: 'Share location' }),
+            t('settingsMore.privacy_location_desc', { defaultValue: 'Allow location features' }),
+            prefs.privacy_location,
+            (v) => updatePref('privacy_location', v)
+          )}
+          {renderToggleRow(
+            t('settingsMore.privacy_messages_label', { defaultValue: 'Messages from anyone' }),
+            t('settingsMore.privacy_messages_desc', { defaultValue: 'Strangers can message you' }),
+            prefs.privacy_messages,
+            (v) => updatePref('privacy_messages', v),
+            { isLast: true }
+          )}
+        </View>
+
+        {/* Default Home Layout Section */}
+        <Text style={styles.sectionHeader}>{t('settingsMore.section_home_layout', { defaultValue: 'Default home layout' }).toUpperCase()}</Text>
+        <View style={styles.card}>
+          <View style={styles.segmented}>
+            {HOME_LAYOUTS.map((opt) => {
+              const active = prefs.home_layout === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[styles.segment, active && styles.segmentActive]}
+                  onPress={() => updatePref('home_layout', opt.value)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>
+                    {t(opt.labelKey, { defaultValue: opt.defaultValue })}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
         {/* Account Group */}
         <Text style={styles.sectionHeader}>{t('settingsMore.section_account')}</Text>
         <View style={styles.card}>
@@ -505,6 +628,12 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
         <View style={styles.card}>
           {renderMenuItem('help-circle-outline', t('settingsMore.menu_help_support'), () => {
             Alert.alert(t('settingsMore.alert_help_title'), t('settingsMore.alert_help_msg'));
+          })}
+          {renderMenuItem('document-text-outline', t('settingsMore.menu_terms', { defaultValue: 'Terms of Service' }), () => {
+            Linking.openURL('https://voorcap.com/terms');
+          })}
+          {renderMenuItem('shield-checkmark-outline', t('settingsMore.menu_privacy', { defaultValue: 'Privacy Policy' }), () => {
+            Linking.openURL('https://voorcap.com/privacy');
           })}
           {renderMenuItem('information-circle-outline', t('settingsMore.menu_about'), () => {
             Alert.alert(t('settingsMore.alert_about_title'), t('settingsMore.alert_about_msg'));
@@ -692,6 +821,56 @@ const styles = StyleSheet.create({
   },
   menuItemLabelDestructive: {
     color: COLORS.danger,
+  },
+  // Toggle Rows
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.border,
+  },
+  toggleRowLast: {
+    borderBottomWidth: 0,
+  },
+  toggleRowText: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  toggleRowLabel: {
+    fontSize: 16,
+    color: COLORS.text,
+  },
+  toggleRowDesc: {
+    ...font('caption'),
+    color: COLORS.text3,
+    marginTop: 2,
+  },
+  // Segmented Control (home layout)
+  segmented: {
+    flexDirection: 'row',
+    padding: 4,
+    gap: 4,
+  },
+  segment: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: COLORS.bg3,
+  },
+  segmentActive: {
+    backgroundColor: COLORS.ember,
+  },
+  segmentLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text2,
+  },
+  segmentLabelActive: {
+    color: COLORS.white,
   },
   // Password Actions
   passwordActions: {

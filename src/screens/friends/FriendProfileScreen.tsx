@@ -32,6 +32,8 @@ type FriendProfileUser = {
   username?: string | null;
   avatar_url?: string | null;
   created_at?: string | null;
+  bio?: string | null;
+  location?: string | null;
 };
 
 interface FriendProfileScreenProps {
@@ -72,6 +74,7 @@ const FriendProfileScreen = ({ onNavigate, onGoBack, friend }: FriendProfileScre
   const [capsulesCount, setCapsulesCount] = useState(0);
   const [friendsCount, setFriendsCount] = useState(0);
   const [daysActive, setDaysActive] = useState(0);
+  const [mutualCount, setMutualCount] = useState(0);
 
   const viewedProfileId = friend?.id;
 
@@ -86,6 +89,9 @@ const FriendProfileScreen = ({ onNavigate, onGoBack, friend }: FriendProfileScre
   const avatarUrl = useMemo(() => {
     return profile?.avatar_url || friend?.avatar_url || null;
   }, [profile?.avatar_url, friend?.avatar_url]);
+
+  const bio = useMemo(() => profile?.bio?.trim() || null, [profile?.bio]);
+  const location = useMemo(() => profile?.location?.trim() || null, [profile?.location]);
 
   const loadProfileData = async () => {
     if (!viewedProfileId) {
@@ -103,7 +109,7 @@ const FriendProfileScreen = ({ onNavigate, onGoBack, friend }: FriendProfileScre
       // Fetch profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, display_name, username, avatar_url, created_at')
+        .select('id, display_name, username, avatar_url, created_at, bio, location')
         .eq('id', viewedProfileId)
         .maybeSingle();
 
@@ -119,6 +125,8 @@ const FriendProfileScreen = ({ onNavigate, onGoBack, friend }: FriendProfileScre
         username: profileData.username || null,
         avatar_url: profileData.avatar_url || null,
         created_at: profileData.created_at || null,
+        bio: (profileData as any).bio || null,
+        location: (profileData as any).location || null,
       });
 
       // Calculate days since joined
@@ -141,19 +149,29 @@ const FriendProfileScreen = ({ onNavigate, onGoBack, friend }: FriendProfileScre
       setPublicCapsules(publicList);
       setCapsulesCount(publicList.length);
 
-      // Fetch friends count
+      // Fetch friends count (and the friend's friend IDs for mutuals)
       const { data: friendsData } = await supabase
         .from('friend_requests')
-        .select('id')
+        .select('sender_id, receiver_id')
         .eq('status', 'accepted')
         .or(`sender_id.eq.${viewedProfileId},receiver_id.eq.${viewedProfileId}`);
 
-      setFriendsCount(friendsData?.length || 0);
+      const theirFriendIds = new Set<string>();
+      (friendsData || []).forEach((r: any) => {
+        theirFriendIds.add(r.sender_id === viewedProfileId ? r.receiver_id : r.sender_id);
+      });
+      setFriendsCount(theirFriendIds.size);
 
-      // Load friendship status
+      // Load friendship status + compute mutual friends
       if (currentUser && currentUser.id !== viewedProfileId) {
         const status = await FriendService.getFriendshipStatus(viewedProfileId);
         setFriendshipStatus(status);
+
+        const { data: myFriends } = await FriendService.getFriends();
+        const mutual = (myFriends || []).filter(
+          (id) => id !== viewedProfileId && theirFriendIds.has(id)
+        ).length;
+        setMutualCount(mutual);
       }
     } catch (err) {
       setError(t('friendProfile.errorLoad'));
@@ -382,6 +400,30 @@ const FriendProfileScreen = ({ onNavigate, onGoBack, friend }: FriendProfileScre
               <Text style={styles.displayName}>{displayName}</Text>
               <Text style={styles.username}>@{username}</Text>
 
+              {/* Location */}
+              {!!location && (
+                <View style={styles.locationRow}>
+                  <Ionicons name="location-outline" size={14} color={COLORS.text3} />
+                  <Text style={styles.locationText} numberOfLines={1}>{location}</Text>
+                </View>
+              )}
+
+              {/* Bio */}
+              {!!bio && <Text style={styles.bio}>{bio}</Text>}
+
+              {/* Mutual friends pill */}
+              {mutualCount > 0 && user?.id !== viewedProfileId && (
+                <View style={styles.mutualPill}>
+                  <Ionicons name="people" size={13} color={COLORS.ember} />
+                  <Text style={styles.mutualText}>
+                    {t('friendProfile.mutualFriends', {
+                      defaultValue: '{{count}} mutual',
+                      count: mutualCount,
+                    })}
+                  </Text>
+                </View>
+              )}
+
               {/* Stats Row */}
               <View style={styles.statsRow}>
                 <View style={styles.statPill}>
@@ -549,7 +591,49 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.text3,
     marginTop: 2,
-    marginBottom: 18,
+    marginBottom: 10,
+  },
+
+  // Location
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 8,
+    maxWidth: '90%',
+  },
+  locationText: {
+    fontSize: 13,
+    color: COLORS.text2,
+    fontWeight: '500',
+  },
+
+  // Bio
+  bio: {
+    ...font('body'),
+    fontSize: 14,
+    lineHeight: 20,
+    color: COLORS.text2,
+    textAlign: 'center',
+    marginBottom: 10,
+    paddingHorizontal: 8,
+  },
+
+  // Mutual friends
+  mutualPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: COLORS.emberSoft,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginBottom: 14,
+  },
+  mutualText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.ember,
   },
 
   // Stats
