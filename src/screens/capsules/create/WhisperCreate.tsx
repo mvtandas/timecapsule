@@ -69,10 +69,10 @@ const WhisperCreate: React.FC<Props> = ({ onClose, onSealed }) => {
         recipient_id: recip?.isSelf ? user.id : (recip?.id || null), is_self_whisper: !!recip?.isSelf,
         media_url, media_type,
       });
-      if (error) { Alert.alert(t('createFlow.alert_error'), t('createFlow.alert_create_failed')); setSealing(false); return; }
+      if (error) { Alert.alert(t('createFlow.alert_error'), (error as any)?.message || t('createFlow.alert_create_failed')); setSealing(false); return; }
       onSealed();
-    } catch {
-      Alert.alert(t('createFlow.alert_error'), t('createFlow.alert_something_wrong'));
+    } catch (e: any) {
+      Alert.alert(t('createFlow.alert_error'), e?.message || t('createFlow.alert_something_wrong'));
       setSealing(false);
     }
   };

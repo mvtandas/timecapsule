@@ -4,7 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Line, Circle } from 'react-native-svg';
 import { DARK_MAP_STYLE } from '../../constants/mapStyle';
 import * as Location from 'expo-location';
 import { BlurView } from 'expo-blur';
@@ -13,7 +13,7 @@ import { CapsuleIcon } from '../../components/common/CapsuleIcon';
 import CapsuleDetailModal from '../../components/CapsuleDetailModal';
 import { calculateDistance } from '../../utils/geoUtils';
 import { formatDistance } from '../../utils/geoUtils';
-import { getMediaUrl } from '../../utils/mediaUtils';
+import { getMediaUrl, isLocked } from '../../utils/mediaUtils';
 import { formatDate, timeAgo } from '../../utils/dateUtils';
 import { openDirections } from '../../utils/directions';
 import { COLORS, font, SPACING, RADIUS } from '../../constants/theme';
@@ -386,8 +386,9 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
     setSelectedCapsule(capsule);
     setShowTimeModal(true);
 
-    // Increment view count
-    if (capsule?.id) {
+    // Increment view count — but not for time-locked caps (else taps on sealed
+    // caps inflate the Popular sort, which ranks by view_count).
+    if (capsule?.id && !isLocked(capsule.open_at)) {
       try {
         await CapsuleService.incrementViewCount(capsule.id);
       } catch {
@@ -449,13 +450,6 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
     const seconds = Math.floor((diff % (1000 * 60)) / 1000);
     
     return { days, hours, minutes, seconds };
-  };
-
-  const isCapsuleLocked = (openDate: string | null | undefined): boolean => {
-    if (!openDate) return false;
-    const now = new Date();
-    const openDateObj = new Date(openDate);
-    return openDateObj.getTime() > now.getTime();
   };
 
   // Invite Modal Functions
@@ -699,15 +693,28 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
                 flat={true}
             >
               <View style={styles.capsuleMarker}>
+                {/* Branded voorcap teardrop + sigil (type-tinted), mirroring
+                    CapTypeIcon / the design demo's createCapMarkerElement. */}
                 <Svg width={26} height={36} viewBox="0 0 200 280">
                   <Path
                     d={PIN_PATH}
-                    fill={capColor(capsule.type)}
-                    stroke={COLORS.bg}
-                    strokeWidth={14}
+                    fill={`${capColor(capsule.type)}25`}
+                    stroke={capColor(capsule.type)}
+                    strokeWidth={7}
                     strokeLinejoin="round"
                     strokeLinecap="round"
                   />
+                  <Line
+                    x1={42}
+                    y1={118}
+                    x2={158}
+                    y2={118}
+                    stroke={capColor(capsule.type)}
+                    strokeWidth={7}
+                    strokeLinecap="round"
+                  />
+                  <Circle cx={100} cy={168} r={13} fill={capColor(capsule.type)} />
+                  <Circle cx={100} cy={168} r={4.5} fill="#fff" opacity={0.8} />
                 </Svg>
               </View>
             </Marker>
@@ -1023,8 +1030,10 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
         ) : (() => {
           let feed = capsules.slice();
           if (activeTab === 'mine') feed = feed.filter((c) => c.owner_id === userId);
-          else if (activeTab === 'friends') feed = feed.filter((c) => friendIds.has(c.owner_id));
-          else feed = feed.filter((c) => c.is_public || c.owner_id === userId);
+          else if (activeTab === 'friends') feed = feed.filter((c) => friendIds.has(c.owner_id) && c.is_public);
+          // Public discovery tabs (All / Nearby / New / Popular) show only public caps.
+          // The owner's own private caps (whispers, private gatherings) stay in "Mine".
+          else feed = feed.filter((c) => c.is_public);
           // Apply the on-map cap-type filter to the feed rows too.
           if (typeFilter != null) feed = feed.filter((c) => c.type === typeFilter);
           let withD = feed.map((c) => ({
@@ -1050,7 +1059,7 @@ const DashboardScreen = ({ onNavigate }: DashboardScreenProps) => {
             <View>
               {withD.map(({ cap, d }, index) => {
                 const ct = getCapType(cap.type);
-                const locked = isCapsuleLocked(cap.open_at);
+                const locked = isLocked(cap.open_at);
                 const media = getMediaUrl(cap);
                 const actor = '@' + (cap.profiles?.username || cap.profiles?.display_name || 'someone');
                 const preview = (cap.description || '').trim();

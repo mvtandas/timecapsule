@@ -51,7 +51,7 @@ const GatheringCreate: React.FC<Props> = ({ onClose, onSealed }) => {
       let cover_photo_url: string | null = null, media_url: string | null = null, media_type: 'image' | 'video' | 'audio' | 'none' = 'none';
       if (cover) { const up = await uploadUri(cover, user.id); if (up) cover_photo_url = up.url; }
       if (myMedia) { const up = await uploadUri(myMedia.uri, user.id); if (up) { media_url = up.url; media_type = up.type; } }
-      const { error } = await CapsuleService.createCapsule({
+      const { data: created, error } = await CapsuleService.createCapsule({
         type: 'gathering', title: title || getCapType('gathering').name, description: myText || null,
         cover_photo_url, category: category || undefined,
         lat: loc!.lat, lng: loc!.lng, location_name: loc!.name || null,
@@ -59,9 +59,19 @@ const GatheringCreate: React.FC<Props> = ({ onClose, onSealed }) => {
         is_public: isPublic, is_anonymous: false, gathering_blind: blind, allow_join_requests: joinReq,
         media_url, media_type,
       });
-      if (error) { Alert.alert(t('createFlow.alert_error'), t('createFlow.alert_create_failed')); setSealing(false); return; }
+      if (error || !created) { Alert.alert(t('createFlow.alert_error'), (error as any)?.message || t('createFlow.alert_create_failed')); setSealing(false); return; }
+      // Persist invites so invitees can access the gathering (incl. private ones).
+      // Requires the "Owners can share their capsules" RLS policy (migration 0009).
+      const inviteeIds = invites.map((u) => u.id).filter((id) => !!id && id !== user.id);
+      if (inviteeIds.length) {
+        try {
+          await supabase.from('shared_capsules').insert(
+            inviteeIds.map((uid) => ({ capsule_id: (created as any).id, user_id: uid })) as any,
+          );
+        } catch { /* invites best-effort; cap is already created */ }
+      }
       onSealed();
-    } catch { Alert.alert(t('createFlow.alert_error'), t('createFlow.alert_something_wrong')); setSealing(false); }
+    } catch (e: any) { Alert.alert(t('createFlow.alert_error'), e?.message || t('createFlow.alert_something_wrong')); setSealing(false); }
   };
 
   return (

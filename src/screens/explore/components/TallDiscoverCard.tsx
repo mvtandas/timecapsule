@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { COLORS, RADIUS, SPACING, font } from '../../../constants/theme';
 import { getCapType } from '../../../constants/capTypes';
-import { getMediaUrl } from '../../../utils/mediaUtils';
+import { getMediaUrl, isLocked } from '../../../utils/mediaUtils';
 import { formatDate } from '../../../utils/dateUtils';
 import CapTypeIcon from '../../../components/common/CapTypeIcon';
 import { useT } from '../../../i18n';
@@ -51,8 +51,7 @@ const EXPIRING_SOON_MS = 48 * 60 * 60 * 1000;
  */
 export const computeCapTimingBadge = (cap: any, t: TFn): CapTimingBadge => {
   const now = Date.now();
-  const openAt = cap?.open_at ? new Date(cap.open_at).getTime() : NaN;
-  if (!Number.isNaN(openAt) && openAt > now) {
+  if (isLocked(cap?.open_at)) {
     return { label: t('capDetail.opens', { date: formatDate(cap.open_at) }), locked: true, tone: 'locked' };
   }
   const expiresAt = cap?.expires_at ? new Date(cap.expires_at).getTime() : NaN;

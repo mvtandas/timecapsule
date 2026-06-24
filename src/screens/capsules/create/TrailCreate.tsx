@@ -53,9 +53,9 @@ const TrailCreate: React.FC<Props> = ({ onClose, onCreated }) => {
         open_at: locked ? date!.toISOString() : null, expires_at: mode === 'expires' && date ? date.toISOString() : null,
         is_locked: locked, status: locked ? 'sealed' : 'open',
       });
-      if (error || !data) { Alert.alert(t('createFlow.alert_error'), t('createFlow.alert_create_failed')); setSealing(false); return; }
+      if (error || !data) { Alert.alert(t('createFlow.alert_error'), (error as any)?.message || t('createFlow.alert_create_failed')); setSealing(false); return; }
       onCreated((data as any).id, title || getCapType('trail').name);
-    } catch { Alert.alert(t('createFlow.alert_error'), t('createFlow.alert_something_wrong')); setSealing(false); }
+    } catch (e: any) { Alert.alert(t('createFlow.alert_error'), e?.message || t('createFlow.alert_something_wrong')); setSealing(false); }
   };
 
   return (

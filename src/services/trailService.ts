@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { CapsuleService } from './capsuleService';
 
 // New tables (migration 0002) aren't in the generated Database type yet.
 const db: any = supabase;
@@ -97,9 +98,9 @@ export class TrailService {
       .eq('user_id', user.id)
       .is('completed_at', null)
       .order('started_at', { ascending: false });
-    return ((data as any[]) || [])
-      .filter((r) => r.capsules)
-      .map((r) => ({ ...r.capsules, _currentIdx: r.current_stop_idx }));
+    const rows = ((data as any[]) || []).filter((r) => r.capsules);
+    const stripped = CapsuleService.stripSealed(rows.map((r) => r.capsules), user.id);
+    return rows.map((r, i) => ({ ...stripped[i], _currentIdx: r.current_stop_idx }));
   }
 
   /** How many users have completed a given trail (for "completed by N others"). */
@@ -122,9 +123,9 @@ export class TrailService {
       .eq('user_id', user.id)
       .not('completed_at', 'is', null)
       .order('completed_at', { ascending: false });
-    return ((data as any[]) || [])
-      .filter((r) => r.capsules)
-      .map((r) => ({ ...r.capsules, _completedAt: r.completed_at }));
+    const rows = ((data as any[]) || []).filter((r) => r.capsules);
+    const stripped = CapsuleService.stripSealed(rows.map((r) => r.capsules), user.id);
+    return rows.map((r, i) => ({ ...stripped[i], _completedAt: r.completed_at }));
   }
 
   static async getProgress(capsuleId: string): Promise<TrailProgress | null> {

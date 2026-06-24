@@ -977,7 +977,14 @@
       "estMinutesLabel": "Estimated time (minutes)",
       "estMinutesPlaceholder": "e.g. 15",
       "needTwoStops": "Add at least 2 stops before finishing your trail.",
-      "photoLabel": "Photo (optional)"
+      "photoLabel": "Photo (optional)",
+      "contentPlaceholderHelper": "A short note helps first-timers — what's special here, what to try?",
+      "estMinutesLabelShort": "Estimated time (minutes)",
+      "optional": "(optional)",
+      "photoLabelShort": "Photo",
+      "saveAndAdd": "Save & add another",
+      "saveAndClose": "Save & close",
+      "statsLine": "%{count} stops · ~%{minutes} min total"
     },
     "discover": {
       "title": "Discover",
@@ -2033,7 +2040,14 @@
       "estMinutesLabel": "Tahmini süre (dakika)",
       "estMinutesPlaceholder": "örn. 15",
       "needTwoStops": "Rotanı bitirmeden önce en az 2 durak ekle.",
-      "photoLabel": "Fotoğraf (opsiyonel)"
+      "photoLabel": "Fotoğraf (opsiyonel)",
+      "contentPlaceholderHelper": "Kısa bir not yeni gelenlere yardımcı olur — burada özel olan ne, ne denenmeli?",
+      "estMinutesLabelShort": "Tahmini süre (dakika)",
+      "optional": "(isteğe bağlı)",
+      "photoLabelShort": "Fotoğraf",
+      "saveAndAdd": "Kaydet ve yeni ekle",
+      "saveAndClose": "Kaydet ve kapat",
+      "statsLine": "%{count} durak · ~%{minutes} dk toplam"
     },
     "discover": {
       "title": "Keşfet",
@@ -3089,7 +3103,14 @@
       "addPhoto": "Añadir foto",
       "estMinutesLabel": "Tiempo estimado (minutos)",
       "estMinutesPlaceholder": "p. ej. 15",
-      "photoLabel": "Foto (opcional)"
+      "photoLabel": "Foto (opcional)",
+      "contentPlaceholderHelper": "Una nota breve ayuda a los nuevos: ¿qué tiene de especial, qué probar?",
+      "estMinutesLabelShort": "Tiempo estimado (minutos)",
+      "optional": "(opcional)",
+      "photoLabelShort": "Foto",
+      "saveAndAdd": "Guardar y añadir otra",
+      "saveAndClose": "Guardar y cerrar",
+      "statsLine": "%{count} paradas · ~%{minutes} min en total"
     },
     "discover": {
       "title": "Descubrir",
@@ -4145,7 +4166,14 @@
       "addPhoto": "Ajouter une photo",
       "estMinutesLabel": "Durée estimée (minutes)",
       "estMinutesPlaceholder": "ex. 15",
-      "photoLabel": "Photo (facultative)"
+      "photoLabel": "Photo (facultative)",
+      "contentPlaceholderHelper": "Une courte note aide les nouveaux venus — qu'y a-t-il de spécial ici, que tester ?",
+      "estMinutesLabelShort": "Temps estimé (minutes)",
+      "optional": "(facultatif)",
+      "photoLabelShort": "Photo",
+      "saveAndAdd": "Enregistrer et en ajouter une",
+      "saveAndClose": "Enregistrer et fermer",
+      "statsLine": "%{count} étapes · ~%{minutes} min au total"
     },
     "discover": {
       "title": "Découvrir",
@@ -5201,7 +5229,14 @@
       "addPhoto": "Foto hinzufügen",
       "estMinutesLabel": "Geschätzte Zeit (Minuten)",
       "estMinutesPlaceholder": "z. B. 15",
-      "photoLabel": "Foto (optional)"
+      "photoLabel": "Foto (optional)",
+      "contentPlaceholderHelper": "Eine kurze Notiz hilft Neulingen — was ist hier besonders, was sollte man ausprobieren?",
+      "estMinutesLabelShort": "Geschätzte Zeit (Minuten)",
+      "optional": "(optional)",
+      "photoLabelShort": "Foto",
+      "saveAndAdd": "Speichern und weitere hinzufügen",
+      "saveAndClose": "Speichern und schließen",
+      "statsLine": "%{count} Stopps · ~%{minutes} Min. gesamt"
     },
     "discover": {
       "title": "Entdecken",
@@ -6257,7 +6292,14 @@
       "addPhoto": "Adicionar foto",
       "estMinutesLabel": "Tempo estimado (minutos)",
       "estMinutesPlaceholder": "ex.: 15",
-      "photoLabel": "Foto (opcional)"
+      "photoLabel": "Foto (opcional)",
+      "contentPlaceholderHelper": "Uma nota breve ajuda os novatos — o que há de especial aqui, o que experimentar?",
+      "estMinutesLabelShort": "Tempo estimado (minutos)",
+      "optional": "(opcional)",
+      "photoLabelShort": "Foto",
+      "saveAndAdd": "Salvar e adicionar outra",
+      "saveAndClose": "Salvar e fechar",
+      "statsLine": "%{count} paradas · ~%{minutes} min no total"
     },
     "discover": {
       "title": "Descobrir",
@@ -7313,7 +7355,14 @@
       "addPhoto": "Aggiungi foto",
       "estMinutesLabel": "Tempo stimato (minuti)",
       "estMinutesPlaceholder": "es. 15",
-      "photoLabel": "Foto (facoltativa)"
+      "photoLabel": "Foto (facoltativa)",
+      "contentPlaceholderHelper": "Una breve nota aiuta i nuovi arrivati — cosa c'è di speciale qui, cosa provare?",
+      "estMinutesLabelShort": "Tempo stimato (minuti)",
+      "optional": "(facoltativo)",
+      "photoLabelShort": "Foto",
+      "saveAndAdd": "Salva e aggiungine un'altra",
+      "saveAndClose": "Salva e chiudi",
+      "statsLine": "%{count} tappe · ~%{minutes} min in totale"
     },
     "discover": {
       "title": "Scopri",
@@ -8369,7 +8418,14 @@
       "addPhoto": "Добавить фото",
       "estMinutesLabel": "Примерное время (минуты)",
       "estMinutesPlaceholder": "напр. 15",
-      "photoLabel": "Фото (необязательно)"
+      "photoLabel": "Фото (необязательно)",
+      "contentPlaceholderHelper": "Короткая заметка поможет новичкам — что здесь особенного, что стоит попробовать?",
+      "estMinutesLabelShort": "Примерное время (минуты)",
+      "optional": "(необязательно)",
+      "photoLabelShort": "Фото",
+      "saveAndAdd": "Сохранить и добавить ещё",
+      "saveAndClose": "Сохранить и закрыть",
+      "statsLine": "%{count} остановок · ~%{minutes} мин всего"
     },
     "discover": {
       "title": "Обзор",
@@ -9425,7 +9481,14 @@
       "addPhoto": "फ़ोटो जोड़ें",
       "estMinutesLabel": "अनुमानित समय (मिनट)",
       "estMinutesPlaceholder": "जैसे 15",
-      "photoLabel": "फ़ोटो (वैकल्पिक)"
+      "photoLabel": "फ़ोटो (वैकल्पिक)",
+      "contentPlaceholderHelper": "एक छोटा नोट नए लोगों की मदद करता है — यहाँ क्या खास है, क्या आज़माएँ?",
+      "estMinutesLabelShort": "अनुमानित समय (मिनट)",
+      "optional": "(वैकल्पिक)",
+      "photoLabelShort": "फ़ोटो",
+      "saveAndAdd": "सहेजें और एक और जोड़ें",
+      "saveAndClose": "सहेजें और बंद करें",
+      "statsLine": "%{count} पड़ाव · ~%{minutes} मिनट कुल"
     },
     "discover": {
       "title": "खोजें",
@@ -10481,7 +10544,14 @@
       "addPhoto": "添加照片",
       "estMinutesLabel": "预计时间（分钟）",
       "estMinutesPlaceholder": "例如：15",
-      "photoLabel": "照片（可选）"
+      "photoLabel": "照片（可选）",
+      "contentPlaceholderHelper": "简短的说明能帮助新手——这里有什么特别之处，可以尝试什么？",
+      "estMinutesLabelShort": "预计时间（分钟）",
+      "optional": "（可选）",
+      "photoLabelShort": "照片",
+      "saveAndAdd": "保存并继续添加",
+      "saveAndClose": "保存并关闭",
+      "statsLine": "%{count} 个站点 · 共约 %{minutes} 分钟"
     },
     "discover": {
       "title": "发现",
@@ -11537,7 +11607,14 @@
       "addPhoto": "写真を追加",
       "estMinutesLabel": "推定所要時間(分)",
       "estMinutesPlaceholder": "例:15",
-      "photoLabel": "写真(任意)"
+      "photoLabel": "写真(任意)",
+      "contentPlaceholderHelper": "短いメモは初めての人の助けになります — ここの特別な点や試すべきことは？",
+      "estMinutesLabelShort": "推定時間（分）",
+      "optional": "（任意）",
+      "photoLabelShort": "写真",
+      "saveAndAdd": "保存して別の項目を追加",
+      "saveAndClose": "保存して閉じる",
+      "statsLine": "%{count} 拠点 · 合計約 %{minutes} 分"
     },
     "discover": {
       "title": "見つける",

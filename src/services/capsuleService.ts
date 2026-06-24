@@ -60,6 +60,24 @@ export interface CreateCapsuleData {
 }
 
 export class CapsuleService {
+  /**
+   * Defense-in-depth: blank the secret payload of any cap that is still
+   * time-locked (open_at in the future) and not owned by the viewer, so sealed
+   * content never reaches the UI even if a raw query returned it. The
+   * authoritative guard is the `capsules_view` server-side masking (migration
+   * 0009); this mirrors it client-side and also covers base-table fallback /
+   * embedded-join reads.
+   */
+  static stripSealed<T extends Record<string, any>>(caps: T[], viewerId: string | null): T[] {
+    const now = Date.now();
+    return (caps || []).map((c: any) => {
+      if (!c) return c;
+      const sealed = c.open_at && new Date(c.open_at).getTime() > now;
+      if (!sealed || c.owner_id === viewerId) return c;
+      return { ...c, description: null, body: null, media_url: null, content_refs: null };
+    }) as T[];
+  }
+
   // Get all user's capsules
   static async getUserCapsules() {
     try {
@@ -161,13 +179,15 @@ export class CapsuleService {
   // Get a single capsule by ID
   static async getCapsule(capsuleId: string) {
     try {
-      const { data, error } = await supabase
-        .from('capsules')
-        .select('*')
-        .eq('id', capsuleId)
-        .single();
-
-      if (error) throw error;
+      const { data: { user } } = await supabase.auth.getUser();
+      // Read through the masking view (sealed content withheld server-side);
+      // fall back to the base table if the view isn't present yet (migration 0009).
+      let resp: any = await supabase.from('capsules_view' as any).select('*').eq('id', capsuleId).single();
+      if (resp.error) {
+        resp = await supabase.from('capsules').select('*').eq('id', capsuleId).single();
+      }
+      if (resp.error) throw resp.error;
+      const [data] = CapsuleService.stripSealed([resp.data], user?.id ?? null);
 
       return { data, error: null };
     } catch (error) {
@@ -225,23 +245,33 @@ export class CapsuleService {
         blockedIds = (blocked || []).map((b: any) => b.blocked_id);
       }
 
-      // Get all public capsules with location, filter by distance client-side
-      const { data, error } = await supabase
-        .from('capsules')
+      // Get all public capsules with location, filter by distance client-side.
+      // Read through the masking view (sealed content withheld); fall back to the
+      // base table if the view isn't present yet (migration 0009).
+      let resp: any = await supabase
+        .from('capsules_view' as any)
         .select('*')
         .eq('is_public', true)
         .not('lat', 'is', null)
         .not('lng', 'is', null);
-
-      if (error) throw error;
+      if (resp.error) {
+        resp = await supabase
+          .from('capsules')
+          .select('*')
+          .eq('is_public', true)
+          .not('lat', 'is', null)
+          .not('lng', 'is', null);
+      }
+      if (resp.error) throw resp.error;
 
       // Filter by distance and blocked users
-      const filtered = data?.filter((capsule) => {
+      let filtered = (resp.data || []).filter((capsule: any) => {
         if (capsule.lat == null || capsule.lng == null) return false;
         if (blockedIds.includes(capsule.owner_id)) return false;
         const distance = calculateDistance(lat, lng, capsule.lat, capsule.lng);
         return distance <= radiusKm;
       });
+      filtered = CapsuleService.stripSealed(filtered, user?.id ?? null);
 
       await CapsuleService.attachProfiles(filtered || []);
 
@@ -265,8 +295,11 @@ export class CapsuleService {
 
       if (error) throw error;
 
-      // Extract capsules from the result
-      const capsules = data?.map((item: any) => item.capsules) || [];
+      // Extract capsules from the result, then strip any still-sealed payload.
+      const capsules = CapsuleService.stripSealed(
+        (data || []).map((item: any) => item.capsules).filter(Boolean),
+        user.id,
+      );
 
       return { data: capsules, error: null };
     } catch (error) {
@@ -300,19 +333,31 @@ export class CapsuleService {
         .eq('user_id', user.id);
       const sharedIds = (shared || []).map((s: any) => s.capsule_id);
 
-      let orFilter = `owner_id.eq.${user.id},is_public.eq.true`;
+      // owner + public + shared-with-me + whispers addressed to me (recipient_id).
+      let orFilter = `owner_id.eq.${user.id},is_public.eq.true,recipient_id.eq.${user.id}`;
       if (sharedIds.length) orFilter += `,id.in.(${sharedIds.join(',')})`;
 
-      const { data, error } = await supabase
-        .from('capsules')
+      // Read through the masking view (sealed content withheld server-side);
+      // fall back to the base table if the view isn't present yet (migration 0009).
+      let resp: any = await supabase
+        .from('capsules_view' as any)
         .select('*')
         .or(orFilter)
         .order('created_at', { ascending: false });
+      if (resp.error) {
+        resp = await supabase
+          .from('capsules')
+          .select('*')
+          .or(orFilter)
+          .order('created_at', { ascending: false });
+      }
+      if (resp.error) throw resp.error;
 
-      if (error) throw error;
-
-      // Filter out blocked users' content
-      const filtered = data?.filter((c: any) => !blockedIds.includes(c.owner_id)) || [];
+      // Filter out blocked users' content, then strip any still-sealed payload.
+      const filtered = CapsuleService.stripSealed(
+        (resp.data || []).filter((c: any) => !blockedIds.includes(c.owner_id)),
+        user.id,
+      );
 
       // Attach creator profile (username/display_name/avatar) so feed/discover
       // cards can show "@handle" without an N+1 query per card.

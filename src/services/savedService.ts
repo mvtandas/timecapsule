@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { CapsuleService } from './capsuleService';
 
 // New tables (migration 0002) aren't in the generated Database type yet.
 const db: any = supabase;
@@ -51,6 +52,8 @@ export class SavedService {
       .select('capsule_id, created_at, capsules(*)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
-    return ((data as any[]) || []).map((r) => r.capsules).filter(Boolean);
+    const caps = ((data as any[]) || []).map((r) => r.capsules).filter(Boolean);
+    // Withhold any still-sealed payload (mirrors capsules_view server-side masking).
+    return CapsuleService.stripSealed(caps, user.id);
   }
 }

@@ -9,6 +9,7 @@ import { SavedService } from '../../services/savedService';
 import CapsuleDetailModal from '../../components/CapsuleDetailModal';
 import MessagesButton from '../../components/common/MessagesButton';
 import { calculateDistance } from '../../utils/geoUtils';
+import { isLocked } from '../../utils/mediaUtils';
 import { COLORS, SPACING, RADIUS, font } from '../../constants/theme';
 import { Skeleton } from '../../components/common/Skeleton';
 import { VoorcapWordmark } from '../../components/common/VoorcapLogo';
@@ -102,7 +103,11 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       setUserId(user?.id ?? null);
       const { data } = await CapsuleService.getAllAccessibleCapsules();
-      const caps = (data || []).slice();
+      // Discover is a PUBLIC discovery surface — never surface private content here.
+      // getAllAccessibleCapsules also returns the viewer's OWN caps (incl. private
+      // whispers / private gatherings), which must not leak into Discover's
+      // featured strip / filter chips / live ticker. Keep only public caps.
+      const caps = (data || []).filter((c: any) => c.is_public && c.type !== 'whisper');
       caps.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
       setPool(caps);
       const saved = await SavedService.list();
@@ -160,7 +165,7 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
   const filtered = useMemo(() => {
     const caps = pool || [];
     if (filter === 'trending') return [...caps].sort((a, b) => (b.view_count || 0) - (a.view_count || 0));
-    if (filter === 'unopened') return caps.filter((c) => !openedIds.has(c.id));
+    if (filter === 'unopened') return caps.filter((c) => !openedIds.has(c.id) && c.owner_id !== userId && !isLocked(c.open_at));
     if (filter === 'nearby') {
       if (!coords) return caps;
       return caps
@@ -175,7 +180,8 @@ const ExploreScreen = ({ onNavigate }: ExploreScreenProps) => {
     setSavedIds((prev) => { const n = new Set(prev); n.has(cap.id) ? n.delete(cap.id) : n.add(cap.id); return n; });
     await SavedService.toggle(cap.id);
   };
-  const openCap = (cap: any) => { setSelected(cap); setShowDetail(true); CapsuleService.incrementViewCount(cap.id); };
+  // Don't let taps on time-locked caps inflate view_count (Trending is ranked by it).
+  const openCap = (cap: any) => { setSelected(cap); setShowDetail(true); if (!isLocked(cap.open_at)) CapsuleService.incrementViewCount(cap.id); };
 
   const loading = pool === null;
   // "Öne çıkanlar" hero strip — a highlights cut of the active filter. Tapping a

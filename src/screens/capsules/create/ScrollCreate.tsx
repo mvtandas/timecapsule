@@ -63,9 +63,9 @@ const ScrollCreate: React.FC<Props> = ({ onClose, onSealed }) => {
         open_at: locked ? date!.toISOString() : null, expires_at: mode === 'expires' && date ? date.toISOString() : null,
         is_public: true, is_anonymous: false, is_locked: locked, status: locked ? 'sealed' : 'open',
       });
-      if (error) { Alert.alert(t('createFlow.alert_error'), t('createFlow.alert_create_failed')); setSealing(false); return; }
+      if (error) { Alert.alert(t('createFlow.alert_error'), (error as any)?.message || t('createFlow.alert_create_failed')); setSealing(false); return; }
       onSealed();
-    } catch { Alert.alert(t('createFlow.alert_error'), t('createFlow.alert_something_wrong')); setSealing(false); }
+    } catch (e: any) { Alert.alert(t('createFlow.alert_error'), e?.message || t('createFlow.alert_something_wrong')); setSealing(false); }
   };
 
   return (

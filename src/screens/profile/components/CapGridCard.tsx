@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, RADIUS, SPACING, font } from '../../../constants/theme';
 import { getCapType } from '../../../constants/capTypes';
 import CapTypeIcon from '../../../components/common/CapTypeIcon';
-import { getMediaUrl } from '../../../utils/mediaUtils';
+import { getMediaUrl, isLocked } from '../../../utils/mediaUtils';
 import { timeAgo } from '../../../utils/dateUtils';
 
 interface Props {
@@ -20,7 +20,7 @@ interface Props {
 const CapGridCard: React.FC<Props> = ({ capsule, width, onPress, onUnsave }) => {
   const ct = getCapType(capsule.type);
   const mediaUrl = getMediaUrl(capsule);
-  const locked = !!capsule.open_at && new Date(capsule.open_at).getTime() > Date.now();
+  const locked = isLocked(capsule.open_at);
 
   return (
     <TouchableOpacity style={[styles.card, { width }]} onPress={() => onPress(capsule)} activeOpacity={0.85}>

@@ -52,6 +52,10 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
   const [draft, setDraft] = useState<Draft>(emptyDraft());
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
+  // Title input ref so we can re-focus after "Save & add another" for fast,
+  // back-to-back stop entry (matches the demo's inline-editor flow).
+  const titleInputRef = useRef<TextInput>(null);
+
   // Serialize auto-saves so concurrent writes can't interleave (which would
   // duplicate rows). While a save is in flight, the latest state is queued.
   const savingRef = useRef(false);
@@ -108,6 +112,8 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
     setDraft(emptyDraft());
     setEditingIndex(null);
     setEditorVisible(true);
+    // Autofocus the title so the user can start typing immediately.
+    setTimeout(() => titleInputRef.current?.focus(), 350);
   };
 
   const openEdit = (i: number) => {
@@ -163,7 +169,12 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
     } catch { /* ignore */ }
   };
 
-  const saveStop = () => {
+  /**
+   * Save the current draft. `addAnother` keeps the editor open, clears the
+   * form, and re-focuses the title input so the user can immediately enter the
+   * next stop (the demo's back-to-back flow). Otherwise the editor dismisses.
+   */
+  const saveStop = (addAnother = false) => {
     if (!draft.title.trim()) { Alert.alert(t('trailEditor.needTitle')); return; }
     if (draft.lat == null || draft.lng == null) { Alert.alert(t('trailEditor.needLocation')); return; }
     const stop: TrailStop = {
@@ -180,8 +191,16 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
     const next = [...stops];
     if (editingIndex == null) next.push(stop);
     else next[editingIndex] = { ...next[editingIndex], ...stop };
-    setEditorVisible(false);
     persist(next.map((s, i) => ({ ...s, ordinal: i })));
+
+    if (addAnother) {
+      // Keep editing inline: clear the form, switch to "add" mode, re-focus.
+      setDraft(emptyDraft());
+      setEditingIndex(null);
+      setTimeout(() => titleInputRef.current?.focus(), 100);
+    } else {
+      setEditorVisible(false);
+    }
   };
 
   const removeStop = (i: number) => {
@@ -212,6 +231,14 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
 
   const canFinish = stops.length >= 2;
 
+  // Live stats: total stop count + summed estimated minutes (matches the demo).
+  const totalMinutes = stops.reduce((sum, s) => sum + (s.estimated_minutes || 0), 0);
+  const statsLine = t('trailEditor.statsLine', {
+    count: stops.length,
+    minutes: totalMinutes,
+    defaultValue: '%{count} stops · ~%{minutes} min total',
+  });
+
   return (
     <View style={styles.container}>
       <ScreenHeader
@@ -234,6 +261,13 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
       ) : (
         <ScrollView contentContainerStyle={{ padding: SPACING.lg, paddingBottom: insets.bottom + 120 }}>
           <Text style={styles.subtitle}>{t('trailEditor.subtitle')}</Text>
+
+          {stops.length > 0 && (
+            <View style={styles.statsRow}>
+              <Ionicons name="footsteps-outline" size={14} color={COLORS.gold} />
+              <Text style={styles.statsText}>{statsLine}</Text>
+            </View>
+          )}
 
           {stops.length === 0 ? (
             <View style={styles.empty}>
@@ -272,7 +306,7 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
         </ScrollView>
       )}
 
-      {/* Stop editor */}
+      {/* Stop editor — persistent/repeatable: stays open for back-to-back adds */}
       <Modal visible={editorVisible} animationType="slide" onRequestClose={() => setEditorVisible(false)}>
         <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScreenHeader
@@ -280,19 +314,27 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
             onBack={() => setEditorVisible(false)}
             borderBottom
             right={(
-              <TouchableOpacity onPress={saveStop} style={styles.doneBtn} accessibilityRole="button">
-                <Text style={styles.saveText}>{t('common.save')}</Text>
+              <TouchableOpacity onPress={() => setEditorVisible(false)} style={styles.doneBtn} accessibilityRole="button">
+                <Text style={styles.saveText}>{t('common.done', { defaultValue: 'Done' })}</Text>
               </TouchableOpacity>
             )}
           />
+          {stops.length > 0 && (
+            <View style={styles.editorStatsRow}>
+              <Ionicons name="footsteps-outline" size={13} color={COLORS.gold} />
+              <Text style={styles.statsText}>{statsLine}</Text>
+            </View>
+          )}
           <ScrollView contentContainerStyle={{ padding: SPACING.lg, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
             <Text style={styles.fieldLabel}>{t('trailEditor.titleLabel')}</Text>
             <TextInput
+              ref={titleInputRef}
               style={styles.input}
               value={draft.title}
               onChangeText={(v) => setDraft((d) => ({ ...d, title: v }))}
               placeholder={t('trailEditor.titlePlaceholder')}
               placeholderTextColor={COLORS.text3}
+              returnKeyType="next"
             />
 
             <Text style={styles.fieldLabel}>{t('trailEditor.locationLabel')}</Text>
@@ -327,17 +369,17 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
               placeholderTextColor={COLORS.text3}
             />
 
-            <Text style={styles.fieldLabel}>{t('trailEditor.contentLabel')}</Text>
+            <Text style={styles.fieldLabel}>{t('trailEditor.contentLabel')} <Text style={styles.optionalTag}>{t('trailEditor.optional', { defaultValue: '(optional)' })}</Text></Text>
             <TextInput
               style={[styles.input, styles.multiline]}
               value={draft.content}
               onChangeText={(v) => setDraft((d) => ({ ...d, content: v }))}
-              placeholder={t('trailEditor.contentPlaceholder')}
+              placeholder={t('trailEditor.contentPlaceholderHelper', { defaultValue: "A short note helps first-timers — what's special here, what to try?" })}
               placeholderTextColor={COLORS.text3}
               multiline
             />
 
-            <Text style={styles.fieldLabel}>{t('trailEditor.tipLabel')}</Text>
+            <Text style={styles.fieldLabel}>{t('trailEditor.tipLabel')} <Text style={styles.optionalTag}>{t('trailEditor.optional', { defaultValue: '(optional)' })}</Text></Text>
             <TextInput
               style={styles.input}
               value={draft.tip}
@@ -346,7 +388,7 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
               placeholderTextColor={COLORS.text3}
             />
 
-            <Text style={styles.fieldLabel}>{t('trailEditor.photoLabel', { defaultValue: 'Photo (optional)' })}</Text>
+            <Text style={styles.fieldLabel}>{t('trailEditor.photoLabelShort', { defaultValue: 'Photo' })} <Text style={styles.optionalTag}>{t('trailEditor.optional', { defaultValue: '(optional)' })}</Text></Text>
             {draft.photo_url ? (
               <TouchableOpacity onPress={pickStopPhoto} activeOpacity={0.85} disabled={uploadingPhoto}>
                 <Image source={{ uri: draft.photo_url }} style={styles.stopPhoto} resizeMode="cover" />
@@ -360,7 +402,7 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
               </TouchableOpacity>
             )}
 
-            <Text style={styles.fieldLabel}>{t('trailEditor.estMinutesLabel', { defaultValue: 'Estimated time (minutes)' })}</Text>
+            <Text style={styles.fieldLabel}>{t('trailEditor.estMinutesLabelShort', { defaultValue: 'Estimated time (minutes)' })} <Text style={styles.optionalTag}>{t('trailEditor.optional', { defaultValue: '(optional)' })}</Text></Text>
             <TextInput
               style={styles.input}
               value={draft.estimated_minutes != null ? String(draft.estimated_minutes) : ''}
@@ -373,6 +415,26 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
               keyboardType="number-pad"
             />
           </ScrollView>
+
+          {/* Persistent footer: primary keeps the editor open for the next stop. */}
+          <View style={[styles.editorFooter, { paddingBottom: insets.bottom + SPACING.sm }]}>
+            {editingIndex == null ? (
+              <>
+                <TouchableOpacity style={styles.primaryBtn} onPress={() => saveStop(true)} activeOpacity={0.85} accessibilityRole="button">
+                  <Ionicons name="add" size={18} color={COLORS.bg} />
+                  <Text style={styles.primaryBtnText}>{t('trailEditor.saveAndAdd', { defaultValue: 'Save & add another' })}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.secondaryBtn} onPress={() => saveStop(false)} activeOpacity={0.85} accessibilityRole="button">
+                  <Text style={styles.secondaryBtnText}>{t('trailEditor.saveAndClose', { defaultValue: 'Save & close' })}</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity style={styles.primaryBtn} onPress={() => saveStop(false)} activeOpacity={0.85} accessibilityRole="button">
+                <Ionicons name="checkmark" size={18} color={COLORS.bg} />
+                <Text style={styles.primaryBtnText}>{t('common.save')}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -385,6 +447,17 @@ const styles = StyleSheet.create({
   doneBtn: { width: 44, height: 44, alignItems: 'flex-end', justifyContent: 'center' },
   doneBtnDisabled: { opacity: 0.4 },
   saveText: { ...font('labelBold'), fontSize: 15, color: COLORS.ember },
+
+  statsRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, marginBottom: SPACING.md, borderRadius: RADIUS.pill, backgroundColor: `${COLORS.gold}14`, borderWidth: 1, borderColor: `${COLORS.gold}33` },
+  editorStatsRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm, borderBottomWidth: 1, borderBottomColor: COLORS.border, backgroundColor: `${COLORS.gold}0D` },
+  statsText: { ...font('labelBold'), fontSize: 13, color: COLORS.gold },
+  optionalTag: { ...font('caption'), color: COLORS.text3, textTransform: 'none' },
+
+  editorFooter: { flexDirection: 'row', gap: SPACING.sm, paddingHorizontal: SPACING.lg, paddingTop: SPACING.sm, borderTopWidth: 1, borderTopColor: COLORS.border, backgroundColor: COLORS.bg },
+  primaryBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.gold },
+  primaryBtnText: { ...font('labelBold'), color: COLORS.bg },
+  secondaryBtn: { alignItems: 'center', justifyContent: 'center', paddingVertical: SPACING.md, paddingHorizontal: SPACING.lg, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.bg3 },
+  secondaryBtnText: { ...font('labelBold'), color: COLORS.text2 },
 
   empty: { alignItems: 'center', paddingVertical: SPACING.xl, gap: SPACING.xs },
   emptyIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: `${COLORS.gold}22`, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.sm },

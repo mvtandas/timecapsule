@@ -17,7 +17,7 @@ import { useAuthStore } from '../../store/authStore';
 import { FriendService, FriendshipStatus } from '../../services/friendService';
 import { ReportService, REPORT_REASONS } from '../../services/reportService';
 import CapsuleDetailModal from '../../components/CapsuleDetailModal';
-import { getMediaUrl } from '../../utils/mediaUtils';
+import { getMediaUrl, isLocked } from '../../utils/mediaUtils';
 import { timeAgo } from '../../utils/dateUtils';
 import { COLORS, GRADIENTS, font } from '../../constants/theme';
 import ScreenHeader from '../../components/common/ScreenHeader';
@@ -472,7 +472,7 @@ const FriendProfileScreen = ({ onNavigate, onGoBack, friend }: FriendProfileScre
               <View style={styles.cardsGrid}>
                 {publicCapsules.map((capsule, index) => {
                   const mediaUrl = getMediaUrl(capsule);
-                  const isLocked = capsule.open_at && new Date(capsule.open_at).getTime() > Date.now();
+                  const locked = isLocked(capsule.open_at);
 
                   return (
                     <TouchableOpacity
@@ -493,7 +493,7 @@ const FriendProfileScreen = ({ onNavigate, onGoBack, friend }: FriendProfileScre
                             <Ionicons name="time" size={28} color={COLORS.white} />
                           </LinearGradient>
                         )}
-                        {isLocked && (
+                        {locked && (
                           <View style={styles.cardLockBadge}>
                             <Ionicons name="lock-closed" size={12} color={COLORS.white} />
                           </View>

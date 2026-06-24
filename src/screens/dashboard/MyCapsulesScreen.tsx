@@ -183,11 +183,6 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack }: MyCapsulesScreenProps) => {
     });
   };
 
-  const isCapsuleLocked = (capsule: any): boolean => {
-    if (!capsule?.open_at) return false;
-    return new Date(capsule.open_at).getTime() > new Date().getTime();
-  };
-
   const getTimeComponents = (dateString: string | null) => {
     if (!dateString) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
     
