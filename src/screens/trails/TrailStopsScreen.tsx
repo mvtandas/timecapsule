@@ -277,8 +277,15 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
             </View>
           ) : (
             stops.map((s, i) => (
-              <View key={i} style={styles.stopCard}>
-                <View style={styles.ordinalBadge}><Text style={styles.ordinalText}>{i + 1}</Text></View>
+              <View key={i} style={styles.stopRow}>
+                {/* Timeline rail: numbered badge linked by a vertical connector */}
+                <View style={styles.rail}>
+                  {stops.length > 1 && (
+                    <View style={[styles.railLine, i === 0 && styles.railLineFirst, i === stops.length - 1 && styles.railLineLast]} />
+                  )}
+                  <View style={styles.ordinalBadge}><Text style={styles.ordinalText}>{i + 1}</Text></View>
+                </View>
+                <View style={styles.stopCard}>
                 <TouchableOpacity style={styles.stopBody} onPress={() => openEdit(i)} activeOpacity={0.7}>
                   <Text style={styles.stopTitle} numberOfLines={1}>{s.title || t('trailEditor.stopNum', { n: i + 1 })}</Text>
                   {!!s.location_name && <Text style={styles.stopMeta} numberOfLines={1}><Ionicons name="location" size={11} color={COLORS.text3} /> {s.location_name}</Text>}
@@ -294,6 +301,7 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
                   <TouchableOpacity onPress={() => removeStop(i)} style={styles.iconBtn} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                     <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
                   </TouchableOpacity>
+                </View>
                 </View>
               </View>
             ))
@@ -464,8 +472,14 @@ const styles = StyleSheet.create({
   emptyTitle: { ...font('title'), color: COLORS.text },
   emptyText: { ...font('body'), color: COLORS.text2, textAlign: 'center', paddingHorizontal: SPACING.lg },
 
-  stopCard: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.sm },
-  ordinalBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
+  // Connected timeline: rail (badge + vertical connector) beside each stop card.
+  stopRow: { flexDirection: 'row', alignItems: 'stretch', marginBottom: SPACING.sm },
+  rail: { width: 28, alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md },
+  railLine: { position: 'absolute', width: 2, top: 0, bottom: -SPACING.sm, backgroundColor: `${COLORS.gold}66` },
+  railLineFirst: { top: '50%' },
+  railLineLast: { bottom: '50%' },
+  stopCard: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SPACING.md, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, padding: SPACING.md },
+  ordinalBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
   ordinalText: { ...font('labelBold'), color: COLORS.bg },
   stopBody: { flex: 1 },
   stopTitle: { ...font('bodyBold'), color: COLORS.text },

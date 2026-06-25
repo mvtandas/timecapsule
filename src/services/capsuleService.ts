@@ -333,24 +333,22 @@ export class CapsuleService {
         .eq('user_id', user.id);
       const sharedIds = (shared || []).map((s: any) => s.capsule_id);
 
-      // owner + public + shared-with-me + whispers addressed to me (recipient_id).
-      let orFilter = `owner_id.eq.${user.id},is_public.eq.true,recipient_id.eq.${user.id}`;
-      if (sharedIds.length) orFilter += `,id.in.(${sharedIds.join(',')})`;
+      // owner + public + shared-with-me (+ whispers addressed to me via recipient_id).
+      const sharedClause = sharedIds.length ? `,id.in.(${sharedIds.join(',')})` : '';
+      const fullOr = `owner_id.eq.${user.id},is_public.eq.true,recipient_id.eq.${user.id}${sharedClause}`;
+      // Resilient fallback for backends behind on migrations: recipient_id (0004)
+      // may not exist, which would 400 the whole query — retry without it.
+      const safeOr = `owner_id.eq.${user.id},is_public.eq.true${sharedClause}`;
+
+      const runOr = async (table: string, or: string) =>
+        supabase.from(table as any).select('*').or(or).order('created_at', { ascending: false });
 
       // Read through the masking view (sealed content withheld server-side);
-      // fall back to the base table if the view isn't present yet (migration 0009).
-      let resp: any = await supabase
-        .from('capsules_view' as any)
-        .select('*')
-        .or(orFilter)
-        .order('created_at', { ascending: false });
-      if (resp.error) {
-        resp = await supabase
-          .from('capsules')
-          .select('*')
-          .or(orFilter)
-          .order('created_at', { ascending: false });
-      }
+      // fall back to the base table if the view isn't present yet (migration 0009);
+      // then drop recipient_id if the column is missing (migration 0004 not run).
+      let resp: any = await runOr('capsules_view', fullOr);
+      if (resp.error) resp = await runOr('capsules', fullOr);
+      if (resp.error) resp = await runOr('capsules', safeOr);
       if (resp.error) throw resp.error;
 
       // Filter out blocked users' content, then strip any still-sealed payload.
