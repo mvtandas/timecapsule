@@ -181,6 +181,7 @@ function AppStack() {
           <TrailStopsScreen
             capsuleId={(route.params as any)?.capsuleId}
             trailTitle={(route.params as any)?.trailTitle}
+            trailDesc={(route.params as any)?.trailDesc}
             fromCreate={(route.params as any)?.fromCreate}
             {...makeNav(navigation)}
           />

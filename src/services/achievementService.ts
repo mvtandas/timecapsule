@@ -78,7 +78,17 @@ export class AchievementService {
 
     let savedCount = 0;
     let trailsCompleted = 0;
-    if (userId) {
+    if (isTarget) {
+      // RLS hides another user's saved_caps / trail_progress rows, so count them
+      // via a SECURITY DEFINER RPC (migration 0010). If the RPC isn't present
+      // yet, fall back to 0 — those two badges just won't show for others.
+      try {
+        const { data: bc } = await db.rpc('user_badge_counts', { p_user: targetUserId });
+        const row = Array.isArray(bc) ? bc[0] : bc;
+        savedCount = row?.saved_count || 0;
+        trailsCompleted = row?.trails_completed || 0;
+      } catch { /* RPC missing — leave both at 0 */ }
+    } else if (userId) {
       const { count: sc } = await db
         .from('saved_caps')
         .select('id', { count: 'exact', head: true })

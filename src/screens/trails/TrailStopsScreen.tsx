@@ -21,6 +21,8 @@ import { useT } from '../../i18n';
 interface Props {
   capsuleId: string;
   trailTitle?: string;
+  /** Trail description, threaded through so the share card has a subtitle. */
+  trailDesc?: string;
   /** True when arriving straight from the create wizard (vs editing an existing
    * trail from My Caps) — controls where leave() lands so we don't drop back
    * onto the still-mounted Create modal. */
@@ -43,7 +45,7 @@ type Draft = {
 const emptyDraft = (): Draft => ({ title: '', content: '', tip: '', lat: null, lng: null, location_name: '', photo_url: null, estimated_minutes: null });
 const FALLBACK = { latitude: 40.99, longitude: 29.02 }; // demo area fallback
 
-const TrailStopsScreen = ({ capsuleId, trailTitle, fromCreate, onNavigate, onGoBack }: Props) => {
+const TrailStopsScreen = ({ capsuleId, trailTitle, trailDesc, fromCreate, onNavigate, onGoBack }: Props) => {
   const t = useT();
   const insets = useSafeAreaInsets();
 
@@ -504,7 +506,7 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, fromCreate, onNavigate, onGoB
 
       <ShareSheet
         visible={showShare}
-        cap={{ id: capsuleId, type: 'trail', title: trailTitle, location_name: stops[0]?.location_name || undefined }}
+        cap={{ id: capsuleId, type: 'trail', title: trailTitle, description: trailDesc || undefined, location_name: stops[0]?.location_name || undefined }}
         onClose={() => { setShowShare(false); leave(); }}
       />
     </View>

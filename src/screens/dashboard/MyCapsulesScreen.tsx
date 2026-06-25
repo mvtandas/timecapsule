@@ -406,7 +406,7 @@ const MyCapsulesScreen = ({ onNavigate, onGoBack }: MyCapsulesScreenProps) => {
                   <TouchableOpacity
                     onPress={(e) => {
                       e.stopPropagation();
-                      onNavigate('TrailStops', { capsuleId: capsule.id, trailTitle: capsule.title });
+                      onNavigate('TrailStops', { capsuleId: capsule.id, trailTitle: capsule.title, trailDesc: capsule.description });
                     }}
                     style={styles.deleteButton}
                     accessibilityRole="button"

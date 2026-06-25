@@ -42,7 +42,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack, initialType }: Props) => {
   if (type === 'trail') return (
     <TrailCreate
       onClose={backToPicker}
-      onCreated={(capsuleId, trailTitle) => onNavigate('TrailStops', { capsuleId, trailTitle, fromCreate: true })}
+      onCreated={(capsuleId, trailTitle, trailDesc) => onNavigate('TrailStops', { capsuleId, trailTitle, trailDesc, fromCreate: true })}
     />
   );
   if (type) return <ComingSoon type={type} onClose={backToPicker} />;

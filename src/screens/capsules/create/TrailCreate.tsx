@@ -16,7 +16,7 @@ import { Heading, ReviewRow, ToggleRow, CategoryPicker, TRAIL_CATEGORIES, upload
 interface Props {
   onClose: () => void;
   /** Trail caps continue into the stop editor after the cap is created. */
-  onCreated: (capsuleId: string, title: string) => void;
+  onCreated: (capsuleId: string, title: string, desc?: string) => void;
 }
 const STEPS = 2; // Name · Seal (stops added in the next screen)
 
@@ -57,7 +57,7 @@ const TrailCreate: React.FC<Props> = ({ onClose, onCreated }) => {
       // Clear the spinner before navigating so it can never stay stuck if the
       // push to the stop editor is delayed.
       setSealing(false);
-      onCreated((data as any).id, title || getCapType('trail').name);
+      onCreated((data as any).id, title || getCapType('trail').name, desc || undefined);
     } catch (e: any) { Alert.alert(t('createFlow.alert_error'), e?.message || t('createFlow.alert_something_wrong')); setSealing(false); }
   };
 
