@@ -232,7 +232,8 @@
       "approve": "Approve",
       "gatheringComplete": "The gathering is complete",
       "finishTrail": "Finish trail →",
-      "unlockOnArrival": "Its photo & message unlock when you arrive."
+      "unlockOnArrival": "Its photo & message unlock when you arrive.",
+      "enableLocation": "Enable location"
     },
     "comments": {
       "title": "Comments",
@@ -918,7 +919,9 @@
       "wa_tag": "Discovered on Voorcap",
       "wa_open": "Open in Voorcap  →",
       "wa_now": "just now",
-      "wa_confirm": "Send on WhatsApp"
+      "wa_confirm": "Send on WhatsApp",
+      "send_to_n": "Send to %{count} people  →",
+      "sent_count": "Sent to %{count} people."
     },
     "capture": {
       "permission_title": "Camera access",
@@ -990,7 +993,8 @@
       "statsLine": "%{count} stops · ~%{minutes} min total",
       "readyTitle": "Your trail is ready",
       "readyDesc": "Share it so people can follow your route, stop by stop.",
-      "shareTrail": "Share trail"
+      "shareTrail": "Share trail",
+      "statsLineCountOnly": "%{count} stops"
     },
     "discover": {
       "title": "Discover",
@@ -1301,7 +1305,8 @@
       "selfWhisperSub": "Kendine bir mektup",
       "creatorPreview": "Oluşturan önizlemesi",
       "finishTrail": "Rotayı bitir →",
-      "unlockOnArrival": "Fotoğraf ve mesajı yanına gidince açılır."
+      "unlockOnArrival": "Fotoğraf ve mesajı yanına gidince açılır.",
+      "enableLocation": "Konumu aç"
     },
     "comments": {
       "title": "Yorumlar",
@@ -1987,7 +1992,9 @@
       "ig_save": "Görseli kaydet / paylaş",
       "ig_cta": "Yakınındaki cap'leri bul",
       "x_confirm": "X'te paylaş",
-      "label_instagram": "Instagram Hikâyeleri"
+      "label_instagram": "Instagram Hikâyeleri",
+      "send_to_n": "%{count} kişiye gönder  →",
+      "sent_count": "%{count} kişiye gönderildi."
     },
     "capture": {
       "permission_title": "Kamera erişimi",
@@ -2059,7 +2066,8 @@
       "statsLine": "%{count} durak · ~%{minutes} dk toplam",
       "readyTitle": "Rotan hazır",
       "readyDesc": "Paylaş ki insanlar rotanı durak durak takip edebilsin.",
-      "shareTrail": "Rotayı paylaş"
+      "shareTrail": "Rotayı paylaş",
+      "statsLineCountOnly": "%{count} durak"
     },
     "discover": {
       "title": "Keşfet",
@@ -2370,7 +2378,8 @@
       "selfWhisperSub": "Una carta para ti",
       "creatorPreview": "Vista previa del creador",
       "finishTrail": "Terminar ruta →",
-      "unlockOnArrival": "Su foto y mensaje se desbloquean cuando llegas."
+      "unlockOnArrival": "Su foto y mensaje se desbloquean cuando llegas.",
+      "enableLocation": "Activar ubicación"
     },
     "comments": {
       "title": "Comentarios",
@@ -3056,7 +3065,9 @@
       "ig_save": "Guardar / Compartir imagen",
       "ig_cta": "Encuentra caps cerca de ti",
       "x_confirm": "Publicar en X",
-      "label_instagram": "Historias de Instagram"
+      "label_instagram": "Historias de Instagram",
+      "send_to_n": "Enviar a %{count} personas  →",
+      "sent_count": "Enviado a %{count} personas."
     },
     "capture": {
       "permission_title": "Acceso a la cámara",
@@ -3128,7 +3139,8 @@
       "statsLine": "%{count} paradas · ~%{minutes} min en total",
       "readyTitle": "Tu ruta está lista",
       "readyDesc": "Compártela para que otros sigan tu ruta, parada por parada.",
-      "shareTrail": "Compartir ruta"
+      "shareTrail": "Compartir ruta",
+      "statsLineCountOnly": "%{count} paradas"
     },
     "discover": {
       "title": "Descubrir",
@@ -3439,7 +3451,8 @@
       "selfWhisperSub": "Une lettre à vous-même",
       "creatorPreview": "Aperçu créateur",
       "finishTrail": "Terminer le parcours →",
-      "unlockOnArrival": "Sa photo et son message se débloquent à votre arrivée."
+      "unlockOnArrival": "Sa photo et son message se débloquent à votre arrivée.",
+      "enableLocation": "Activer la localisation"
     },
     "comments": {
       "title": "Commentaires",
@@ -4125,7 +4138,9 @@
       "ig_save": "Enregistrer / Partager l'image",
       "ig_cta": "Trouvez des caps près de vous",
       "x_confirm": "Publier sur X",
-      "label_instagram": "Stories Instagram"
+      "label_instagram": "Stories Instagram",
+      "send_to_n": "Envoyer à %{count} personnes  →",
+      "sent_count": "Envoyé à %{count} personnes."
     },
     "capture": {
       "permission_title": "Accès à l’appareil photo",
@@ -4197,7 +4212,8 @@
       "statsLine": "%{count} étapes · ~%{minutes} min au total",
       "readyTitle": "Votre parcours est prêt",
       "readyDesc": "Partagez-le pour que les autres suivent votre itinéraire, étape par étape.",
-      "shareTrail": "Partager le parcours"
+      "shareTrail": "Partager le parcours",
+      "statsLineCountOnly": "%{count} étapes"
     },
     "discover": {
       "title": "Découvrir",
@@ -4508,7 +4524,8 @@
       "selfWhisperSub": "Ein Brief an dich selbst",
       "creatorPreview": "Ersteller-Vorschau",
       "finishTrail": "Trail beenden →",
-      "unlockOnArrival": "Foto und Nachricht werden freigeschaltet, wenn du ankommst."
+      "unlockOnArrival": "Foto und Nachricht werden freigeschaltet, wenn du ankommst.",
+      "enableLocation": "Standort aktivieren"
     },
     "comments": {
       "title": "Kommentare",
@@ -5194,7 +5211,9 @@
       "ig_save": "Bild speichern / teilen",
       "ig_cta": "Finde Caps in deiner Nähe",
       "x_confirm": "Auf X posten",
-      "label_instagram": "Instagram Stories"
+      "label_instagram": "Instagram Stories",
+      "send_to_n": "An %{count} Personen senden  →",
+      "sent_count": "An %{count} Personen gesendet."
     },
     "capture": {
       "permission_title": "Kamerazugriff",
@@ -5266,7 +5285,8 @@
       "statsLine": "%{count} Stopps · ~%{minutes} Min. gesamt",
       "readyTitle": "Dein Trail ist fertig",
       "readyDesc": "Teile ihn, damit andere deiner Route Stopp für Stopp folgen können.",
-      "shareTrail": "Trail teilen"
+      "shareTrail": "Trail teilen",
+      "statsLineCountOnly": "%{count} Stopps"
     },
     "discover": {
       "title": "Entdecken",
@@ -5577,7 +5597,8 @@
       "selfWhisperSub": "Uma carta para você mesmo",
       "creatorPreview": "Pré-visualização do criador",
       "finishTrail": "Terminar trilho →",
-      "unlockOnArrival": "A foto e a mensagem são desbloqueadas quando você chega."
+      "unlockOnArrival": "A foto e a mensagem são desbloqueadas quando você chega.",
+      "enableLocation": "Ativar localização"
     },
     "comments": {
       "title": "Comentários",
@@ -6263,7 +6284,9 @@
       "ig_save": "Salvar / Compartilhar imagem",
       "ig_cta": "Encontre caps perto de você",
       "x_confirm": "Publicar no X",
-      "label_instagram": "Stories do Instagram"
+      "label_instagram": "Stories do Instagram",
+      "send_to_n": "Enviar para %{count} pessoas  →",
+      "sent_count": "Enviado para %{count} pessoas."
     },
     "capture": {
       "permission_title": "Acesso à câmera",
@@ -6335,7 +6358,8 @@
       "statsLine": "%{count} paradas · ~%{minutes} min no total",
       "readyTitle": "Sua trilha está pronta",
       "readyDesc": "Compartilhe para que outros sigam sua rota, parada por parada.",
-      "shareTrail": "Compartilhar trilha"
+      "shareTrail": "Compartilhar trilha",
+      "statsLineCountOnly": "%{count} paradas"
     },
     "discover": {
       "title": "Descobrir",
@@ -6646,7 +6670,8 @@
       "selfWhisperSub": "Una lettera a te stesso",
       "creatorPreview": "Anteprima creatore",
       "finishTrail": "Termina percorso →",
-      "unlockOnArrival": "La foto e il messaggio si sbloccano quando arrivi."
+      "unlockOnArrival": "La foto e il messaggio si sbloccano quando arrivi.",
+      "enableLocation": "Attiva la posizione"
     },
     "comments": {
       "title": "Commenti",
@@ -7332,7 +7357,9 @@
       "ig_save": "Salva / Condividi immagine",
       "ig_cta": "Trova cap vicino a te",
       "x_confirm": "Pubblica su X",
-      "label_instagram": "Storie di Instagram"
+      "label_instagram": "Storie di Instagram",
+      "send_to_n": "Invia a %{count} persone  →",
+      "sent_count": "Inviato a %{count} persone."
     },
     "capture": {
       "permission_title": "Accesso alla fotocamera",
@@ -7404,7 +7431,8 @@
       "statsLine": "%{count} tappe · ~%{minutes} min in totale",
       "readyTitle": "Il tuo percorso è pronto",
       "readyDesc": "Condividilo così gli altri possono seguire il tuo itinerario, tappa per tappa.",
-      "shareTrail": "Condividi percorso"
+      "shareTrail": "Condividi percorso",
+      "statsLineCountOnly": "%{count} tappe"
     },
     "discover": {
       "title": "Scopri",
@@ -7715,7 +7743,8 @@
       "selfWhisperSub": "Письмо самому себе",
       "creatorPreview": "Предпросмотр создателя",
       "finishTrail": "Завершить маршрут →",
-      "unlockOnArrival": "Фото и сообщение откроются, когда вы придёте."
+      "unlockOnArrival": "Фото и сообщение откроются, когда вы придёте.",
+      "enableLocation": "Включить геолокацию"
     },
     "comments": {
       "title": "Комментарии",
@@ -8401,7 +8430,9 @@
       "ig_save": "Сохранить / поделиться",
       "ig_cta": "Найдите cap'ы рядом",
       "x_confirm": "Опубликовать в X",
-      "label_instagram": "Instagram Stories"
+      "label_instagram": "Instagram Stories",
+      "send_to_n": "Отправить %{count} людям  →",
+      "sent_count": "Отправлено %{count} людям."
     },
     "capture": {
       "permission_title": "Доступ к камере",
@@ -8473,7 +8504,8 @@
       "statsLine": "%{count} остановок · ~%{minutes} мин всего",
       "readyTitle": "Ваш маршрут готов",
       "readyDesc": "Поделитесь им, чтобы другие могли пройти ваш маршрут от точки к точке.",
-      "shareTrail": "Поделиться маршрутом"
+      "shareTrail": "Поделиться маршрутом",
+      "statsLineCountOnly": "%{count} остановок"
     },
     "discover": {
       "title": "Обзор",
@@ -8784,7 +8816,8 @@
       "selfWhisperSub": "ख़ुद के नाम एक चिट्ठी",
       "creatorPreview": "क्रिएटर प्रीव्यू",
       "finishTrail": "ट्रेल पूरा करें →",
-      "unlockOnArrival": "इसकी फ़ोटो और संदेश तब खुलते हैं जब आप पहुँचते हैं।"
+      "unlockOnArrival": "इसकी फ़ोटो और संदेश तब खुलते हैं जब आप पहुँचते हैं।",
+      "enableLocation": "लोकेशन चालू करें"
     },
     "comments": {
       "title": "टिप्पणियाँ",
@@ -9470,7 +9503,9 @@
       "ig_save": "इमेज सेव / साझा करें",
       "ig_cta": "अपने पास caps खोजें",
       "x_confirm": "X पर पोस्ट करें",
-      "label_instagram": "Instagram Stories"
+      "label_instagram": "Instagram Stories",
+      "send_to_n": "%{count} लोगों को भेजें  →",
+      "sent_count": "%{count} लोगों को भेजा गया।"
     },
     "capture": {
       "permission_title": "कैमरा एक्सेस",
@@ -9542,7 +9577,8 @@
       "statsLine": "%{count} पड़ाव · ~%{minutes} मिनट कुल",
       "readyTitle": "आपका ट्रेल तैयार है",
       "readyDesc": "इसे साझा करें ताकि लोग आपके रास्ते को पड़ाव दर पड़ाव फ़ॉलो कर सकें।",
-      "shareTrail": "ट्रेल साझा करें"
+      "shareTrail": "ट्रेल साझा करें",
+      "statsLineCountOnly": "%{count} पड़ाव"
     },
     "discover": {
       "title": "खोजें",
@@ -9853,7 +9889,8 @@
       "selfWhisperSub": "写给自己的信",
       "creatorPreview": "创建者预览",
       "finishTrail": "完成路线 →",
-      "unlockOnArrival": "到达后即可解锁照片和留言。"
+      "unlockOnArrival": "到达后即可解锁照片和留言。",
+      "enableLocation": "开启定位"
     },
     "comments": {
       "title": "评论",
@@ -10539,7 +10576,9 @@
       "ig_save": "保存 / 分享图片",
       "ig_cta": "发现你附近的 cap",
       "x_confirm": "发布到 X",
-      "label_instagram": "Instagram Stories"
+      "label_instagram": "Instagram Stories",
+      "send_to_n": "发送给 %{count} 人  →",
+      "sent_count": "已发送给 %{count} 人。"
     },
     "capture": {
       "permission_title": "相机权限",
@@ -10611,7 +10650,8 @@
       "statsLine": "%{count} 个站点 · 共约 %{minutes} 分钟",
       "readyTitle": "你的路线已就绪",
       "readyDesc": "分享出去，让大家可以一站一站地跟随你的路线。",
-      "shareTrail": "分享路线"
+      "shareTrail": "分享路线",
+      "statsLineCountOnly": "%{count} 个站点"
     },
     "discover": {
       "title": "发现",
@@ -10922,7 +10962,8 @@
       "selfWhisperSub": "自分への手紙",
       "creatorPreview": "作成者プレビュー",
       "finishTrail": "トレイルを終える →",
-      "unlockOnArrival": "到着すると写真とメッセージが開きます。"
+      "unlockOnArrival": "到着すると写真とメッセージが開きます。",
+      "enableLocation": "位置情報をオンにする"
     },
     "comments": {
       "title": "コメント",
@@ -11608,7 +11649,9 @@
       "ig_save": "画像を保存 / 共有",
       "ig_cta": "近くのcapを探す",
       "x_confirm": "Xに投稿",
-      "label_instagram": "Instagramストーリーズ"
+      "label_instagram": "Instagramストーリーズ",
+      "send_to_n": "%{count} 人に送信  →",
+      "sent_count": "%{count} 人に送信しました。"
     },
     "capture": {
       "permission_title": "カメラへのアクセス",
@@ -11680,7 +11723,8 @@
       "statsLine": "%{count} 拠点 · 合計約 %{minutes} 分",
       "readyTitle": "トレイルが完成しました",
       "readyDesc": "シェアして、みんながあなたのルートを拠点ごとにたどれるようにしましょう。",
-      "shareTrail": "トレイルをシェア"
+      "shareTrail": "トレイルをシェア",
+      "statsLineCountOnly": "%{count} 拠点"
     },
     "discover": {
       "title": "見つける",

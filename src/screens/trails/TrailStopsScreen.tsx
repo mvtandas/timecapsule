@@ -21,6 +21,10 @@ import { useT } from '../../i18n';
 interface Props {
   capsuleId: string;
   trailTitle?: string;
+  /** True when arriving straight from the create wizard (vs editing an existing
+   * trail from My Caps) — controls where leave() lands so we don't drop back
+   * onto the still-mounted Create modal. */
+  fromCreate?: boolean;
   onNavigate: (screen: string, data?: any) => void;
   onGoBack?: () => void;
 }
@@ -39,7 +43,7 @@ type Draft = {
 const emptyDraft = (): Draft => ({ title: '', content: '', tip: '', lat: null, lng: null, location_name: '', photo_url: null, estimated_minutes: null });
 const FALLBACK = { latitude: 40.99, longitude: 29.02 }; // demo area fallback
 
-const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props) => {
+const TrailStopsScreen = ({ capsuleId, trailTitle, fromCreate, onNavigate, onGoBack }: Props) => {
   const t = useT();
   const insets = useSafeAreaInsets();
 
@@ -223,7 +227,14 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
     persist(next.map((s, idx) => ({ ...s, ordinal: idx })));
   };
 
-  const leave = () => { if (onGoBack) onGoBack(); else onNavigate('Dashboard'); };
+  const leave = () => {
+    // From the create flow, goBack() would land on the still-mounted Create
+    // modal — navigate to a tab instead so that modal is popped too and the
+    // creator sees the map. From the edit flow, go back to where they came from.
+    if (fromCreate) onNavigate('Dashboard');
+    else if (onGoBack) onGoBack();
+    else onNavigate('Dashboard');
+  };
 
   const done = () => {
     // Demo requirement: a trail needs at least 2 stops to be complete.
@@ -240,11 +251,16 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
 
   // Live stats: total stop count + summed estimated minutes (matches the demo).
   const totalMinutes = stops.reduce((sum, s) => sum + (s.estimated_minutes || 0), 0);
-  const statsLine = t('trailEditor.statsLine', {
-    count: stops.length,
-    minutes: totalMinutes,
-    defaultValue: '%{count} stops · ~%{minutes} min total',
-  });
+  const statsLine = totalMinutes > 0
+    ? t('trailEditor.statsLine', {
+        count: stops.length,
+        minutes: totalMinutes,
+        defaultValue: '%{count} stops · ~%{minutes} min total',
+      })
+    : t('trailEditor.statsLineCountOnly', {
+        count: stops.length,
+        defaultValue: '%{count} stops',
+      });
 
   return (
     <View style={styles.container}>
@@ -461,7 +477,21 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
             <Text style={styles.doneTitle}>{t('trailEditor.readyTitle', { defaultValue: 'Your trail is ready' })}</Text>
             <Text style={styles.doneStats}>{statsLine}</Text>
             <Text style={styles.doneDesc}>{t('trailEditor.readyDesc', { defaultValue: 'Share it so people can follow your route, stop by stop.' })}</Text>
-            <TouchableOpacity style={styles.shareBtn} onPress={() => setShowShare(true)} activeOpacity={0.85} accessibilityRole="button">
+            {/* The connected route, reviewed together before sharing. */}
+            <ScrollView style={styles.donePreview} contentContainerStyle={{ paddingVertical: SPACING.xs }} showsVerticalScrollIndicator={false}>
+              {stops.map((s, i) => (
+                <View key={i} style={styles.donePreviewRow}>
+                  <View style={styles.rail}>
+                    {stops.length > 1 && (
+                      <View style={[styles.railLine, i === 0 && styles.railLineFirst, i === stops.length - 1 && styles.railLineLast]} />
+                    )}
+                    <View style={styles.ordinalBadge}><Text style={styles.ordinalText}>{i + 1}</Text></View>
+                  </View>
+                  <Text style={styles.donePreviewText} numberOfLines={1}>{s.title || t('trailEditor.stopNum', { n: i + 1 })}</Text>
+                </View>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.shareBtn} onPress={() => { setFinished(false); setShowShare(true); }} activeOpacity={0.85} accessibilityRole="button">
               <Ionicons name="share-social" size={18} color={COLORS.bg} />
               <Text style={styles.shareBtnText}>{t('trailEditor.shareTrail', { defaultValue: 'Share trail' })}</Text>
             </TouchableOpacity>
@@ -472,7 +502,11 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
         </View>
       </Modal>
 
-      <ShareSheet visible={showShare} cap={{ id: capsuleId, type: 'trail', title: trailTitle }} onClose={() => setShowShare(false)} />
+      <ShareSheet
+        visible={showShare}
+        cap={{ id: capsuleId, type: 'trail', title: trailTitle, location_name: stops[0]?.location_name || undefined }}
+        onClose={() => { setShowShare(false); leave(); }}
+      />
     </View>
   );
 };
@@ -506,7 +540,10 @@ const styles = StyleSheet.create({
   doneTrophy: { width: 64, height: 64, borderRadius: 32, backgroundColor: `${COLORS.gold}22`, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.md },
   doneTitle: { ...font('title'), color: COLORS.text, textAlign: 'center' },
   doneStats: { ...font('labelBold'), color: COLORS.gold, marginTop: SPACING.xs },
-  doneDesc: { ...font('body'), color: COLORS.text2, textAlign: 'center', marginTop: SPACING.sm, marginBottom: SPACING.lg, paddingHorizontal: SPACING.md },
+  doneDesc: { ...font('body'), color: COLORS.text2, textAlign: 'center', marginTop: SPACING.sm, marginBottom: SPACING.md, paddingHorizontal: SPACING.md },
+  donePreview: { alignSelf: 'stretch', maxHeight: 220, marginBottom: SPACING.md },
+  donePreviewRow: { flexDirection: 'row', alignItems: 'center', minHeight: 40 },
+  donePreviewText: { ...font('body'), color: COLORS.text, flex: 1 },
   shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, alignSelf: 'stretch', paddingVertical: SPACING.md, borderRadius: RADIUS.pill, backgroundColor: COLORS.gold },
   shareBtnText: { ...font('bodyBold'), color: COLORS.bg },
   doneSecondary: { paddingVertical: SPACING.md, marginTop: SPACING.xs },

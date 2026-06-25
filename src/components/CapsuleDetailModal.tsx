@@ -15,6 +15,7 @@ import {
   ScrollView,
   TextInput,
   Platform,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -716,7 +717,16 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
           {!capProx.denied && (
             <Text style={styles.lockedHint}>{t('capDetail.walkWithin', { m: ARRIVE_RADIUS_M })}</Text>
           )}
-          {item?.lat != null && item?.lng != null && (
+          {capProx.denied ? (
+            <TouchableOpacity
+              style={styles.takeMeThereBtn}
+              onPress={() => Linking.openSettings()}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="location-outline" size={16} color="#fff" />
+              <Text style={styles.takeMeThereText}>{t('capDetail.enableLocation', { defaultValue: 'Enable location' })}</Text>
+            </TouchableOpacity>
+          ) : item?.lat != null && item?.lng != null ? (
             <TouchableOpacity
               style={styles.takeMeThereBtn}
               onPress={() => openDirections(item.lat, item.lng, item.title)}
@@ -724,7 +734,7 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
               <Ionicons name="navigate" size={16} color="#fff" />
               <Text style={styles.takeMeThereText}>{t('capDetail.takeMeThere')}</Text>
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
       )}
 
