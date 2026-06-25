@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import { Skeleton } from '../../components/common/Skeleton';
+import ShareSheet from '../../components/ShareSheet';
 import { TrailService, type TrailStop } from '../../services/trailService';
 import { MediaService } from '../../services/mediaService';
 import { supabase } from '../../lib/supabase';
@@ -48,6 +49,10 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
   const [region, setRegion] = useState(FALLBACK);
 
   const [editorVisible, setEditorVisible] = useState(false);
+  // Completion + share: shown after the trail is finished so the creator can
+  // immediately share the connected route (key for influencer distribution).
+  const [finished, setFinished] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft());
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -226,7 +231,9 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
       Alert.alert(t('trailEditor.needTwoStops', { defaultValue: 'Add at least 2 stops before finishing your trail.' }));
       return;
     }
-    leave();
+    // Show the completion screen so the creator can review the connected route
+    // and share it, instead of silently dropping back to the map.
+    setFinished(true);
   };
 
   const canFinish = stops.length >= 2;
@@ -445,6 +452,27 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, onNavigate, onGoBack }: Props
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Completion → share: review the connected route, then share it. */}
+      <Modal visible={finished} animationType="slide" transparent onRequestClose={leave}>
+        <View style={styles.doneOverlay}>
+          <View style={[styles.doneCard, { paddingBottom: insets.bottom + SPACING.lg }]}>
+            <View style={styles.doneTrophy}><Ionicons name="trophy" size={34} color={COLORS.gold} /></View>
+            <Text style={styles.doneTitle}>{t('trailEditor.readyTitle', { defaultValue: 'Your trail is ready' })}</Text>
+            <Text style={styles.doneStats}>{statsLine}</Text>
+            <Text style={styles.doneDesc}>{t('trailEditor.readyDesc', { defaultValue: 'Share it so people can follow your route, stop by stop.' })}</Text>
+            <TouchableOpacity style={styles.shareBtn} onPress={() => setShowShare(true)} activeOpacity={0.85} accessibilityRole="button">
+              <Ionicons name="share-social" size={18} color={COLORS.bg} />
+              <Text style={styles.shareBtnText}>{t('trailEditor.shareTrail', { defaultValue: 'Share trail' })}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.doneSecondary} onPress={leave} activeOpacity={0.7} accessibilityRole="button">
+              <Text style={styles.doneSecondaryText}>{t('common.done', { defaultValue: 'Done' })}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <ShareSheet visible={showShare} cap={{ id: capsuleId, type: 'trail', title: trailTitle }} onClose={() => setShowShare(false)} />
     </View>
   );
 };
@@ -471,6 +499,18 @@ const styles = StyleSheet.create({
   emptyIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: `${COLORS.gold}22`, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.sm },
   emptyTitle: { ...font('title'), color: COLORS.text },
   emptyText: { ...font('body'), color: COLORS.text2, textAlign: 'center', paddingHorizontal: SPACING.lg },
+
+  // Completion → share overlay.
+  doneOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  doneCard: { backgroundColor: COLORS.bg2, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SPACING.xl, alignItems: 'center', borderTopWidth: 1, borderColor: COLORS.border },
+  doneTrophy: { width: 64, height: 64, borderRadius: 32, backgroundColor: `${COLORS.gold}22`, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.md },
+  doneTitle: { ...font('title'), color: COLORS.text, textAlign: 'center' },
+  doneStats: { ...font('labelBold'), color: COLORS.gold, marginTop: SPACING.xs },
+  doneDesc: { ...font('body'), color: COLORS.text2, textAlign: 'center', marginTop: SPACING.sm, marginBottom: SPACING.lg, paddingHorizontal: SPACING.md },
+  shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, alignSelf: 'stretch', paddingVertical: SPACING.md, borderRadius: RADIUS.pill, backgroundColor: COLORS.gold },
+  shareBtnText: { ...font('bodyBold'), color: COLORS.bg },
+  doneSecondary: { paddingVertical: SPACING.md, marginTop: SPACING.xs },
+  doneSecondaryText: { ...font('label'), color: COLORS.text2 },
 
   // Connected timeline: rail (badge + vertical connector) beside each stop card.
   stopRow: { flexDirection: 'row', alignItems: 'stretch', marginBottom: SPACING.sm },

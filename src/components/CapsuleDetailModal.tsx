@@ -699,6 +699,9 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
             <Ionicons name="walk" size={34} color={COLORS.ember} />
           </View>
           <Text style={styles.lockedTitle}>{t('capDetail.walkHere')}</Text>
+          <Text style={styles.lockedSubtitle}>
+            {t('capDetail.unlockOnArrival', { defaultValue: 'Its photo & message unlock when you arrive.' })}
+          </Text>
           <Text style={styles.lockedDate}>
             {capProx.denied
               ? t('capDetail.locationNeeded')
@@ -1733,10 +1736,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#fff',
   },
+  lockedSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+    marginTop: 6,
+    paddingHorizontal: 24,
+  },
   lockedDate: {
     fontSize: 14,
     color: COLORS.ember,
-    marginTop: 4,
+    marginTop: 8,
     fontWeight: '600',
   },
   lockedHint: {

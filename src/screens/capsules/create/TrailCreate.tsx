@@ -54,6 +54,9 @@ const TrailCreate: React.FC<Props> = ({ onClose, onCreated }) => {
         is_locked: locked, status: locked ? 'sealed' : 'open',
       });
       if (error || !data) { Alert.alert(t('createFlow.alert_error'), (error as any)?.message || t('createFlow.alert_create_failed')); setSealing(false); return; }
+      // Clear the spinner before navigating so it can never stay stuck if the
+      // push to the stop editor is delayed.
+      setSealing(false);
       onCreated((data as any).id, title || getCapType('trail').name);
     } catch (e: any) { Alert.alert(t('createFlow.alert_error'), e?.message || t('createFlow.alert_something_wrong')); setSealing(false); }
   };

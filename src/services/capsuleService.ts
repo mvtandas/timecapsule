@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { withTimeout } from '../utils/withTimeout';
 
 import type { CapTypeId } from '../constants/capTypes';
 
@@ -99,11 +100,20 @@ export class CapsuleService {
     }
   }
 
-  // Create a new capsule
+  // Create a new capsule — wrapped in a timeout so a dead/paused backend or a
+  // stalled network surfaces a clear error instead of an infinite "sealing" spinner.
   static async createCapsule(capsuleData: CreateCapsuleData) {
     try {
+      return await withTimeout(CapsuleService._createCapsule(capsuleData), 25000, 'Creating capsule');
+    } catch (error) {
+      return { data: null, error };
+    }
+  }
+
+  private static async _createCapsule(capsuleData: CreateCapsuleData) {
+    try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) throw new Error('No user logged in');
 
       // CRITICAL: Ensure profile exists before creating capsule

@@ -19,9 +19,10 @@ import { ReportService, REPORT_REASONS } from '../../services/reportService';
 import CapsuleDetailModal from '../../components/CapsuleDetailModal';
 import { getMediaUrl, isLocked } from '../../utils/mediaUtils';
 import { timeAgo } from '../../utils/dateUtils';
-import { COLORS, GRADIENTS, font } from '../../constants/theme';
+import { COLORS, GRADIENTS, RADIUS, SPACING, font } from '../../constants/theme';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import { useT } from '../../i18n';
+import { AchievementService, type AchievementSummary } from '../../services/achievementService';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48 - 12) / 2;
@@ -75,6 +76,7 @@ const FriendProfileScreen = ({ onNavigate, onGoBack, friend }: FriendProfileScre
   const [friendsCount, setFriendsCount] = useState(0);
   const [daysActive, setDaysActive] = useState(0);
   const [mutualCount, setMutualCount] = useState(0);
+  const [achievements, setAchievements] = useState<AchievementSummary | null>(null);
 
   const viewedProfileId = friend?.id;
 
@@ -148,6 +150,14 @@ const FriendProfileScreen = ({ onNavigate, onGoBack, friend }: FriendProfileScre
       const publicList: CapsuleSummary[] = (publicData || []).map((c) => ({ ...c }));
       setPublicCapsules(publicList);
       setCapsulesCount(publicList.length);
+
+      // Load this user's earned badges (best-effort — never blocks the profile).
+      try {
+        const summary = await AchievementService.compute(viewedProfileId);
+        setAchievements(summary);
+      } catch {
+        setAchievements(null);
+      }
 
       // Fetch friends count (and the friend's friend IDs for mutuals)
       const { data: friendsData } = await supabase
@@ -449,6 +459,42 @@ const FriendProfileScreen = ({ onNavigate, onGoBack, friend }: FriendProfileScre
               {renderActionButton()}
             </View>
 
+            {/* Achievements showcase — only when there's at least one earned badge */}
+            {!!achievements && achievements.unlockedCount > 0 && (
+              <>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>
+                    {t('friendProfile.achievements', { defaultValue: 'Achievements' })}
+                  </Text>
+                  <Text style={styles.sectionCount}>
+                    {t('friendProfile.achievementsUnlocked', {
+                      defaultValue: '{{count}}/{{total}} unlocked',
+                      count: achievements.unlockedCount,
+                      total: achievements.totalCount,
+                    })}
+                  </Text>
+                </View>
+                <View style={styles.badgesRow}>
+                  {achievements.achievements
+                    .filter((a) => a.unlocked)
+                    .map((a) => {
+                      const tierColor =
+                        achievements.tiers.find((tr) => tr.id === a.tier)?.color || COLORS.ember;
+                      return (
+                        <View key={a.id} style={styles.badge}>
+                          <View
+                            style={[styles.badgeIcon, { backgroundColor: `${tierColor}22`, borderColor: `${tierColor}55` }]}
+                          >
+                            <Ionicons name={a.icon as any} size={20} color={tierColor} />
+                          </View>
+                          <Text style={styles.badgeLabel} numberOfLines={1}>{a.name}</Text>
+                        </View>
+                      );
+                    })}
+                </View>
+              </>
+            )}
+
             {/* Section Header */}
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>{t('friendProfile.publicCaps')}</Text>
@@ -695,6 +741,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.text3,
+  },
+
+  // Achievements showcase
+  badgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 20,
+    gap: SPACING.lg,
+    marginBottom: SPACING.xl,
+  },
+  badge: {
+    alignItems: 'center',
+    width: 64,
+    gap: 6,
+  },
+  badgeIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeLabel: {
+    ...font('caption'),
+    color: COLORS.text2,
+    textAlign: 'center',
   },
 
   // Cards Grid

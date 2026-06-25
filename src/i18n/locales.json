@@ -231,7 +231,8 @@
       "decline": "Decline",
       "approve": "Approve",
       "gatheringComplete": "The gathering is complete",
-      "finishTrail": "Finish trail →"
+      "finishTrail": "Finish trail →",
+      "unlockOnArrival": "Its photo & message unlock when you arrive."
     },
     "comments": {
       "title": "Comments",
@@ -639,7 +640,9 @@
       "publicCaps": "Public Caps",
       "emptyTitle": "No Public Caps",
       "emptyText": "This user hasn't shared any public caps yet",
-      "mutualFriends": "%{count} mutual"
+      "mutualFriends": "%{count} mutual",
+      "achievements": "Achievements",
+      "achievementsUnlocked": "%{count}/%{total} unlocked"
     },
     "friends": {
       "title": "Friends",
@@ -984,7 +987,10 @@
       "photoLabelShort": "Photo",
       "saveAndAdd": "Save & add another",
       "saveAndClose": "Save & close",
-      "statsLine": "%{count} stops · ~%{minutes} min total"
+      "statsLine": "%{count} stops · ~%{minutes} min total",
+      "readyTitle": "Your trail is ready",
+      "readyDesc": "Share it so people can follow your route, stop by stop.",
+      "shareTrail": "Share trail"
     },
     "discover": {
       "title": "Discover",
@@ -1294,7 +1300,8 @@
       "statTime": "Süre",
       "selfWhisperSub": "Kendine bir mektup",
       "creatorPreview": "Oluşturan önizlemesi",
-      "finishTrail": "Rotayı bitir →"
+      "finishTrail": "Rotayı bitir →",
+      "unlockOnArrival": "Fotoğraf ve mesajı yanına gidince açılır."
     },
     "comments": {
       "title": "Yorumlar",
@@ -1702,7 +1709,9 @@
       "publicCaps": "Herkese Açık Capler",
       "emptyTitle": "Herkese Açık Cap Yok",
       "emptyText": "Bu kullanıcı henüz herkese açık bir cap paylaşmadı",
-      "mutualFriends": "%{count} ortak"
+      "mutualFriends": "%{count} ortak",
+      "achievements": "Başarımlar",
+      "achievementsUnlocked": "%{count}/%{total} açıldı"
     },
     "friends": {
       "title": "Arkadaşlar",
@@ -2047,7 +2056,10 @@
       "photoLabelShort": "Fotoğraf",
       "saveAndAdd": "Kaydet ve yeni ekle",
       "saveAndClose": "Kaydet ve kapat",
-      "statsLine": "%{count} durak · ~%{minutes} dk toplam"
+      "statsLine": "%{count} durak · ~%{minutes} dk toplam",
+      "readyTitle": "Rotan hazır",
+      "readyDesc": "Paylaş ki insanlar rotanı durak durak takip edebilsin.",
+      "shareTrail": "Rotayı paylaş"
     },
     "discover": {
       "title": "Keşfet",
@@ -2357,7 +2369,8 @@
       "statTime": "Tiempo",
       "selfWhisperSub": "Una carta para ti",
       "creatorPreview": "Vista previa del creador",
-      "finishTrail": "Terminar ruta →"
+      "finishTrail": "Terminar ruta →",
+      "unlockOnArrival": "Su foto y mensaje se desbloquean cuando llegas."
     },
     "comments": {
       "title": "Comentarios",
@@ -2765,7 +2778,9 @@
       "publicCaps": "Cápsulas públicas",
       "emptyTitle": "Sin cápsulas públicas",
       "emptyText": "Este usuario aún no ha compartido ninguna cápsula pública",
-      "mutualFriends": "%{count} en común"
+      "mutualFriends": "%{count} en común",
+      "achievements": "Logros",
+      "achievementsUnlocked": "%{count}/%{total} desbloqueados"
     },
     "friends": {
       "title": "Amigos",
@@ -3110,7 +3125,10 @@
       "photoLabelShort": "Foto",
       "saveAndAdd": "Guardar y añadir otra",
       "saveAndClose": "Guardar y cerrar",
-      "statsLine": "%{count} paradas · ~%{minutes} min en total"
+      "statsLine": "%{count} paradas · ~%{minutes} min en total",
+      "readyTitle": "Tu ruta está lista",
+      "readyDesc": "Compártela para que otros sigan tu ruta, parada por parada.",
+      "shareTrail": "Compartir ruta"
     },
     "discover": {
       "title": "Descubrir",
@@ -3420,7 +3438,8 @@
       "statTime": "Durée",
       "selfWhisperSub": "Une lettre à vous-même",
       "creatorPreview": "Aperçu créateur",
-      "finishTrail": "Terminer le parcours →"
+      "finishTrail": "Terminer le parcours →",
+      "unlockOnArrival": "Sa photo et son message se débloquent à votre arrivée."
     },
     "comments": {
       "title": "Commentaires",
@@ -3828,7 +3847,9 @@
       "publicCaps": "Capsules publiques",
       "emptyTitle": "Aucune capsule publique",
       "emptyText": "Cet utilisateur n'a encore partagé aucune capsule publique",
-      "mutualFriends": "%{count} en commun"
+      "mutualFriends": "%{count} en commun",
+      "achievements": "Réalisations",
+      "achievementsUnlocked": "%{count}/%{total} débloqués"
     },
     "friends": {
       "title": "Amis",
@@ -4173,7 +4194,10 @@
       "photoLabelShort": "Photo",
       "saveAndAdd": "Enregistrer et en ajouter une",
       "saveAndClose": "Enregistrer et fermer",
-      "statsLine": "%{count} étapes · ~%{minutes} min au total"
+      "statsLine": "%{count} étapes · ~%{minutes} min au total",
+      "readyTitle": "Votre parcours est prêt",
+      "readyDesc": "Partagez-le pour que les autres suivent votre itinéraire, étape par étape.",
+      "shareTrail": "Partager le parcours"
     },
     "discover": {
       "title": "Découvrir",
@@ -4483,7 +4507,8 @@
       "statTime": "Zeit",
       "selfWhisperSub": "Ein Brief an dich selbst",
       "creatorPreview": "Ersteller-Vorschau",
-      "finishTrail": "Trail beenden →"
+      "finishTrail": "Trail beenden →",
+      "unlockOnArrival": "Foto und Nachricht werden freigeschaltet, wenn du ankommst."
     },
     "comments": {
       "title": "Kommentare",
@@ -4891,7 +4916,9 @@
       "publicCaps": "Öffentliche Caps",
       "emptyTitle": "Keine öffentlichen Caps",
       "emptyText": "Dieser Nutzer hat noch keine öffentlichen Caps geteilt",
-      "mutualFriends": "%{count} gemeinsame"
+      "mutualFriends": "%{count} gemeinsame",
+      "achievements": "Erfolge",
+      "achievementsUnlocked": "%{count}/%{total} freigeschaltet"
     },
     "friends": {
       "title": "Freunde",
@@ -5236,7 +5263,10 @@
       "photoLabelShort": "Foto",
       "saveAndAdd": "Speichern und weitere hinzufügen",
       "saveAndClose": "Speichern und schließen",
-      "statsLine": "%{count} Stopps · ~%{minutes} Min. gesamt"
+      "statsLine": "%{count} Stopps · ~%{minutes} Min. gesamt",
+      "readyTitle": "Dein Trail ist fertig",
+      "readyDesc": "Teile ihn, damit andere deiner Route Stopp für Stopp folgen können.",
+      "shareTrail": "Trail teilen"
     },
     "discover": {
       "title": "Entdecken",
@@ -5546,7 +5576,8 @@
       "statTime": "Tempo",
       "selfWhisperSub": "Uma carta para você mesmo",
       "creatorPreview": "Pré-visualização do criador",
-      "finishTrail": "Terminar trilho →"
+      "finishTrail": "Terminar trilho →",
+      "unlockOnArrival": "A foto e a mensagem são desbloqueadas quando você chega."
     },
     "comments": {
       "title": "Comentários",
@@ -5954,7 +5985,9 @@
       "publicCaps": "Cápsulas públicas",
       "emptyTitle": "Sem cápsulas públicas",
       "emptyText": "Este utilizador ainda não partilhou cápsulas públicas",
-      "mutualFriends": "%{count} em comum"
+      "mutualFriends": "%{count} em comum",
+      "achievements": "Conquistas",
+      "achievementsUnlocked": "%{count}/%{total} desbloqueadas"
     },
     "friends": {
       "title": "Amigos",
@@ -6299,7 +6332,10 @@
       "photoLabelShort": "Foto",
       "saveAndAdd": "Salvar e adicionar outra",
       "saveAndClose": "Salvar e fechar",
-      "statsLine": "%{count} paradas · ~%{minutes} min no total"
+      "statsLine": "%{count} paradas · ~%{minutes} min no total",
+      "readyTitle": "Sua trilha está pronta",
+      "readyDesc": "Compartilhe para que outros sigam sua rota, parada por parada.",
+      "shareTrail": "Compartilhar trilha"
     },
     "discover": {
       "title": "Descobrir",
@@ -6609,7 +6645,8 @@
       "statTime": "Tempo",
       "selfWhisperSub": "Una lettera a te stesso",
       "creatorPreview": "Anteprima creatore",
-      "finishTrail": "Termina percorso →"
+      "finishTrail": "Termina percorso →",
+      "unlockOnArrival": "La foto e il messaggio si sbloccano quando arrivi."
     },
     "comments": {
       "title": "Commenti",
@@ -7017,7 +7054,9 @@
       "publicCaps": "Capsule pubbliche",
       "emptyTitle": "Nessuna capsula pubblica",
       "emptyText": "Questo utente non ha ancora condiviso capsule pubbliche",
-      "mutualFriends": "%{count} in comune"
+      "mutualFriends": "%{count} in comune",
+      "achievements": "Obiettivi",
+      "achievementsUnlocked": "%{count}/%{total} sbloccati"
     },
     "friends": {
       "title": "Amici",
@@ -7362,7 +7401,10 @@
       "photoLabelShort": "Foto",
       "saveAndAdd": "Salva e aggiungine un'altra",
       "saveAndClose": "Salva e chiudi",
-      "statsLine": "%{count} tappe · ~%{minutes} min in totale"
+      "statsLine": "%{count} tappe · ~%{minutes} min in totale",
+      "readyTitle": "Il tuo percorso è pronto",
+      "readyDesc": "Condividilo così gli altri possono seguire il tuo itinerario, tappa per tappa.",
+      "shareTrail": "Condividi percorso"
     },
     "discover": {
       "title": "Scopri",
@@ -7672,7 +7714,8 @@
       "statTime": "Время",
       "selfWhisperSub": "Письмо самому себе",
       "creatorPreview": "Предпросмотр создателя",
-      "finishTrail": "Завершить маршрут →"
+      "finishTrail": "Завершить маршрут →",
+      "unlockOnArrival": "Фото и сообщение откроются, когда вы придёте."
     },
     "comments": {
       "title": "Комментарии",
@@ -8080,7 +8123,9 @@
       "publicCaps": "Публичные капсулы",
       "emptyTitle": "Нет публичных капсул",
       "emptyText": "Этот пользователь пока не поделился публичными капсулами",
-      "mutualFriends": "%{count} общих"
+      "mutualFriends": "%{count} общих",
+      "achievements": "Достижения",
+      "achievementsUnlocked": "Открыто %{count}/%{total}"
     },
     "friends": {
       "title": "Друзья",
@@ -8425,7 +8470,10 @@
       "photoLabelShort": "Фото",
       "saveAndAdd": "Сохранить и добавить ещё",
       "saveAndClose": "Сохранить и закрыть",
-      "statsLine": "%{count} остановок · ~%{minutes} мин всего"
+      "statsLine": "%{count} остановок · ~%{minutes} мин всего",
+      "readyTitle": "Ваш маршрут готов",
+      "readyDesc": "Поделитесь им, чтобы другие могли пройти ваш маршрут от точки к точке.",
+      "shareTrail": "Поделиться маршрутом"
     },
     "discover": {
       "title": "Обзор",
@@ -8735,7 +8783,8 @@
       "statTime": "समय",
       "selfWhisperSub": "ख़ुद के नाम एक चिट्ठी",
       "creatorPreview": "क्रिएटर प्रीव्यू",
-      "finishTrail": "ट्रेल पूरा करें →"
+      "finishTrail": "ट्रेल पूरा करें →",
+      "unlockOnArrival": "इसकी फ़ोटो और संदेश तब खुलते हैं जब आप पहुँचते हैं।"
     },
     "comments": {
       "title": "टिप्पणियाँ",
@@ -9143,7 +9192,9 @@
       "publicCaps": "सार्वजनिक कैप",
       "emptyTitle": "कोई सार्वजनिक कैप नहीं",
       "emptyText": "इस उपयोगकर्ता ने अभी तक कोई सार्वजनिक कैप साझा नहीं किया है",
-      "mutualFriends": "%{count} साझा"
+      "mutualFriends": "%{count} साझा",
+      "achievements": "उपलब्धियाँ",
+      "achievementsUnlocked": "%{count}/%{total} अनलॉक"
     },
     "friends": {
       "title": "दोस्त",
@@ -9488,7 +9539,10 @@
       "photoLabelShort": "फ़ोटो",
       "saveAndAdd": "सहेजें और एक और जोड़ें",
       "saveAndClose": "सहेजें और बंद करें",
-      "statsLine": "%{count} पड़ाव · ~%{minutes} मिनट कुल"
+      "statsLine": "%{count} पड़ाव · ~%{minutes} मिनट कुल",
+      "readyTitle": "आपका ट्रेल तैयार है",
+      "readyDesc": "इसे साझा करें ताकि लोग आपके रास्ते को पड़ाव दर पड़ाव फ़ॉलो कर सकें।",
+      "shareTrail": "ट्रेल साझा करें"
     },
     "discover": {
       "title": "खोजें",
@@ -9798,7 +9852,8 @@
       "statTime": "时间",
       "selfWhisperSub": "写给自己的信",
       "creatorPreview": "创建者预览",
-      "finishTrail": "完成路线 →"
+      "finishTrail": "完成路线 →",
+      "unlockOnArrival": "到达后即可解锁照片和留言。"
     },
     "comments": {
       "title": "评论",
@@ -10206,7 +10261,9 @@
       "publicCaps": "公开胶囊",
       "emptyTitle": "暂无公开胶囊",
       "emptyText": "该用户尚未分享任何公开胶囊",
-      "mutualFriends": "%{count} 位共同好友"
+      "mutualFriends": "%{count} 位共同好友",
+      "achievements": "成就",
+      "achievementsUnlocked": "已解锁 %{count}/%{total}"
     },
     "friends": {
       "title": "好友",
@@ -10551,7 +10608,10 @@
       "photoLabelShort": "照片",
       "saveAndAdd": "保存并继续添加",
       "saveAndClose": "保存并关闭",
-      "statsLine": "%{count} 个站点 · 共约 %{minutes} 分钟"
+      "statsLine": "%{count} 个站点 · 共约 %{minutes} 分钟",
+      "readyTitle": "你的路线已就绪",
+      "readyDesc": "分享出去，让大家可以一站一站地跟随你的路线。",
+      "shareTrail": "分享路线"
     },
     "discover": {
       "title": "发现",
@@ -10861,7 +10921,8 @@
       "statTime": "時間",
       "selfWhisperSub": "自分への手紙",
       "creatorPreview": "作成者プレビュー",
-      "finishTrail": "トレイルを終える →"
+      "finishTrail": "トレイルを終える →",
+      "unlockOnArrival": "到着すると写真とメッセージが開きます。"
     },
     "comments": {
       "title": "コメント",
@@ -11269,7 +11330,9 @@
       "publicCaps": "公開カプセル",
       "emptyTitle": "公開カプセルはありません",
       "emptyText": "このユーザーはまだ公開カプセルをシェアしていません",
-      "mutualFriends": "共通 %{count} 人"
+      "mutualFriends": "共通 %{count} 人",
+      "achievements": "実績",
+      "achievementsUnlocked": "%{count}/%{total} 達成"
     },
     "friends": {
       "title": "友達",
@@ -11614,7 +11677,10 @@
       "photoLabelShort": "写真",
       "saveAndAdd": "保存して別の項目を追加",
       "saveAndClose": "保存して閉じる",
-      "statsLine": "%{count} 拠点 · 合計約 %{minutes} 分"
+      "statsLine": "%{count} 拠点 · 合計約 %{minutes} 分",
+      "readyTitle": "トレイルが完成しました",
+      "readyDesc": "シェアして、みんながあなたのルートを拠点ごとにたどれるようにしましょう。",
+      "shareTrail": "トレイルをシェア"
     },
     "discover": {
       "title": "見つける",

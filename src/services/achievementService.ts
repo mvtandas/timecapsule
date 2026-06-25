@@ -40,10 +40,35 @@ export interface AchievementSummary {
 }
 
 export class AchievementService {
-  /** Derive achievement progress from the user's existing data (no extra tables). */
-  static async compute(): Promise<AchievementSummary> {
+  /**
+   * Derive achievement progress from existing data (no extra tables).
+   *
+   * Without `targetUserId` this computes the CURRENT user's summary (unchanged
+   * behavior: getUserCapsules + their own saved/trail rows).
+   *
+   * With `targetUserId` it computes another user's summary from data the viewer
+   * can actually see. RLS hides others' private/sealed content — that's fine,
+   * achievements are count-based, so we use only the target's PUBLIC caps and
+   * whatever saved/trail rows RLS permits. Queries that return nothing due to
+   * RLS are treated as zero; this never throws.
+   */
+  static async compute(targetUserId?: string): Promise<AchievementSummary> {
+    const isTarget = !!targetUserId;
     const { data: { user } } = await supabase.auth.getUser();
-    const caps: any[] = user ? ((await CapsuleService.getUserCapsules()).data || []) : [];
+    const userId = isTarget ? targetUserId : user?.id;
+
+    let caps: any[] = [];
+    if (isTarget) {
+      // Other users: only their public caps are visible / counted.
+      const { data } = await db
+        .from('capsules')
+        .select('type, is_public')
+        .eq('owner_id', targetUserId)
+        .eq('is_public', true);
+      caps = data || [];
+    } else if (user) {
+      caps = (await CapsuleService.getUserCapsules()).data || [];
+    }
 
     const createdCount = caps.length;
     const types = new Set(caps.map((c) => c.type || 'public'));
@@ -53,16 +78,16 @@ export class AchievementService {
 
     let savedCount = 0;
     let trailsCompleted = 0;
-    if (user) {
+    if (userId) {
       const { count: sc } = await db
         .from('saved_caps')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id);
+        .eq('user_id', userId);
       savedCount = sc || 0;
       const { count: tc } = await db
         .from('trail_progress')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .not('completed_at', 'is', null);
       trailsCompleted = tc || 0;
     }
