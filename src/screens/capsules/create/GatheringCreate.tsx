@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { uuidv4 } from '../../../utils/uuid';
 import { COLORS, RADIUS, SPACING, font } from '../../../constants/theme';
 import { getCapType } from '../../../constants/capTypes';
 import { CapsuleService } from '../../../services/capsuleService';
@@ -38,6 +39,7 @@ const GatheringCreate: React.FC<Props> = ({ onClose, onSealed }) => {
   const [invites, setInvites] = useState<PickedUser[]>([]);
   const [sealing, setSealing] = useState(false);
   const [showExit, setShowExit] = useState(false);
+  const capIdRef = useRef(uuidv4());
 
   const dirty = !!(title || cover || loc || date || myMedia || myText || invites.length);
   const canAdvance = step === 0 ? !!title.trim() : step === 1 ? !!(loc && date) : true;
@@ -52,6 +54,7 @@ const GatheringCreate: React.FC<Props> = ({ onClose, onSealed }) => {
       if (cover) { const up = await uploadUri(cover, user.id); if (up) cover_photo_url = up.url; }
       if (myMedia) { const up = await uploadUri(myMedia.uri, user.id); if (up) { media_url = up.url; media_type = up.type; } }
       const { data: created, error } = await CapsuleService.createCapsule({
+        id: capIdRef.current,
         type: 'gathering', title: title || getCapType('gathering').name, description: myText || null,
         cover_photo_url, category: category || undefined,
         lat: loc!.lat, lng: loc!.lng, location_name: loc!.name || null,

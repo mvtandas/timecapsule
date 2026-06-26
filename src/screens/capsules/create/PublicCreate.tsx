@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert } from 'react-native';
 import { COLORS, RADIUS, SPACING, font } from '../../../constants/theme';
+import { uuidv4 } from '../../../utils/uuid';
 import { getCapType } from '../../../constants/capTypes';
 import { CapsuleService } from '../../../services/capsuleService';
 import { supabase } from '../../../lib/supabase';
@@ -34,6 +35,7 @@ const PublicCreate: React.FC<Props> = ({ onClose, onSealed }) => {
   const [comments, setComments] = useState(true);
   const [sealing, setSealing] = useState(false);
   const [showExit, setShowExit] = useState(false);
+  const capIdRef = useRef(uuidv4());
 
   const dirty = !!(media || text || cover || loc || hint || date);
   const canAdvance = step === 0 ? !!(text.trim() || media) : step === 1 ? !!loc : step === 2 ? !!date : true;
@@ -49,6 +51,7 @@ const PublicCreate: React.FC<Props> = ({ onClose, onSealed }) => {
       if (cover) { const up = await uploadUri(cover, user.id); if (up) cover_photo_url = up.url; }
       const locked = mode === 'locked';
       const { error } = await CapsuleService.createCapsule({
+        id: capIdRef.current,
         type: 'public', title: (text && text.split('\n')[0].slice(0, 80)) || getCapType('public').name, description: text || null,
         lat: loc!.lat, lng: loc!.lng, location_name: loc!.name || null, location_hint: hint || null,
         open_at: locked ? date!.toISOString() : null, expires_at: !locked ? date!.toISOString() : null,

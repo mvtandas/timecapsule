@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert } from 'react-native';
 import { COLORS, RADIUS, SPACING, font } from '../../../constants/theme';
+import { uuidv4 } from '../../../utils/uuid';
 import { getCapType } from '../../../constants/capTypes';
 import { CapsuleService } from '../../../services/capsuleService';
 import { DraftService } from '../../../services/draftService';
@@ -34,6 +35,7 @@ const TrailCreate: React.FC<Props> = ({ onClose, onCreated }) => {
   const [date, setDate] = useState<Date | null>(null);
   const [sealing, setSealing] = useState(false);
   const [showExit, setShowExit] = useState(false);
+  const capIdRef = useRef(uuidv4());
 
   const dirty = !!(title || desc || cover);
   const canAdvance = step === 0 ? !!title.trim() : true;
@@ -48,6 +50,7 @@ const TrailCreate: React.FC<Props> = ({ onClose, onCreated }) => {
       if (cover) { const up = await uploadUri(cover, user.id); if (up) cover_photo_url = up.url; }
       const locked = mode === 'locked' && !!date;
       const { data, error } = await CapsuleService.createCapsule({
+        id: capIdRef.current,
         type: 'trail', title: title || getCapType('trail').name, description: desc || null,
         cover_photo_url, category: category || undefined, is_public: isPublic, is_anonymous: false,
         open_at: locked ? date!.toISOString() : null, expires_at: mode === 'expires' && date ? date.toISOString() : null,

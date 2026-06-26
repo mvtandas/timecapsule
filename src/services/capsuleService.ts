@@ -28,6 +28,8 @@ export interface Capsule {
 }
 
 export interface CreateCapsuleData {
+  /** Optional client-generated id for idempotent create (retry-safe). */
+  id?: string;
   title: string;
   description?: string | null;
   open_at?: string | null;
@@ -138,12 +140,14 @@ export class CapsuleService {
         }
       }
 
-      // Now create the capsule
-      const { data, error } = await supabase
-        .from('capsules')
-        .insert({
-          owner_id: user.id,
-          title: capsuleData.title,
+      // Now create the capsule. When the caller supplies a client-generated id,
+      // upsert on it so a retry (e.g. after a slow/timed-out request that
+      // actually succeeded server-side) updates the same row instead of
+      // creating a duplicate cap.
+      const row: any = {
+        ...(capsuleData.id ? { id: capsuleData.id } : {}),
+        owner_id: user.id,
+        title: capsuleData.title,
           description: capsuleData.description || null,
           open_at: capsuleData.open_at || null,
           // `?? null` not `|| null` so lat/lng of exactly 0 (equator / prime
@@ -174,9 +178,12 @@ export class CapsuleService {
           total_minutes: capsuleData.total_minutes ?? null,
           cover_transform: capsuleData.cover_transform ?? null,
           body: capsuleData.body ?? null,
-        } as any)
-        .select()
-        .single();
+      };
+
+      const q = capsuleData.id
+        ? supabase.from('capsules').upsert(row as any, { onConflict: 'id' })
+        : supabase.from('capsules').insert(row as any);
+      const { data, error } = await q.select().single();
 
       if (error) throw error;
 

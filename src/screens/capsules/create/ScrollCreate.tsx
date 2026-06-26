@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert } from 'react-native';
 import { COLORS, RADIUS, SPACING, font } from '../../../constants/theme';
+import { uuidv4 } from '../../../utils/uuid';
 import { getCapType } from '../../../constants/capTypes';
 import { CapsuleService } from '../../../services/capsuleService';
 import { DraftService } from '../../../services/draftService';
@@ -33,6 +34,7 @@ const ScrollCreate: React.FC<Props> = ({ onClose, onSealed }) => {
   const [date, setDate] = useState<Date | null>(null);
   const [sealing, setSealing] = useState(false);
   const [showExit, setShowExit] = useState(false);
+  const capIdRef = useRef(uuidv4());
 
   const hasContent = blocks.some((b) => (b.text && b.text.trim()) || b.uri || (b.url && b.url.trim()));
   const dirty = !!(title || cover || hasContent || loc || detail);
@@ -57,6 +59,7 @@ const ScrollCreate: React.FC<Props> = ({ onClose, onSealed }) => {
       const excerpt = blocks.find((b) => b.type === 'text' && b.text)?.text?.slice(0, 160) || title;
       const locked = mode === 'locked' && !!date;
       const { error } = await CapsuleService.createCapsule({
+        id: capIdRef.current,
         type: 'scroll', title: title || getCapType('scroll').name, description: excerpt, body,
         category: category || undefined, cover_photo_url,
         lat: loc!.lat, lng: loc!.lng, location_name: loc!.name || null, location_hint: detail || null,

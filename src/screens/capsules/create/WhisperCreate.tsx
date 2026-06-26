@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert } from 'react-native';
 import { COLORS, RADIUS, SPACING, font } from '../../../constants/theme';
+import { uuidv4 } from '../../../utils/uuid';
 import { getCapType } from '../../../constants/capTypes';
 import { CapsuleService } from '../../../services/capsuleService';
 import { MediaService } from '../../../services/mediaService';
@@ -35,6 +36,7 @@ const WhisperCreate: React.FC<Props> = ({ onClose, onSealed }) => {
   const [openDate, setOpenDate] = useState<Date | null>(null);
   const [sealing, setSealing] = useState(false);
   const [showExit, setShowExit] = useState(false);
+  const capIdRef = useRef(uuidv4());
 
   const dirty = !!(recipient.length || media || text || loc || hint || openDate);
   const canAdvance =
@@ -62,6 +64,7 @@ const WhisperCreate: React.FC<Props> = ({ onClose, onSealed }) => {
       }
       const recip = recipient[0];
       const { error } = await CapsuleService.createCapsule({
+        id: capIdRef.current,
         type: 'whisper', title: getCapType('whisper').name, description: text || null,
         lat: loc!.lat, lng: loc!.lng, location_name: loc!.name || null, location_hint: hint || null,
         open_at: openDate!.toISOString(), is_locked: true, status: 'sealed',
