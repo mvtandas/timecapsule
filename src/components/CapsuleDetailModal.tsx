@@ -1930,7 +1930,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   extraScroll: {
-    maxHeight: 180,
+    maxHeight: height * 0.4,
   },
   // Trail body wrapper — lets long trails (many stops / map open) scroll within
   // the modal instead of overflowing the bottom-anchored content and clipping
@@ -2105,7 +2105,7 @@ const styles = StyleSheet.create({
   },
   contributionImage: {
     width: '100%',
-    height: 160,
+    height: 130,
     borderRadius: 12,
     marginTop: 4,
     backgroundColor: COLORS.bg3,
