@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, Modal,
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Image,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Image, Linking,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -39,10 +39,11 @@ type Draft = {
   lng: number | null;
   location_name: string;
   photo_url: string | null;
+  media_type: 'image' | 'video';
   estimated_minutes: number | null;
 };
 
-const emptyDraft = (): Draft => ({ title: '', content: '', tip: '', lat: null, lng: null, location_name: '', photo_url: null, estimated_minutes: null });
+const emptyDraft = (): Draft => ({ title: '', content: '', tip: '', lat: null, lng: null, location_name: '', photo_url: null, media_type: 'image', estimated_minutes: null });
 const FALLBACK = { latitude: 40.99, longitude: 29.02 }; // demo area fallback
 
 const TrailStopsScreen = ({ capsuleId, trailTitle, trailDesc, fromCreate, onNavigate, onGoBack }: Props) => {
@@ -66,6 +67,8 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, trailDesc, fromCreate, onNavi
   // Title input ref so we can re-focus after "Save & add another" for fast,
   // back-to-back stop entry (matches the demo's inline-editor flow).
   const titleInputRef = useRef<TextInput>(null);
+  // Page ScrollView ref so opening the inline editor can scroll it into view.
+  const scrollRef = useRef<ScrollView>(null);
 
   // Serialize auto-saves so concurrent writes can't interleave (which would
   // duplicate rows). While a save is in flight, the latest state is queued.
@@ -123,8 +126,12 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, trailDesc, fromCreate, onNavi
     setDraft(emptyDraft());
     setEditingIndex(null);
     setEditorVisible(true);
-    // Autofocus the title so the user can start typing immediately.
-    setTimeout(() => titleInputRef.current?.focus(), 350);
+    // Autofocus the title so the user can start typing immediately, and scroll
+    // the inline editor (rendered at the end of the list) into view.
+    setTimeout(() => {
+      titleInputRef.current?.focus();
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 350);
   };
 
   const openEdit = (i: number) => {
@@ -137,24 +144,31 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, trailDesc, fromCreate, onNavi
       lng: s.lng ?? null,
       location_name: s.location_name || '',
       photo_url: s.photo_url ?? null,
+      media_type: s.media_type === 'video' ? 'video' : 'image',
       estimated_minutes: s.estimated_minutes ?? null,
     });
     setEditingIndex(i);
     setEditorVisible(true);
+    // Reveal the inline editor below the list.
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 350);
   };
 
   const pickStopPhoto = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { Alert.alert(t('createFlow.alert_allow_photos')); return; }
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [16, 9], quality: 0.85 });
+    // Allow both photos and videos. Editing/cropping only applies to images, so
+    // leave it off here to support video selection cleanly.
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.All, quality: 0.85 });
     if (res.canceled || !res.assets?.[0]) return;
+    const asset = res.assets[0];
+    const isVideo = asset.type === 'video';
     setUploadingPhoto(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { Alert.alert(t('trailEditor.saveFailed')); return; }
-      const up = await MediaService.uploadMedia(res.assets[0].uri, user.id, `trailstop_${Date.now()}`);
+      const up = await MediaService.uploadMedia(asset.uri, user.id, `trailstop_${Date.now()}`);
       if (!up) { Alert.alert(t('trailEditor.saveFailed')); return; }
-      setDraft((d) => ({ ...d, photo_url: up.url }));
+      setDraft((d) => ({ ...d, photo_url: up.url, media_type: isVideo ? 'video' : 'image' }));
     } finally {
       setUploadingPhoto(false);
     }
@@ -197,6 +211,7 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, trailDesc, fromCreate, onNavi
       lng: draft.lng,
       location_name: draft.location_name.trim() || null,
       photo_url: draft.photo_url || null,
+      media_type: draft.media_type || 'image',
       estimated_minutes: draft.estimated_minutes,
     };
     const next = [...stops];
@@ -284,7 +299,8 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, trailDesc, fromCreate, onNavi
           <Skeleton height={64} radius={RADIUS.lg} />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: SPACING.lg, paddingBottom: insets.bottom + 120 }}>
+        <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView ref={scrollRef} contentContainerStyle={{ padding: SPACING.lg, paddingBottom: insets.bottom + 120 }} keyboardShouldPersistTaps="handled">
           <Text style={styles.subtitle}>{t('trailEditor.subtitle')}</Text>
 
           {stops.length > 0 && (
@@ -311,6 +327,16 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, trailDesc, fromCreate, onNavi
                   <View style={styles.ordinalBadge}><Text style={styles.ordinalText}>{i + 1}</Text></View>
                 </View>
                 <View style={styles.stopCard}>
+                {!!s.photo_url && (
+                  s.media_type === 'video' ? (
+                    <TouchableOpacity style={styles.stopThumbWrap} onPress={() => s.photo_url && Linking.openURL(s.photo_url)} activeOpacity={0.85}>
+                      <Image source={{ uri: s.photo_url }} style={styles.stopThumb} resizeMode="cover" />
+                      <View style={styles.thumbPlay}><Ionicons name="play-circle" size={24} color={COLORS.text} /></View>
+                    </TouchableOpacity>
+                  ) : (
+                    <Image source={{ uri: s.photo_url }} style={styles.stopThumb} resizeMode="cover" />
+                  )
+                )}
                 <TouchableOpacity style={styles.stopBody} onPress={() => openEdit(i)} activeOpacity={0.7}>
                   <Text style={styles.stopTitle} numberOfLines={1}>{s.title || t('trailEditor.stopNum', { n: i + 1 })}</Text>
                   {!!s.location_name && <Text style={styles.stopMeta} numberOfLines={1}><Ionicons name="location" size={11} color={COLORS.text3} /> {s.location_name}</Text>}
@@ -332,144 +358,142 @@ const TrailStopsScreen = ({ capsuleId, trailTitle, trailDesc, fromCreate, onNavi
             ))
           )}
 
-          <TouchableOpacity style={styles.addBtn} onPress={openAdd} activeOpacity={0.85}>
-            <Ionicons name="add" size={20} color={COLORS.gold} />
-            <Text style={styles.addBtnText}>{t('trailEditor.addStop')}</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      )}
+          {/* Inline stop editor — opens in-place (no page transition). Shown
+              right after the list; replaces the "Add stop" button while open. */}
+          {editorVisible ? (
+            <View style={styles.editorCard}>
+              <View style={styles.editorCardHeader}>
+                <Text style={styles.editorCardTitle}>
+                  {editingIndex == null
+                    ? t('trailEditor.addStop')
+                    : t('trailEditor.editStop', { n: (editingIndex ?? 0) + 1, defaultValue: 'Edit stop %{n}' })}
+                </Text>
+                <TouchableOpacity onPress={() => setEditorVisible(false)} style={styles.editorClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel={t('common.close', { defaultValue: 'Close' })}>
+                  <Ionicons name="close" size={22} color={COLORS.text2} />
+                </TouchableOpacity>
+              </View>
 
-      {/* Stop editor — persistent/repeatable: stays open for back-to-back adds */}
-      <Modal visible={editorVisible} animationType="slide" onRequestClose={() => setEditorVisible(false)}>
-        <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScreenHeader
-            title={editingIndex == null ? t('trailEditor.addStop') : t('trailEditor.stopNum', { n: (editingIndex ?? 0) + 1 })}
-            onBack={() => setEditorVisible(false)}
-            borderBottom
-            right={(
-              <TouchableOpacity onPress={() => setEditorVisible(false)} style={styles.doneBtn} accessibilityRole="button">
-                <Text style={styles.saveText}>{t('common.done', { defaultValue: 'Done' })}</Text>
-              </TouchableOpacity>
-            )}
-          />
-          {stops.length > 0 && (
-            <View style={styles.editorStatsRow}>
-              <Ionicons name="footsteps-outline" size={13} color={COLORS.gold} />
-              <Text style={styles.statsText}>{statsLine}</Text>
-            </View>
-          )}
-          <ScrollView contentContainerStyle={{ padding: SPACING.lg, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
-            <Text style={styles.fieldLabel}>{t('trailEditor.titleLabel')}</Text>
-            <TextInput
-              ref={titleInputRef}
-              style={styles.input}
-              value={draft.title}
-              onChangeText={(v) => setDraft((d) => ({ ...d, title: v }))}
-              placeholder={t('trailEditor.titlePlaceholder')}
-              placeholderTextColor={COLORS.text3}
-              returnKeyType="next"
-            />
+              <Text style={styles.fieldLabel}>{t('trailEditor.titleLabel')}</Text>
+              <TextInput
+                ref={titleInputRef}
+                style={styles.input}
+                value={draft.title}
+                onChangeText={(v) => setDraft((d) => ({ ...d, title: v }))}
+                placeholder={t('trailEditor.titlePlaceholder')}
+                placeholderTextColor={COLORS.text3}
+                returnKeyType="next"
+              />
 
-            <Text style={styles.fieldLabel}>{t('trailEditor.locationLabel')}</Text>
-            <Text style={styles.hint}>{t('trailEditor.tapToPlace')}</Text>
-            <View style={styles.mapWrap}>
-              <MapView
-                provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-                customMapStyle={DARK_MAP_STYLE}
-                style={StyleSheet.absoluteFill}
-                region={{
-                  latitude: draft.lat ?? region.latitude,
-                  longitude: draft.lng ?? region.longitude,
-                  latitudeDelta: 0.02,
-                  longitudeDelta: 0.02,
+              <Text style={styles.fieldLabel}>{t('trailEditor.locationLabel')}</Text>
+              <Text style={styles.hint}>{t('trailEditor.tapToPlace')}</Text>
+              <View style={styles.mapWrap}>
+                <MapView
+                  provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+                  customMapStyle={DARK_MAP_STYLE}
+                  style={StyleSheet.absoluteFill}
+                  region={{
+                    latitude: draft.lat ?? region.latitude,
+                    longitude: draft.lng ?? region.longitude,
+                    latitudeDelta: 0.02,
+                    longitudeDelta: 0.02,
+                  }}
+                  onPress={(e) => onMapPress(e.nativeEvent.coordinate.latitude, e.nativeEvent.coordinate.longitude)}
+                >
+                  {draft.lat != null && draft.lng != null && (
+                    <Marker coordinate={{ latitude: draft.lat, longitude: draft.lng }} pinColor={COLORS.gold} />
+                  )}
+                </MapView>
+                <TouchableOpacity style={styles.myLocBtn} onPress={useMyLocation} activeOpacity={0.85}>
+                  <Ionicons name="locate" size={16} color={COLORS.text} />
+                  <Text style={styles.myLocText}>{t('trailEditor.useMyLocation')}</Text>
+                </TouchableOpacity>
+              </View>
+              <TextInput
+                style={styles.input}
+                value={draft.location_name}
+                onChangeText={(v) => setDraft((d) => ({ ...d, location_name: v }))}
+                placeholder={t('trailEditor.placeName')}
+                placeholderTextColor={COLORS.text3}
+              />
+
+              <Text style={styles.fieldLabel}>{t('trailEditor.contentLabel')} <Text style={styles.optionalTag}>{t('trailEditor.optional', { defaultValue: '(optional)' })}</Text></Text>
+              <TextInput
+                style={[styles.input, styles.multiline]}
+                value={draft.content}
+                onChangeText={(v) => setDraft((d) => ({ ...d, content: v }))}
+                placeholder={t('trailEditor.contentPlaceholderHelper', { defaultValue: "A short note helps first-timers — what's special here, what to try?" })}
+                placeholderTextColor={COLORS.text3}
+                multiline
+              />
+
+              <Text style={styles.fieldLabel}>{t('trailEditor.tipLabel')} <Text style={styles.optionalTag}>{t('trailEditor.optional', { defaultValue: '(optional)' })}</Text></Text>
+              <TextInput
+                style={styles.input}
+                value={draft.tip}
+                onChangeText={(v) => setDraft((d) => ({ ...d, tip: v }))}
+                placeholder={t('trailEditor.tipPlaceholder')}
+                placeholderTextColor={COLORS.text3}
+              />
+
+              <Text style={styles.fieldLabel}>{t('trailEditor.mediaLabelShort', { defaultValue: 'Photo or video' })} <Text style={styles.optionalTag}>{t('trailEditor.optional', { defaultValue: '(optional)' })}</Text></Text>
+              {draft.photo_url ? (
+                <TouchableOpacity onPress={pickStopPhoto} activeOpacity={0.85} disabled={uploadingPhoto}>
+                  <Image source={{ uri: draft.photo_url }} style={styles.stopPhoto} resizeMode="cover" />
+                  {draft.media_type === 'video' && !uploadingPhoto && (
+                    <View style={styles.previewPlay}><Ionicons name="play-circle" size={48} color={COLORS.text} /></View>
+                  )}
+                  {uploadingPhoto && <View style={styles.photoLoading}><ActivityIndicator size="small" color={COLORS.text} /></View>}
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.photoBtn} onPress={pickStopPhoto} activeOpacity={0.85} disabled={uploadingPhoto}>
+                  {uploadingPhoto
+                    ? <ActivityIndicator size="small" color={COLORS.gold} />
+                    : <><Ionicons name="images-outline" size={20} color={COLORS.gold} /><Text style={styles.photoBtnText}>{t('trailEditor.addMedia', { defaultValue: 'Add photo or video' })}</Text></>}
+                </TouchableOpacity>
+              )}
+
+              <Text style={styles.fieldLabel}>{t('trailEditor.estMinutesLabelShort', { defaultValue: 'Estimated time (minutes)' })} <Text style={styles.optionalTag}>{t('trailEditor.optional', { defaultValue: '(optional)' })}</Text></Text>
+              <TextInput
+                style={styles.input}
+                value={draft.estimated_minutes != null ? String(draft.estimated_minutes) : ''}
+                onChangeText={(v) => {
+                  const n = parseInt(v.replace(/[^0-9]/g, ''), 10);
+                  setDraft((d) => ({ ...d, estimated_minutes: Number.isNaN(n) ? null : n }));
                 }}
-                onPress={(e) => onMapPress(e.nativeEvent.coordinate.latitude, e.nativeEvent.coordinate.longitude)}
-              >
-                {draft.lat != null && draft.lng != null && (
-                  <Marker coordinate={{ latitude: draft.lat, longitude: draft.lng }} pinColor={COLORS.gold} />
+                placeholder={t('trailEditor.estMinutesPlaceholder', { defaultValue: 'e.g. 15' })}
+                placeholderTextColor={COLORS.text3}
+                keyboardType="number-pad"
+              />
+
+              {/* Save controls: primary keeps the editor open for the next stop. */}
+              <View style={styles.editorActions}>
+                {editingIndex == null ? (
+                  <>
+                    <TouchableOpacity style={styles.primaryBtn} onPress={() => saveStop(true)} activeOpacity={0.85} accessibilityRole="button">
+                      <Ionicons name="add" size={18} color={COLORS.bg} />
+                      <Text style={styles.primaryBtnText}>{t('trailEditor.saveAndAdd', { defaultValue: 'Save & add another' })}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.secondaryBtn} onPress={() => saveStop(false)} activeOpacity={0.85} accessibilityRole="button">
+                      <Text style={styles.secondaryBtnText}>{t('trailEditor.saveAndClose', { defaultValue: 'Save & close' })}</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <TouchableOpacity style={styles.primaryBtn} onPress={() => saveStop(false)} activeOpacity={0.85} accessibilityRole="button">
+                    <Ionicons name="checkmark" size={18} color={COLORS.bg} />
+                    <Text style={styles.primaryBtnText}>{t('common.save')}</Text>
+                  </TouchableOpacity>
                 )}
-              </MapView>
-              <TouchableOpacity style={styles.myLocBtn} onPress={useMyLocation} activeOpacity={0.85}>
-                <Ionicons name="locate" size={16} color={COLORS.text} />
-                <Text style={styles.myLocText}>{t('trailEditor.useMyLocation')}</Text>
-              </TouchableOpacity>
+              </View>
             </View>
-            <TextInput
-              style={styles.input}
-              value={draft.location_name}
-              onChangeText={(v) => setDraft((d) => ({ ...d, location_name: v }))}
-              placeholder={t('trailEditor.placeName')}
-              placeholderTextColor={COLORS.text3}
-            />
-
-            <Text style={styles.fieldLabel}>{t('trailEditor.contentLabel')} <Text style={styles.optionalTag}>{t('trailEditor.optional', { defaultValue: '(optional)' })}</Text></Text>
-            <TextInput
-              style={[styles.input, styles.multiline]}
-              value={draft.content}
-              onChangeText={(v) => setDraft((d) => ({ ...d, content: v }))}
-              placeholder={t('trailEditor.contentPlaceholderHelper', { defaultValue: "A short note helps first-timers — what's special here, what to try?" })}
-              placeholderTextColor={COLORS.text3}
-              multiline
-            />
-
-            <Text style={styles.fieldLabel}>{t('trailEditor.tipLabel')} <Text style={styles.optionalTag}>{t('trailEditor.optional', { defaultValue: '(optional)' })}</Text></Text>
-            <TextInput
-              style={styles.input}
-              value={draft.tip}
-              onChangeText={(v) => setDraft((d) => ({ ...d, tip: v }))}
-              placeholder={t('trailEditor.tipPlaceholder')}
-              placeholderTextColor={COLORS.text3}
-            />
-
-            <Text style={styles.fieldLabel}>{t('trailEditor.photoLabelShort', { defaultValue: 'Photo' })} <Text style={styles.optionalTag}>{t('trailEditor.optional', { defaultValue: '(optional)' })}</Text></Text>
-            {draft.photo_url ? (
-              <TouchableOpacity onPress={pickStopPhoto} activeOpacity={0.85} disabled={uploadingPhoto}>
-                <Image source={{ uri: draft.photo_url }} style={styles.stopPhoto} resizeMode="cover" />
-                {uploadingPhoto && <View style={styles.photoLoading}><ActivityIndicator size="small" color={COLORS.text} /></View>}
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={styles.photoBtn} onPress={pickStopPhoto} activeOpacity={0.85} disabled={uploadingPhoto}>
-                {uploadingPhoto
-                  ? <ActivityIndicator size="small" color={COLORS.gold} />
-                  : <><Ionicons name="image-outline" size={20} color={COLORS.gold} /><Text style={styles.photoBtnText}>{t('trailEditor.addPhoto', { defaultValue: 'Add photo' })}</Text></>}
-              </TouchableOpacity>
-            )}
-
-            <Text style={styles.fieldLabel}>{t('trailEditor.estMinutesLabelShort', { defaultValue: 'Estimated time (minutes)' })} <Text style={styles.optionalTag}>{t('trailEditor.optional', { defaultValue: '(optional)' })}</Text></Text>
-            <TextInput
-              style={styles.input}
-              value={draft.estimated_minutes != null ? String(draft.estimated_minutes) : ''}
-              onChangeText={(v) => {
-                const n = parseInt(v.replace(/[^0-9]/g, ''), 10);
-                setDraft((d) => ({ ...d, estimated_minutes: Number.isNaN(n) ? null : n }));
-              }}
-              placeholder={t('trailEditor.estMinutesPlaceholder', { defaultValue: 'e.g. 15' })}
-              placeholderTextColor={COLORS.text3}
-              keyboardType="number-pad"
-            />
-          </ScrollView>
-
-          {/* Persistent footer: primary keeps the editor open for the next stop. */}
-          <View style={[styles.editorFooter, { paddingBottom: insets.bottom + SPACING.sm }]}>
-            {editingIndex == null ? (
-              <>
-                <TouchableOpacity style={styles.primaryBtn} onPress={() => saveStop(true)} activeOpacity={0.85} accessibilityRole="button">
-                  <Ionicons name="add" size={18} color={COLORS.bg} />
-                  <Text style={styles.primaryBtnText}>{t('trailEditor.saveAndAdd', { defaultValue: 'Save & add another' })}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.secondaryBtn} onPress={() => saveStop(false)} activeOpacity={0.85} accessibilityRole="button">
-                  <Text style={styles.secondaryBtnText}>{t('trailEditor.saveAndClose', { defaultValue: 'Save & close' })}</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <TouchableOpacity style={styles.primaryBtn} onPress={() => saveStop(false)} activeOpacity={0.85} accessibilityRole="button">
-                <Ionicons name="checkmark" size={18} color={COLORS.bg} />
-                <Text style={styles.primaryBtnText}>{t('common.save')}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          ) : (
+            <TouchableOpacity style={styles.addBtn} onPress={openAdd} activeOpacity={0.85}>
+              <Ionicons name="add" size={20} color={COLORS.gold} />
+              <Text style={styles.addBtnText}>{t('trailEditor.addStop')}</Text>
+            </TouchableOpacity>
+          )}
+        </ScrollView>
         </KeyboardAvoidingView>
-      </Modal>
+      )}
 
       {/* Completion → share: review the connected route, then share it. */}
       <Modal visible={finished} animationType="slide" transparent onRequestClose={leave}>
@@ -518,14 +542,18 @@ const styles = StyleSheet.create({
   subtitle: { ...font('body'), color: COLORS.text2, marginBottom: SPACING.lg },
   doneBtn: { width: 44, height: 44, alignItems: 'flex-end', justifyContent: 'center' },
   doneBtnDisabled: { opacity: 0.4 },
-  saveText: { ...font('labelBold'), fontSize: 15, color: COLORS.ember },
 
   statsRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, marginBottom: SPACING.md, borderRadius: RADIUS.pill, backgroundColor: `${COLORS.gold}14`, borderWidth: 1, borderColor: `${COLORS.gold}33` },
-  editorStatsRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm, borderBottomWidth: 1, borderBottomColor: COLORS.border, backgroundColor: `${COLORS.gold}0D` },
   statsText: { ...font('labelBold'), fontSize: 13, color: COLORS.gold },
   optionalTag: { ...font('caption'), color: COLORS.text3, textTransform: 'none' },
 
-  editorFooter: { flexDirection: 'row', gap: SPACING.sm, paddingHorizontal: SPACING.lg, paddingTop: SPACING.sm, borderTopWidth: 1, borderTopColor: COLORS.border, backgroundColor: COLORS.bg },
+  // Inline editor card (replaces the former full-screen editor modal).
+  editorCard: { marginTop: SPACING.md, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, padding: SPACING.lg },
+  editorCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.xs },
+  editorCardTitle: { ...font('title'), color: COLORS.text },
+  editorClose: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  editorActions: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.lg },
+
   primaryBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.gold },
   primaryBtnText: { ...font('labelBold'), color: COLORS.bg },
   secondaryBtn: { alignItems: 'center', justifyContent: 'center', paddingVertical: SPACING.md, paddingHorizontal: SPACING.lg, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.bg3 },
@@ -560,6 +588,9 @@ const styles = StyleSheet.create({
   stopCard: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SPACING.md, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, padding: SPACING.md },
   ordinalBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
   ordinalText: { ...font('labelBold'), color: COLORS.bg },
+  stopThumbWrap: { width: 48, height: 48, borderRadius: RADIUS.sm, overflow: 'hidden' },
+  stopThumb: { width: 48, height: 48, borderRadius: RADIUS.sm, backgroundColor: COLORS.bg3 },
+  thumbPlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)' },
   stopBody: { flex: 1 },
   stopTitle: { ...font('bodyBold'), color: COLORS.text },
   stopMeta: { ...font('caption'), color: COLORS.text3, marginTop: 2 },
@@ -579,6 +610,7 @@ const styles = StyleSheet.create({
   photoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: `${COLORS.gold}66`, backgroundColor: `${COLORS.gold}14` },
   photoBtnText: { ...font('labelBold'), color: COLORS.gold },
   stopPhoto: { width: '100%', aspectRatio: 16 / 9, borderRadius: RADIUS.md, backgroundColor: COLORS.bg3 },
+  previewPlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   photoLoading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.overlay, borderRadius: RADIUS.md },
 });
 

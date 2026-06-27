@@ -12,7 +12,8 @@
       "retry": "Try Again",
       "or": "or",
       "ok": "OK",
-      "remove": "Remove"
+      "remove": "Remove",
+      "close": "Close"
     },
     "tabs": {
       "home": "Home",
@@ -994,7 +995,10 @@
       "readyTitle": "Your trail is ready",
       "readyDesc": "Share it so people can follow your route, stop by stop.",
       "shareTrail": "Share trail",
-      "statsLineCountOnly": "%{count} stops"
+      "statsLineCountOnly": "%{count} stops",
+      "editStop": "Edit stop %{n}",
+      "mediaLabelShort": "Photo or video",
+      "addMedia": "Add photo or video"
     },
     "discover": {
       "title": "Discover",
@@ -1085,7 +1089,8 @@
       "retry": "Tekrar Dene",
       "or": "veya",
       "ok": "Tamam",
-      "remove": "Kaldır"
+      "remove": "Kaldır",
+      "close": "Kapat"
     },
     "tabs": {
       "home": "Ana Sayfa",
@@ -2067,7 +2072,10 @@
       "readyTitle": "Rotan hazır",
       "readyDesc": "Paylaş ki insanlar rotanı durak durak takip edebilsin.",
       "shareTrail": "Rotayı paylaş",
-      "statsLineCountOnly": "%{count} durak"
+      "statsLineCountOnly": "%{count} durak",
+      "editStop": "%{n}. durağı düzenle",
+      "mediaLabelShort": "Fotoğraf veya video",
+      "addMedia": "Fotoğraf veya video ekle"
     },
     "discover": {
       "title": "Keşfet",
@@ -2158,7 +2166,8 @@
       "retry": "Reintentar",
       "or": "o",
       "ok": "OK",
-      "remove": "Quitar"
+      "remove": "Quitar",
+      "close": "Cerrar"
     },
     "tabs": {
       "home": "Inicio",
@@ -3140,7 +3149,10 @@
       "readyTitle": "Tu ruta está lista",
       "readyDesc": "Compártela para que otros sigan tu ruta, parada por parada.",
       "shareTrail": "Compartir ruta",
-      "statsLineCountOnly": "%{count} paradas"
+      "statsLineCountOnly": "%{count} paradas",
+      "editStop": "Editar parada %{n}",
+      "mediaLabelShort": "Foto o video",
+      "addMedia": "Añadir foto o video"
     },
     "discover": {
       "title": "Descubrir",
@@ -3231,7 +3243,8 @@
       "retry": "Réessayer",
       "or": "ou",
       "ok": "OK",
-      "remove": "Retirer"
+      "remove": "Retirer",
+      "close": "Fermer"
     },
     "tabs": {
       "home": "Accueil",
@@ -4213,7 +4226,10 @@
       "readyTitle": "Votre parcours est prêt",
       "readyDesc": "Partagez-le pour que les autres suivent votre itinéraire, étape par étape.",
       "shareTrail": "Partager le parcours",
-      "statsLineCountOnly": "%{count} étapes"
+      "statsLineCountOnly": "%{count} étapes",
+      "editStop": "Modifier l’étape %{n}",
+      "mediaLabelShort": "Photo ou vidéo",
+      "addMedia": "Ajouter une photo ou une vidéo"
     },
     "discover": {
       "title": "Découvrir",
@@ -4304,7 +4320,8 @@
       "retry": "Erneut versuchen",
       "or": "oder",
       "ok": "OK",
-      "remove": "Entfernen"
+      "remove": "Entfernen",
+      "close": "Schließen"
     },
     "tabs": {
       "home": "Start",
@@ -5286,7 +5303,10 @@
       "readyTitle": "Dein Trail ist fertig",
       "readyDesc": "Teile ihn, damit andere deiner Route Stopp für Stopp folgen können.",
       "shareTrail": "Trail teilen",
-      "statsLineCountOnly": "%{count} Stopps"
+      "statsLineCountOnly": "%{count} Stopps",
+      "editStop": "Stopp %{n} bearbeiten",
+      "mediaLabelShort": "Foto oder Video",
+      "addMedia": "Foto oder Video hinzufügen"
     },
     "discover": {
       "title": "Entdecken",
@@ -5377,7 +5397,8 @@
       "retry": "Tentar novamente",
       "or": "ou",
       "ok": "OK",
-      "remove": "Remover"
+      "remove": "Remover",
+      "close": "Fechar"
     },
     "tabs": {
       "home": "Início",
@@ -6359,7 +6380,10 @@
       "readyTitle": "Sua trilha está pronta",
       "readyDesc": "Compartilhe para que outros sigam sua rota, parada por parada.",
       "shareTrail": "Compartilhar trilha",
-      "statsLineCountOnly": "%{count} paradas"
+      "statsLineCountOnly": "%{count} paradas",
+      "editStop": "Editar parada %{n}",
+      "mediaLabelShort": "Foto ou vídeo",
+      "addMedia": "Adicionar foto ou vídeo"
     },
     "discover": {
       "title": "Descobrir",
@@ -6450,7 +6474,8 @@
       "retry": "Riprova",
       "or": "o",
       "ok": "OK",
-      "remove": "Rimuovi"
+      "remove": "Rimuovi",
+      "close": "Chiudi"
     },
     "tabs": {
       "home": "Home",
@@ -7432,7 +7457,10 @@
       "readyTitle": "Il tuo percorso è pronto",
       "readyDesc": "Condividilo così gli altri possono seguire il tuo itinerario, tappa per tappa.",
       "shareTrail": "Condividi percorso",
-      "statsLineCountOnly": "%{count} tappe"
+      "statsLineCountOnly": "%{count} tappe",
+      "editStop": "Modifica tappa %{n}",
+      "mediaLabelShort": "Foto o video",
+      "addMedia": "Aggiungi foto o video"
     },
     "discover": {
       "title": "Scopri",
@@ -7523,7 +7551,8 @@
       "retry": "Повторить",
       "or": "или",
       "ok": "OK",
-      "remove": "Удалить"
+      "remove": "Удалить",
+      "close": "Закрыть"
     },
     "tabs": {
       "home": "Главная",
@@ -8505,7 +8534,10 @@
       "readyTitle": "Ваш маршрут готов",
       "readyDesc": "Поделитесь им, чтобы другие могли пройти ваш маршрут от точки к точке.",
       "shareTrail": "Поделиться маршрутом",
-      "statsLineCountOnly": "%{count} остановок"
+      "statsLineCountOnly": "%{count} остановок",
+      "editStop": "Изменить остановку %{n}",
+      "mediaLabelShort": "Фото или видео",
+      "addMedia": "Добавить фото или видео"
     },
     "discover": {
       "title": "Обзор",
@@ -8596,7 +8628,8 @@
       "retry": "फिर कोशिश करें",
       "or": "या",
       "ok": "ठीक है",
-      "remove": "हटाएँ"
+      "remove": "हटाएँ",
+      "close": "बंद करें"
     },
     "tabs": {
       "home": "होम",
@@ -9578,7 +9611,10 @@
       "readyTitle": "आपका ट्रेल तैयार है",
       "readyDesc": "इसे साझा करें ताकि लोग आपके रास्ते को पड़ाव दर पड़ाव फ़ॉलो कर सकें।",
       "shareTrail": "ट्रेल साझा करें",
-      "statsLineCountOnly": "%{count} पड़ाव"
+      "statsLineCountOnly": "%{count} पड़ाव",
+      "editStop": "पड़ाव %{n} संपादित करें",
+      "mediaLabelShort": "फ़ोटो या वीडियो",
+      "addMedia": "फ़ोटो या वीडियो जोड़ें"
     },
     "discover": {
       "title": "खोजें",
@@ -9669,7 +9705,8 @@
       "retry": "重试",
       "or": "或",
       "ok": "好",
-      "remove": "移除"
+      "remove": "移除",
+      "close": "关闭"
     },
     "tabs": {
       "home": "首页",
@@ -10651,7 +10688,10 @@
       "readyTitle": "你的路线已就绪",
       "readyDesc": "分享出去，让大家可以一站一站地跟随你的路线。",
       "shareTrail": "分享路线",
-      "statsLineCountOnly": "%{count} 个站点"
+      "statsLineCountOnly": "%{count} 个站点",
+      "editStop": "编辑第 %{n} 个站点",
+      "mediaLabelShort": "照片或视频",
+      "addMedia": "添加照片或视频"
     },
     "discover": {
       "title": "发现",
@@ -10742,7 +10782,8 @@
       "retry": "もう一度試す",
       "or": "または",
       "ok": "OK",
-      "remove": "削除"
+      "remove": "削除",
+      "close": "閉じる"
     },
     "tabs": {
       "home": "ホーム",
@@ -11724,7 +11765,10 @@
       "readyTitle": "トレイルが完成しました",
       "readyDesc": "シェアして、みんながあなたのルートを拠点ごとにたどれるようにしましょう。",
       "shareTrail": "トレイルをシェア",
-      "statsLineCountOnly": "%{count} 拠点"
+      "statsLineCountOnly": "%{count} 拠点",
+      "editStop": "拠点 %{n} を編集",
+      "mediaLabelShort": "写真または動画",
+      "addMedia": "写真・動画を追加"
     },
     "discover": {
       "title": "見つける",

@@ -14,6 +14,8 @@ export interface TrailStop {
   lng?: number | null;
   content?: string | null;
   photo_url?: string | null;
+  /** 'image' (default) or 'video' — the kind of media at photo_url (migration 0011). */
+  media_type?: 'image' | 'video' | null;
   tip?: string | null;
   estimated_minutes?: number | null;
 }
@@ -42,7 +44,7 @@ export class TrailService {
       const oldIds = ((existing as any[]) || []).map((r) => r.id);
 
       if (stops.length > 0) {
-        const rows = stops.map((s, i) => ({
+        const baseRows = stops.map((s, i) => ({
           capsule_id: capsuleId,
           ordinal: i,
           title: s.title || null,
@@ -54,7 +56,12 @@ export class TrailService {
           tip: s.tip || null,
           estimated_minutes: s.estimated_minutes ?? null,
         }));
-        const { error } = await db.from('trail_stops').insert(rows as any);
+        const rows = baseRows.map((r, i) => ({ ...r, media_type: stops[i].media_type || 'image' }));
+        let { error } = await db.from('trail_stops').insert(rows as any);
+        if (error) {
+          // media_type column may not exist yet (migration 0011) — retry without it.
+          ({ error } = await db.from('trail_stops').insert(baseRows as any));
+        }
         if (error) return { error }; // old stops left intact
       }
       // New set landed (or is intentionally empty) — remove the previous rows.

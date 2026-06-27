@@ -985,7 +985,16 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
                               <Text style={styles.trailStopLocation}>{t('capDetail.estMinutes', { min: stop.estimated_minutes })}</Text>
                             ) : null}
                             {stop.photo_url ? (
-                              <Image source={{ uri: stop.photo_url }} style={styles.trailStopPhoto} resizeMode="cover" />
+                              (stop as any).media_type === 'video' ? (
+                                <TouchableOpacity activeOpacity={0.85} onPress={() => Linking.openURL(stop.photo_url as string)}>
+                                  <Image source={{ uri: stop.photo_url }} style={styles.trailStopPhoto} resizeMode="cover" />
+                                  <View style={styles.trailStopPlay}>
+                                    <Ionicons name="play-circle" size={40} color="#fff" />
+                                  </View>
+                                </TouchableOpacity>
+                              ) : (
+                                <Image source={{ uri: stop.photo_url }} style={styles.trailStopPhoto} resizeMode="cover" />
+                              )
                             ) : null}
                             {/* Reveal the stop's payoff once it's been opened (arrived + tapped). */}
                             {revealStop && stop.content ? (
@@ -1891,6 +1900,7 @@ const styles = StyleSheet.create({
     color: COLORS.text2,
   },
   trailStopPhoto: { width: '100%', height: 120, borderRadius: 10, marginTop: 8, backgroundColor: COLORS.bg3 },
+  trailStopPlay: { position: 'absolute', top: 8, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   trailStopContent: { ...font('body'), color: COLORS.text, marginTop: 8, lineHeight: 20 },
   trailTipBox: { marginTop: 8, padding: 10, borderRadius: 10, backgroundColor: 'rgba(212,162,76,0.12)', borderWidth: 1, borderColor: 'rgba(212,162,76,0.3)' },
   trailTipLabel: { ...font('eyebrow'), color: getCapType('trail').color, marginBottom: 2 },
