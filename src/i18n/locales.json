@@ -441,7 +441,8 @@
       "block_video": "Video",
       "block_link": "Link",
       "block_ph_link": "https://…",
-      "block_ph_link_label": "Label (optional)"
+      "block_ph_link_label": "Label (optional)",
+      "searchAddress": "Search address or place"
     },
     "dashboard": {
       "noOpenDate": "No open date set",
@@ -1031,7 +1032,8 @@
       "tab_stops": "Stops",
       "titlePh": "e.g. Mom's Neighborhood Trail",
       "viewTrail": "View Trail",
-      "whenAvailable": "When is it available?"
+      "whenAvailable": "When is it available?",
+      "setLocation": "Set location"
     },
     "discover": {
       "title": "Discover",
@@ -1551,7 +1553,8 @@
       "block_video": "Video",
       "block_link": "Bağlantı",
       "block_ph_link": "https://…",
-      "block_ph_link_label": "Etiket (opsiyonel)"
+      "block_ph_link_label": "Etiket (opsiyonel)",
+      "searchAddress": "Adres veya yer ara"
     },
     "dashboard": {
       "noOpenDate": "Açılış tarihi belirlenmedi",
@@ -2141,7 +2144,8 @@
       "tab_stops": "Duraklar",
       "titlePh": "örn. Annemin Mahalle Rotası",
       "viewTrail": "Rotayı gör",
-      "whenAvailable": "Ne zaman erişilebilir?"
+      "whenAvailable": "Ne zaman erişilebilir?",
+      "setLocation": "Konum belirle"
     },
     "discover": {
       "title": "Keşfet",
@@ -2661,7 +2665,8 @@
       "saveDraft": "Guardar como borrador",
       "r_location": "Ubicación",
       "pinnedLocation": "Ubicación fijada",
-      "addCover": "Añadir foto de portada"
+      "addCover": "Añadir foto de portada",
+      "searchAddress": "Buscar dirección o lugar"
     },
     "dashboard": {
       "noOpenDate": "Sin fecha de apertura",
@@ -3251,7 +3256,8 @@
       "tab_stops": "Paradas",
       "titlePh": "ej. La ruta del barrio de mamá",
       "viewTrail": "Ver ruta",
-      "whenAvailable": "¿Cuándo está disponible?"
+      "whenAvailable": "¿Cuándo está disponible?",
+      "setLocation": "Establecer ubicación"
     },
     "discover": {
       "title": "Descubrir",
@@ -3771,7 +3777,8 @@
       "saveDraft": "Enregistrer comme brouillon",
       "r_location": "Lieu",
       "pinnedLocation": "Lieu épinglé",
-      "addCover": "Ajouter une photo de couverture"
+      "addCover": "Ajouter une photo de couverture",
+      "searchAddress": "Rechercher une adresse ou un lieu"
     },
     "dashboard": {
       "noOpenDate": "Aucune date d'ouverture définie",
@@ -4361,7 +4368,8 @@
       "tab_stops": "Étapes",
       "titlePh": "ex. Parcours du quartier de maman",
       "viewTrail": "Voir le parcours",
-      "whenAvailable": "Quand est-il disponible ?"
+      "whenAvailable": "Quand est-il disponible ?",
+      "setLocation": "Définir le lieu"
     },
     "discover": {
       "title": "Découvrir",
@@ -4881,7 +4889,8 @@
       "saveDraft": "Als Entwurf speichern",
       "r_location": "Ort",
       "pinnedLocation": "Angepinnter Ort",
-      "addCover": "Titelbild hinzufügen"
+      "addCover": "Titelbild hinzufügen",
+      "searchAddress": "Adresse oder Ort suchen"
     },
     "dashboard": {
       "noOpenDate": "Kein Öffnungsdatum festgelegt",
@@ -5471,7 +5480,8 @@
       "tab_stops": "Stopps",
       "titlePh": "z. B. Mamas Viertel-Trail",
       "viewTrail": "Trail ansehen",
-      "whenAvailable": "Wann ist er verfügbar?"
+      "whenAvailable": "Wann ist er verfügbar?",
+      "setLocation": "Ort festlegen"
     },
     "discover": {
       "title": "Entdecken",
@@ -5991,7 +6001,8 @@
       "saveDraft": "Guardar como rascunho",
       "r_location": "Localização",
       "pinnedLocation": "Localização fixada",
-      "addCover": "Adicionar foto de capa"
+      "addCover": "Adicionar foto de capa",
+      "searchAddress": "Buscar endereço ou local"
     },
     "dashboard": {
       "noOpenDate": "Sem data de abertura definida",
@@ -6581,7 +6592,8 @@
       "tab_stops": "Paradas",
       "titlePh": "ex.: Trilha do Bairro da Mãe",
       "viewTrail": "Ver Trilha",
-      "whenAvailable": "Quando fica disponível?"
+      "whenAvailable": "Quando fica disponível?",
+      "setLocation": "Definir local"
     },
     "discover": {
       "title": "Descobrir",
@@ -7101,7 +7113,8 @@
       "saveDraft": "Salva come bozza",
       "r_location": "Posizione",
       "pinnedLocation": "Posizione fissata",
-      "addCover": "Aggiungi foto di copertina"
+      "addCover": "Aggiungi foto di copertina",
+      "searchAddress": "Cerca indirizzo o luogo"
     },
     "dashboard": {
       "noOpenDate": "Nessuna data di apertura impostata",
@@ -7691,7 +7704,8 @@
       "tab_stops": "Tappe",
       "titlePh": "es. Il percorso del quartiere di mamma",
       "viewTrail": "Vedi percorso",
-      "whenAvailable": "Quando è disponibile?"
+      "whenAvailable": "Quando è disponibile?",
+      "setLocation": "Imposta luogo"
     },
     "discover": {
       "title": "Scopri",
@@ -8211,7 +8225,8 @@
       "saveDraft": "Сохранить черновик",
       "r_location": "Место",
       "pinnedLocation": "Закреплённое место",
-      "addCover": "Добавить обложку"
+      "addCover": "Добавить обложку",
+      "searchAddress": "Искать адрес или место"
     },
     "dashboard": {
       "noOpenDate": "Дата открытия не задана",
@@ -8801,7 +8816,8 @@
       "tab_stops": "Остановки",
       "titlePh": "напр. «Тропа по маминому району»",
       "viewTrail": "Открыть тропу",
-      "whenAvailable": "Когда она будет доступна?"
+      "whenAvailable": "Когда она будет доступна?",
+      "setLocation": "Указать место"
     },
     "discover": {
       "title": "Обзор",
@@ -9321,7 +9337,8 @@
       "saveDraft": "ड्राफ़्ट के रूप में सहेजें",
       "r_location": "स्थान",
       "pinnedLocation": "पिन किया स्थान",
-      "addCover": "कवर फ़ोटो जोड़ें"
+      "addCover": "कवर फ़ोटो जोड़ें",
+      "searchAddress": "पता या स्थान खोजें"
     },
     "dashboard": {
       "noOpenDate": "खुलने की कोई तारीख तय नहीं",
@@ -9911,7 +9928,8 @@
       "tab_stops": "पड़ाव",
       "titlePh": "जैसे मॉम का मोहल्ला ट्रेल",
       "viewTrail": "ट्रेल देखें",
-      "whenAvailable": "यह कब उपलब्ध होगी?"
+      "whenAvailable": "यह कब उपलब्ध होगी?",
+      "setLocation": "स्थान सेट करें"
     },
     "discover": {
       "title": "खोजें",
@@ -10431,7 +10449,8 @@
       "saveDraft": "存为草稿",
       "r_location": "位置",
       "pinnedLocation": "已固定位置",
-      "addCover": "添加封面图"
+      "addCover": "添加封面图",
+      "searchAddress": "搜索地址或地点"
     },
     "dashboard": {
       "noOpenDate": "未设置开启日期",
@@ -11021,7 +11040,8 @@
       "tab_stops": "站点",
       "titlePh": "如：妈妈的街区路线",
       "viewTrail": "查看路线",
-      "whenAvailable": "何时开放？"
+      "whenAvailable": "何时开放？",
+      "setLocation": "设置位置"
     },
     "discover": {
       "title": "发现",
@@ -11541,7 +11561,8 @@
       "saveDraft": "下書きとして保存",
       "r_location": "場所",
       "pinnedLocation": "ピン留めした場所",
-      "addCover": "カバー写真を追加"
+      "addCover": "カバー写真を追加",
+      "searchAddress": "住所や場所を検索"
     },
     "dashboard": {
       "noOpenDate": "開く日が未設定",
@@ -12131,7 +12152,8 @@
       "tab_stops": "スポット",
       "titlePh": "例：母さんのご近所トレイル",
       "viewTrail": "トレイルを見る",
-      "whenAvailable": "いつ公開する？"
+      "whenAvailable": "いつ公開する？",
+      "setLocation": "場所を設定"
     },
     "discover": {
       "title": "見つける",

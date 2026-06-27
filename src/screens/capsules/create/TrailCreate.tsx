@@ -71,6 +71,8 @@ const TrailCreate: React.FC<Props> = ({ onClose, onNavigate, onSealed }) => {
   // ── Step 1: Stops ─────────────────────────────────────────────
   const [stops, setStops] = useState<DraftStop[]>([]);
   const [adding, setAdding] = useState(false);
+  // Which existing stop currently has its location editor open (inline).
+  const [editLocKey, setEditLocKey] = useState<string | null>(null);
   const [sTitle, setSTitle] = useState('');
   const [sLoc, setSLoc] = useState<PickedLocation | null>(null);
   const [sMedia, setSMedia] = useState<PickedMedia | null>(null);
@@ -345,12 +347,27 @@ const TrailCreate: React.FC<Props> = ({ onClose, onNavigate, onSealed }) => {
 
                 <TextInput style={styles.stopInput} value={s.title || ''} onChangeText={(v) => updateStop(s.key, { title: v })} placeholder={t('trailEditor.stopTitlePh', { defaultValue: "Stop title (e.g. Joe's Pizza)" })} placeholderTextColor={COLORS.text3} />
 
-                <View style={styles.locRow}>
+                <TouchableOpacity
+                  style={styles.locRow}
+                  onPress={() => setEditLocKey((k) => (k === s.key ? null : s.key))}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                >
                   <Ionicons name="location" size={14} color={s.location_name ? accent : COLORS.text3} />
                   <Text style={[styles.locText, { color: s.location_name ? COLORS.text : COLORS.text3 }]} numberOfLines={1}>
-                    {s.location_name || t('trailEditor.noLocation', { defaultValue: 'No location set — remove and re-add to pick' })}
+                    {s.location_name || t('trailEditor.setLocation', { defaultValue: 'Set location' })}
                   </Text>
-                </View>
+                  <Ionicons name={editLocKey === s.key ? 'chevron-up' : 'pencil'} size={14} color={COLORS.text3} />
+                </TouchableOpacity>
+                {editLocKey === s.key && (
+                  <View style={{ marginBottom: SPACING.sm }}>
+                    <LocationPicker
+                      value={s.lat != null && s.lng != null ? { lat: s.lat, lng: s.lng, name: s.location_name || undefined } : null}
+                      onChange={(v) => updateStop(s.key, { lat: v.lat, lng: v.lng, location_name: v.name || null })}
+                      accent={accent}
+                    />
+                  </View>
+                )}
 
                 <TextInput style={[styles.stopInput, styles.multiline]} value={s.content || ''} onChangeText={(v) => updateStop(s.key, { content: v })} placeholder={t('trailEditor.stopDescPh', { defaultValue: "What's special about this stop? What should they try?" })} placeholderTextColor={COLORS.text3} multiline />
 

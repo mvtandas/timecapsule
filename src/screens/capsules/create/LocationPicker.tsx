@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,8 +39,42 @@ const LocationPicker: React.FC<Props> = ({ value, onChange, accent = COLORS.embe
     } catch { /* ignore */ }
   };
 
+  // Forward-geocode a typed address / place name → drop the pin there.
+  const [query, setQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+  const search = async () => {
+    const q = query.trim();
+    if (!q) return;
+    setSearching(true);
+    try {
+      const r = await Location.geocodeAsync(q);
+      const p: any = r?.[0];
+      if (p) { const name = await reverse(p.latitude, p.longitude); onChange({ lat: p.latitude, lng: p.longitude, name: name || q }); }
+    } catch { /* ignore */ }
+    finally { setSearching(false); }
+  };
+
   return (
     <View>
+      <View style={styles.searchRow}>
+        <Ionicons name="search" size={16} color={COLORS.text3} />
+        <TextInput
+          style={styles.searchInput}
+          value={query}
+          onChangeText={setQuery}
+          onSubmitEditing={search}
+          returnKeyType="search"
+          placeholder={t('createFlow.searchAddress', { defaultValue: 'Search address or place' })}
+          placeholderTextColor={COLORS.text3}
+        />
+        {searching
+          ? <ActivityIndicator size="small" color={accent} />
+          : !!query.trim() && (
+            <TouchableOpacity onPress={search} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('createFlow.searchAddress', { defaultValue: 'Search address or place' })}>
+              <Ionicons name="arrow-forward-circle" size={22} color={accent} />
+            </TouchableOpacity>
+          )}
+      </View>
       <View style={styles.mapWrap}>
         <MapView
           provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
@@ -63,6 +97,8 @@ const LocationPicker: React.FC<Props> = ({ value, onChange, accent = COLORS.embe
 };
 
 const styles = StyleSheet.create({
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, backgroundColor: COLORS.bg3, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, paddingHorizontal: SPACING.md, height: 44, marginBottom: SPACING.sm },
+  searchInput: { ...font('body'), color: COLORS.text, flex: 1, padding: 0 },
   mapWrap: { height: 220, borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border },
   myLoc: { position: 'absolute', top: SPACING.sm, right: SPACING.sm, width: 38, height: 38, borderRadius: 19, backgroundColor: COLORS.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border },
   name: { ...font('caption'), marginTop: SPACING.sm },
