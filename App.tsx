@@ -133,7 +133,7 @@ function AppStack() {
     <RootStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.bg } }}>
       <RootStack.Screen name="MainTabs" component={MainTabs} />
       <RootStack.Screen name="Create" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}>
-        {({ navigation, route }) => <CreateCapsuleScreen {...makeNav(navigation)} initialType={(route.params as any)?.type} />}
+        {({ navigation, route }) => <CreateCapsuleScreen {...makeNav(navigation)} navigation={navigation} initialType={(route.params as any)?.type} />}
       </RootStack.Screen>
       <RootStack.Screen name="MyCapsules">
         {({ navigation }) => <MyCapsulesScreen {...makeNav(navigation)} onLogout={signOut} />}

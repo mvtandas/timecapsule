@@ -25,6 +25,8 @@ interface Props {
   onClose: () => void;
   onNavigate: (screen: string, data?: any) => void;
   onSealed: () => void;
+  /** Dismiss the Create modal and open the just-sealed cap's detail. */
+  onViewCap?: (capId: string) => void;
 }
 
 /** Local stop shape: TrailStop plus the not-yet-uploaded media URI/type. */
@@ -54,7 +56,7 @@ const haversineKm = (a: { lat: number; lng: number }, b: { lat: number; lng: num
  * The cap AND its stops are saved together at the final "Seal this Trail" tap;
  * stops live in component state until then (no separate page, no duplicate caps).
  */
-const TrailCreate: React.FC<Props> = ({ onClose, onNavigate, onSealed }) => {
+const TrailCreate: React.FC<Props> = ({ onClose, onNavigate, onSealed, onViewCap }) => {
   const t = useT();
   const insets = useSafeAreaInsets();
   const accent = getCapType('trail').color;
@@ -255,7 +257,7 @@ const TrailCreate: React.FC<Props> = ({ onClose, onNavigate, onSealed }) => {
             <Ionicons name="share-social" size={18} color={COLORS.bg} />
             <Text style={styles.sealedPrimaryText}>{t('trailEditor.shareTrail', { defaultValue: 'Share trail' })}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.sealedSecondary} onPress={() => sealedCapId && onNavigate('Cap', { capId: sealedCapId })} activeOpacity={0.85} accessibilityRole="button">
+          <TouchableOpacity style={styles.sealedSecondary} onPress={() => { if (!sealedCapId) return; onViewCap ? onViewCap(sealedCapId) : onNavigate('Cap', { capId: sealedCapId }); }} activeOpacity={0.85} accessibilityRole="button">
             <Text style={styles.sealedSecondaryText}>{t('trailEditor.viewTrail', { defaultValue: 'View Trail' })}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.sealedDone} onPress={() => onNavigate('Dashboard')} activeOpacity={0.7} accessibilityRole="button">

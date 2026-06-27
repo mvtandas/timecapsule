@@ -17,12 +17,15 @@ const LAUNCH = CAP_TYPE_LIST.filter((c) => c.enabled);
 interface Props {
   onNavigate: (screen: string, data?: any) => void;
   onGoBack?: () => void;
+  /** Raw navigation — used to reset out of the Create fullScreenModal into a
+   * card route (e.g. open the just-sealed trail), which a plain push can't do. */
+  navigation?: any;
   /** When resuming a draft, jump straight into that type's wizard. */
   initialType?: CapTypeId;
 }
 
 /** Create landing: pick a cap type → branch into that type's bespoke wizard. */
-const CreateCapsuleScreen = ({ onNavigate, onGoBack, initialType }: Props) => {
+const CreateCapsuleScreen = ({ onNavigate, onGoBack, navigation, initialType }: Props) => {
   const t = useT();
   const insets = useSafeAreaInsets();
   // Resume straight into the draft's wizard, but only for a recognized cap type;
@@ -34,12 +37,18 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack, initialType }: Props) => {
   const close = () => onGoBack?.();
   const backToPicker = () => setType(null);
   const onSealed = () => onGoBack?.();
+  // Dismiss the Create modal AND show the cap detail: a plain navigate('Cap')
+  // pushes behind the fullScreenModal (invisible), so reset the stack instead.
+  const viewCap = (capId: string) => {
+    if (navigation?.reset) navigation.reset({ index: 1, routes: [{ name: 'MainTabs' }, { name: 'Cap', params: { capId } }] });
+    else onNavigate('Cap', { capId });
+  };
 
   if (type === 'whisper') return <WhisperCreate onClose={backToPicker} onSealed={onSealed} />;
   if (type === 'public') return <PublicCreate onClose={backToPicker} onSealed={onSealed} />;
   if (type === 'scroll') return <ScrollCreate onClose={backToPicker} onSealed={onSealed} />;
   if (type === 'gathering') return <GatheringCreate onClose={backToPicker} onSealed={onSealed} />;
-  if (type === 'trail') return <TrailCreate onClose={backToPicker} onNavigate={onNavigate} onSealed={onSealed} />;
+  if (type === 'trail') return <TrailCreate onClose={backToPicker} onNavigate={onNavigate} onSealed={onSealed} onViewCap={viewCap} />;
   if (type) return <ComingSoon type={type} onClose={backToPicker} />;
 
   return (
