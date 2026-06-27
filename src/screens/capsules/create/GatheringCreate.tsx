@@ -5,6 +5,7 @@ import { uuidv4 } from '../../../utils/uuid';
 import { COLORS, RADIUS, SPACING, font } from '../../../constants/theme';
 import { getCapType } from '../../../constants/capTypes';
 import { CapsuleService } from '../../../services/capsuleService';
+import { GatheringService } from '../../../services/gatheringService';
 import { DraftService } from '../../../services/draftService';
 import { supabase } from '../../../lib/supabase';
 import { formatDate } from '../../../utils/dateUtils';
@@ -63,6 +64,17 @@ const GatheringCreate: React.FC<Props> = ({ onClose, onSealed }) => {
         media_url, media_type,
       });
       if (error || !created) { Alert.alert(t('createFlow.alert_error'), (error as any)?.message || t('createFlow.alert_create_failed')); setSealing(false); return; }
+      // Seed the owner's moment as the first contribution so it shows in the
+      // gathering's contributions list + count (not just as the cap subtitle).
+      if (myText.trim() || media_url) {
+        try {
+          await GatheringService.addContribution((created as any).id, {
+            text: myText.trim() || undefined,
+            media_url: media_url || undefined,
+            media_type: media_url ? media_type : undefined, // never 'none'
+          });
+        } catch { /* best-effort; cap is already created */ }
+      }
       // Persist invites so invitees can access the gathering (incl. private ones).
       // Requires the "Owners can share their capsules" RLS policy (migration 0009).
       const inviteeIds = invites.map((u) => u.id).filter((id) => !!id && id !== user.id);

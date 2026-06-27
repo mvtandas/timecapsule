@@ -231,10 +231,11 @@
       "joinRequestsCount": "Join requests (%{count})",
       "decline": "Decline",
       "approve": "Approve",
-      "gatheringComplete": "The gathering is complete",
+      "gatheringComplete": "The seal is broken",
       "finishTrail": "Finish trail →",
       "unlockOnArrival": "Its photo & message unlock when you arrive.",
-      "enableLocation": "Enable location"
+      "enableLocation": "Enable location",
+      "gatheringEmpty": "No contributions yet — be the first to add one."
     },
     "comments": {
       "title": "Comments",
@@ -1340,7 +1341,7 @@
       "approve": "Onayla",
       "viewCount": "%{n} okuma",
       "creatorPreviewSub": "Bunu yalnızca sen görebilirsin. Okuyucular açılana kadar mühürlü hâlini görür.",
-      "gatheringComplete": "Buluşma tamamlandı",
+      "gatheringComplete": "Mühür kırıldı",
       "whisperNotForYou": "Bu fısıltı sana yazılmamış",
       "decline": "Reddet",
       "statDistance": "Mesafe",
@@ -1359,7 +1360,8 @@
       "creatorPreview": "Oluşturan önizlemesi",
       "finishTrail": "Rotayı bitir →",
       "unlockOnArrival": "Fotoğraf ve mesajı yanına gidince açılır.",
-      "enableLocation": "Konumu aç"
+      "enableLocation": "Konumu aç",
+      "gatheringEmpty": "Henüz katkı yok — ilk ekleyen sen ol."
     },
     "comments": {
       "title": "Yorumlar",
@@ -2465,7 +2467,7 @@
       "approve": "Aprobar",
       "viewCount": "%{n} lecturas",
       "creatorPreviewSub": "Solo tú puedes ver esto. Los lectores ven un estado sellado hasta que se abre.",
-      "gatheringComplete": "El encuentro está completo",
+      "gatheringComplete": "El sello se ha roto",
       "whisperNotForYou": "Este susurro no está dirigido a ti",
       "decline": "Rechazar",
       "statDistance": "Distancia",
@@ -2484,7 +2486,8 @@
       "creatorPreview": "Vista previa del creador",
       "finishTrail": "Terminar ruta →",
       "unlockOnArrival": "Su foto y mensaje se desbloquean cuando llegas.",
-      "enableLocation": "Activar ubicación"
+      "enableLocation": "Activar ubicación",
+      "gatheringEmpty": "Aún no hay contribuciones — sé el primero."
     },
     "comments": {
       "title": "Comentarios",
@@ -3590,7 +3593,7 @@
       "approve": "Approuver",
       "viewCount": "%{n} lectures",
       "creatorPreviewSub": "Vous seul voyez ceci. Les lecteurs voient un état scellé jusqu'à l'ouverture.",
-      "gatheringComplete": "Le rassemblement est terminé",
+      "gatheringComplete": "Le sceau est brisé",
       "whisperNotForYou": "Ce murmure ne vous est pas adressé",
       "decline": "Refuser",
       "statDistance": "Distance",
@@ -3609,7 +3612,8 @@
       "creatorPreview": "Aperçu créateur",
       "finishTrail": "Terminer le parcours →",
       "unlockOnArrival": "Sa photo et son message se débloquent à votre arrivée.",
-      "enableLocation": "Activer la localisation"
+      "enableLocation": "Activer la localisation",
+      "gatheringEmpty": "Aucune contribution pour l’instant — soyez le premier."
     },
     "comments": {
       "title": "Commentaires",
@@ -4715,7 +4719,7 @@
       "approve": "Annehmen",
       "viewCount": "%{n} Aufrufe",
       "creatorPreviewSub": "Nur du siehst das. Leser sehen einen versiegelten Zustand, bis er sich öffnet.",
-      "gatheringComplete": "Das Treffen ist abgeschlossen",
+      "gatheringComplete": "Das Siegel ist gebrochen",
       "whisperNotForYou": "Dieses Whisper ist nicht an dich gerichtet",
       "decline": "Ablehnen",
       "statDistance": "Distanz",
@@ -4734,7 +4738,8 @@
       "creatorPreview": "Ersteller-Vorschau",
       "finishTrail": "Trail beenden →",
       "unlockOnArrival": "Foto und Nachricht werden freigeschaltet, wenn du ankommst.",
-      "enableLocation": "Standort aktivieren"
+      "enableLocation": "Standort aktivieren",
+      "gatheringEmpty": "Noch keine Beiträge — sei der Erste."
     },
     "comments": {
       "title": "Kommentare",
@@ -5840,7 +5845,7 @@
       "approve": "Aprovar",
       "viewCount": "%{n} leituras",
       "creatorPreviewSub": "Só você vê isto. Os leitores veem o estado selado até abrir.",
-      "gatheringComplete": "O encontro está completo",
+      "gatheringComplete": "O selo foi rompido",
       "whisperNotForYou": "Este sussurro não é endereçado a você",
       "decline": "Recusar",
       "statDistance": "Distância",
@@ -5859,7 +5864,8 @@
       "creatorPreview": "Pré-visualização do criador",
       "finishTrail": "Terminar trilho →",
       "unlockOnArrival": "A foto e a mensagem são desbloqueadas quando você chega.",
-      "enableLocation": "Ativar localização"
+      "enableLocation": "Ativar localização",
+      "gatheringEmpty": "Ainda sem contribuições — seja o primeiro."
     },
     "comments": {
       "title": "Comentários",
@@ -6965,7 +6971,7 @@
       "approve": "Approva",
       "viewCount": "%{n} letture",
       "creatorPreviewSub": "Solo tu puoi vederlo. I lettori vedono uno stato sigillato finché non si apre.",
-      "gatheringComplete": "Il raduno è completo",
+      "gatheringComplete": "Il sigillo è spezzato",
       "whisperNotForYou": "Questo sussurro non è indirizzato a te",
       "decline": "Rifiuta",
       "statDistance": "Distanza",
@@ -6984,7 +6990,8 @@
       "creatorPreview": "Anteprima creatore",
       "finishTrail": "Termina percorso →",
       "unlockOnArrival": "La foto e il messaggio si sbloccano quando arrivi.",
-      "enableLocation": "Attiva la posizione"
+      "enableLocation": "Attiva la posizione",
+      "gatheringEmpty": "Ancora nessun contributo — sii il primo."
     },
     "comments": {
       "title": "Commenti",
@@ -8090,7 +8097,7 @@
       "approve": "Принять",
       "viewCount": "%{n} прочтений",
       "creatorPreviewSub": "Видно только вам. Читатели видят запечатанное состояние до открытия.",
-      "gatheringComplete": "Сбор завершён",
+      "gatheringComplete": "Печать сломана",
       "whisperNotForYou": "Этот шёпот адресован не вам",
       "decline": "Отклонить",
       "statDistance": "Расстояние",
@@ -8109,7 +8116,8 @@
       "creatorPreview": "Предпросмотр создателя",
       "finishTrail": "Завершить маршрут →",
       "unlockOnArrival": "Фото и сообщение откроются, когда вы придёте.",
-      "enableLocation": "Включить геолокацию"
+      "enableLocation": "Включить геолокацию",
+      "gatheringEmpty": "Пока нет вкладов — будьте первым."
     },
     "comments": {
       "title": "Комментарии",
@@ -9215,7 +9223,7 @@
       "approve": "स्वीकारें",
       "viewCount": "%{n} बार पढ़ा गया",
       "creatorPreviewSub": "यह सिर्फ़ आपको दिखता है। पाठकों को खुलने तक सील्ड स्थिति दिखती है।",
-      "gatheringComplete": "जमावड़ा पूरा हुआ",
+      "gatheringComplete": "मुहर टूट गई",
       "whisperNotForYou": "यह व्हिस्पर आपके नाम नहीं है",
       "decline": "अस्वीकारें",
       "statDistance": "दूरी",
@@ -9234,7 +9242,8 @@
       "creatorPreview": "क्रिएटर प्रीव्यू",
       "finishTrail": "ट्रेल पूरा करें →",
       "unlockOnArrival": "इसकी फ़ोटो और संदेश तब खुलते हैं जब आप पहुँचते हैं।",
-      "enableLocation": "लोकेशन चालू करें"
+      "enableLocation": "लोकेशन चालू करें",
+      "gatheringEmpty": "अभी कोई योगदान नहीं — सबसे पहले आप जोड़ें।"
     },
     "comments": {
       "title": "टिप्पणियाँ",
@@ -10340,7 +10349,7 @@
       "approve": "通过",
       "viewCount": "%{n} 次阅读",
       "creatorPreviewSub": "仅你可见。读者在开启前只会看到封存状态。",
-      "gatheringComplete": "聚会已完成",
+      "gatheringComplete": "封印已破",
       "whisperNotForYou": "这条私语不是写给你的",
       "decline": "拒绝",
       "statDistance": "距离",
@@ -10359,7 +10368,8 @@
       "creatorPreview": "创建者预览",
       "finishTrail": "完成路线 →",
       "unlockOnArrival": "到达后即可解锁照片和留言。",
-      "enableLocation": "开启定位"
+      "enableLocation": "开启定位",
+      "gatheringEmpty": "还没有贡献 — 来做第一个吧。"
     },
     "comments": {
       "title": "评论",
@@ -11465,7 +11475,7 @@
       "approve": "承認",
       "viewCount": "%{n} 回閲覧",
       "creatorPreviewSub": "これはあなただけに表示されます。読者には開封されるまで封印状態が表示されます。",
-      "gatheringComplete": "集まりが完了しました",
+      "gatheringComplete": "封印が解かれた",
       "whisperNotForYou": "このささやきはあなた宛てではありません",
       "decline": "辞退",
       "statDistance": "距離",
@@ -11484,7 +11494,8 @@
       "creatorPreview": "作成者プレビュー",
       "finishTrail": "トレイルを終える →",
       "unlockOnArrival": "到着すると写真とメッセージが開きます。",
-      "enableLocation": "位置情報をオンにする"
+      "enableLocation": "位置情報をオンにする",
+      "gatheringEmpty": "まだ投稿がありません — 最初の一人になりましょう。"
     },
     "comments": {
       "title": "コメント",

@@ -462,10 +462,13 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
     if (item?.id && !sealed && !isOwner) CapsuleService.recordOpen(item.id);
   }, [item?.id, sealed, isOwner]);
 
-  // Gathering reveal — play once when a gathering is open (not sealed), guarded by a ref.
+  // Gathering reveal ("break the seal") — the arrival ceremony for a visitor who
+  // reaches the location (a non-owner is !sealed only once within range). The
+  // OWNER previews without the ceremony, so it must NOT fire for them (it was
+  // showing "the gathering is complete" the instant the creator opened it).
   useEffect(() => {
-    if (item?.type === 'gathering' && !sealed && item?.id) playReveal();
-  }, [item?.id, item?.type, sealed, playReveal]);
+    if (item?.type === 'gathering' && !sealed && !isOwner && item?.id) playReveal();
+  }, [item?.id, item?.type, sealed, isOwner, playReveal]);
 
   // Gathering contribution visibility (mirrors the demo): open caps after seal
   // show all; while sealed, blind hides every contribution (even from the owner),
@@ -1131,7 +1134,7 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
         {/* Gathering contributions */}
         {item?.type === 'gathering' && (
           <View style={styles.extraSection}>
-            <Text style={styles.extraSectionTitle}>{t('capDetail.gatheringCount', { count: contributions.length })}</Text>
+            <Text style={styles.extraSectionTitle}>{t('capDetail.gatheringCount', { count: visibleContributions.length })}</Text>
             {visibleContributions.length > 0 ? (
               <ScrollView style={styles.extraScroll} keyboardShouldPersistTaps="handled">
                 {visibleContributions.map((c, idx) => (
@@ -1150,6 +1153,11 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
                   </View>
                 ))}
               </ScrollView>
+            ) : hiddenContributions === 0 ? (
+              <View style={styles.blindNote}>
+                <Ionicons name="chatbubbles-outline" size={20} color={COLORS.text3} />
+                <Text style={styles.blindNoteText}>{t('capDetail.gatheringEmpty', { defaultValue: 'No contributions yet — be the first to add one.' })}</Text>
+              </View>
             ) : null}
             {hiddenContributions > 0 && (
               <View style={styles.blindNote}>
