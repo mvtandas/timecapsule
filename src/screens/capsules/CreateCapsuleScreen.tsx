@@ -39,12 +39,7 @@ const CreateCapsuleScreen = ({ onNavigate, onGoBack, initialType }: Props) => {
   if (type === 'public') return <PublicCreate onClose={backToPicker} onSealed={onSealed} />;
   if (type === 'scroll') return <ScrollCreate onClose={backToPicker} onSealed={onSealed} />;
   if (type === 'gathering') return <GatheringCreate onClose={backToPicker} onSealed={onSealed} />;
-  if (type === 'trail') return (
-    <TrailCreate
-      onClose={backToPicker}
-      onCreated={(capsuleId, trailTitle, trailDesc) => onNavigate('TrailStops', { capsuleId, trailTitle, trailDesc, fromCreate: true })}
-    />
-  );
+  if (type === 'trail') return <TrailCreate onClose={backToPicker} onNavigate={onNavigate} onSealed={onSealed} />;
   if (type) return <ComingSoon type={type} onClose={backToPicker} />;
 
   return (
