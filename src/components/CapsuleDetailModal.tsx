@@ -985,7 +985,7 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
               })()}
 
               {!done && trailViewMode === 'timeline' && (
-              <ScrollView style={styles.extraScroll} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+              <View>
                 {trailStops.map((stop, idx) => {
                   const isDone = completed.includes(idx);
                   const isCurrent = idx === currentIdx && !done;
@@ -1121,7 +1121,7 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
                     </View>
                   );
                 })}
-              </ScrollView>
+              </View>
               )}
             </View>
             </ScrollView>
@@ -1928,7 +1928,7 @@ const styles = StyleSheet.create({
   // the modal instead of overflowing the bottom-anchored content and clipping
   // the start / map-toggle / progress controls off-screen (U4).
   trailBodyScroll: {
-    maxHeight: height * 0.55,
+    maxHeight: height * 0.62,
     marginBottom: 10,
   },
   trailBodyScrollContent: {
