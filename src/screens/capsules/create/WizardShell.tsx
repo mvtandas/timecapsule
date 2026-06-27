@@ -15,12 +15,16 @@ interface Props {
   primaryDisabled?: boolean;
   onPrimary: () => void;
   loading?: boolean;
+  /** When the primary button is disabled, an optional one-line reason shown beneath it. */
+  hintText?: string;
+  /** Optional ref to the body ScrollView so callers can scrollToEnd (e.g. after adding an item). */
+  scrollRef?: React.RefObject<ScrollView | null>;
   children: React.ReactNode;
 }
 
 /** Shared chrome for every create wizard: close + title + step dots, scroll body, Back/primary footer. */
 const WizardShell: React.FC<Props> = ({
-  title, stepIndex, steps, accent = COLORS.ember, onClose, onBack, primaryLabel, primaryDisabled, onPrimary, loading, children,
+  title, stepIndex, steps, accent = COLORS.ember, onClose, onBack, primaryLabel, primaryDisabled, onPrimary, loading, hintText, scrollRef, children,
 }) => {
   const insets = useSafeAreaInsets();
   return (
@@ -40,24 +44,29 @@ const WizardShell: React.FC<Props> = ({
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }} keyboardVerticalOffset={8}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {children}
         </ScrollView>
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, SPACING.md) }]}>
-          {stepIndex > 0 && (
-            <TouchableOpacity onPress={onBack} style={styles.backBtn} activeOpacity={0.8} accessibilityRole="button">
-              <Ionicons name="chevron-back" size={22} color={COLORS.text} />
+          <View style={styles.footerRow}>
+            {stepIndex > 0 && (
+              <TouchableOpacity onPress={onBack} style={styles.backBtn} activeOpacity={0.8} accessibilityRole="button">
+                <Ionicons name="chevron-back" size={22} color={COLORS.text} />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={onPrimary}
+              disabled={primaryDisabled || loading}
+              activeOpacity={0.9}
+              style={[styles.primary, { backgroundColor: accent, opacity: primaryDisabled || loading ? 0.5 : 1 }]}
+              accessibilityRole="button"
+            >
+              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{primaryLabel}</Text>}
             </TouchableOpacity>
+          </View>
+          {primaryDisabled && !!hintText && (
+            <Text style={styles.hint} accessibilityRole="text">{hintText}</Text>
           )}
-          <TouchableOpacity
-            onPress={onPrimary}
-            disabled={primaryDisabled || loading}
-            activeOpacity={0.9}
-            style={[styles.primary, { backgroundColor: accent, opacity: primaryDisabled || loading ? 0.5 : 1 }]}
-            accessibilityRole="button"
-          >
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{primaryLabel}</Text>}
-          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -72,10 +81,12 @@ const styles = StyleSheet.create({
   dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, paddingBottom: SPACING.md },
   dot: { height: 7, borderRadius: 4 },
   content: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.xl },
-  footer: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingHorizontal: SPACING.lg, paddingTop: SPACING.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.border },
+  footer: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.border },
+  footerRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   backBtn: { width: 48, height: 48, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.bg3, borderWidth: 1, borderColor: COLORS.border },
   primary: { flex: 1, height: 48, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
   primaryText: { ...font('labelBold'), fontSize: 15, color: '#fff' },
+  hint: { ...font('caption'), color: COLORS.text3, textAlign: 'center', marginTop: SPACING.sm },
 });
 
 export default WizardShell;

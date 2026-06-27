@@ -12,10 +12,12 @@ interface Props {
   media: PickedMedia | null;
   onChange: (m: PickedMedia | null) => void;
   accent?: string;
+  /** Show the voice/record button. Set false where audio has no storage slot (e.g. trail stops). */
+  allowVoice?: boolean;
 }
 
 /** Attach a photo/video (camera or gallery) or record a voice note. */
-const MediaPicker: React.FC<Props> = ({ media, onChange, accent = COLORS.ember }) => {
+const MediaPicker: React.FC<Props> = ({ media, onChange, accent = COLORS.ember, allowVoice = true }) => {
   const t = useT();
   const recRef = useRef<Audio.Recording | null>(null);
   const [recording, setRecording] = useState(false);
@@ -104,7 +106,7 @@ const MediaPicker: React.FC<Props> = ({ media, onChange, accent = COLORS.ember }
       <Btn icon="camera" label={t('createFlow.mediaPhoto')} accent={accent} onPress={fromCamera} />
       <Btn icon="images" label={t('createFlow.mediaGallery')} accent={accent} onPress={() => fromLibrary(false)} />
       <Btn icon="videocam" label={t('createFlow.mediaVideo')} accent={accent} onPress={() => fromLibrary(true)} />
-      <Btn icon="mic" label={t('createFlow.mediaVoice')} accent={accent} onPress={startVoice} />
+      {allowVoice && <Btn icon="mic" label={t('createFlow.mediaVoice')} accent={accent} onPress={startVoice} />}
     </View>
   );
 };

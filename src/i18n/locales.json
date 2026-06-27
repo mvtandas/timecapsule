@@ -442,7 +442,10 @@
       "block_link": "Link",
       "block_ph_link": "https://…",
       "block_ph_link_label": "Label (optional)",
-      "searchAddress": "Search address or place"
+      "searchAddress": "Search address or place",
+      "locationDenied": "Location permission is off. Enable it in Settings to use your current location.",
+      "openSettings": "Open Settings",
+      "searchNoResult": "No place found — try a different search or tap the map"
     },
     "dashboard": {
       "noOpenDate": "No open date set",
@@ -1033,7 +1036,17 @@
       "titlePh": "e.g. Mom's Neighborhood Trail",
       "viewTrail": "View Trail",
       "whenAvailable": "When is it available?",
-      "setLocation": "Set location"
+      "setLocation": "Set location",
+      "hintName": "Name your trail to continue",
+      "hintNeedStops": "Add at least 2 stops, each with a location",
+      "hintSeal": "Choose when the trail unlocks and set a date",
+      "hintStopLocation": "A stop is missing its location — tap it to set one",
+      "hintStopTitle": "Give every stop a title",
+      "removeStopMsg": "This stop and everything in it will be deleted.",
+      "removeStopTitle": "Remove this stop?",
+      "setLocationRequired": "Set location (required)",
+      "stat_est_time": "Est. time",
+      "stopMediaLabel": "Photo / video (optional)"
     },
     "discover": {
       "title": "Discover",
@@ -1554,7 +1567,10 @@
       "block_link": "Bağlantı",
       "block_ph_link": "https://…",
       "block_ph_link_label": "Etiket (opsiyonel)",
-      "searchAddress": "Adres veya yer ara"
+      "searchAddress": "Adres veya yer ara",
+      "locationDenied": "Konum izni kapalı. Mevcut konumunu kullanmak için Ayarlar'dan aç.",
+      "openSettings": "Ayarları aç",
+      "searchNoResult": "Yer bulunamadı — farklı bir arama dene ya da haritaya dokun"
     },
     "dashboard": {
       "noOpenDate": "Açılış tarihi belirlenmedi",
@@ -2145,7 +2161,17 @@
       "titlePh": "örn. Annemin Mahalle Rotası",
       "viewTrail": "Rotayı gör",
       "whenAvailable": "Ne zaman erişilebilir?",
-      "setLocation": "Konum belirle"
+      "setLocation": "Konum belirle",
+      "hintName": "Devam etmek için rotanı adlandır",
+      "hintNeedStops": "En az 2 durak ekle, her birinin konumu olsun",
+      "hintSeal": "Rotanın ne zaman açılacağını seç ve bir tarih belirle",
+      "hintStopLocation": "Bir durağın konumu yok — ayarlamak için üstüne dokun",
+      "hintStopTitle": "Her durağa bir başlık ver",
+      "removeStopMsg": "Bu durak ve içindeki her şey silinecek.",
+      "removeStopTitle": "Bu durak silinsin mi?",
+      "setLocationRequired": "Konum belirle (zorunlu)",
+      "stat_est_time": "Tah. süre",
+      "stopMediaLabel": "Fotoğraf / video (isteğe bağlı)"
     },
     "discover": {
       "title": "Keşfet",
@@ -2666,7 +2692,10 @@
       "r_location": "Ubicación",
       "pinnedLocation": "Ubicación fijada",
       "addCover": "Añadir foto de portada",
-      "searchAddress": "Buscar dirección o lugar"
+      "searchAddress": "Buscar dirección o lugar",
+      "locationDenied": "El permiso de ubicación está desactivado. Actívalo en Ajustes para usar tu ubicación actual.",
+      "openSettings": "Abrir Ajustes",
+      "searchNoResult": "No se encontró ningún lugar — prueba otra búsqueda o toca el mapa"
     },
     "dashboard": {
       "noOpenDate": "Sin fecha de apertura",
@@ -3257,7 +3286,17 @@
       "titlePh": "ej. La ruta del barrio de mamá",
       "viewTrail": "Ver ruta",
       "whenAvailable": "¿Cuándo está disponible?",
-      "setLocation": "Establecer ubicación"
+      "setLocation": "Establecer ubicación",
+      "hintName": "Nombra tu ruta para continuar",
+      "hintNeedStops": "Añade al menos 2 paradas, cada una con ubicación",
+      "hintSeal": "Elige cuándo se desbloquea la ruta y fija una fecha",
+      "hintStopLocation": "A una parada le falta la ubicación — tócala para fijarla",
+      "hintStopTitle": "Da un título a cada parada",
+      "removeStopMsg": "Esta parada y todo su contenido se eliminarán.",
+      "removeStopTitle": "¿Eliminar esta parada?",
+      "setLocationRequired": "Fijar ubicación (obligatorio)",
+      "stat_est_time": "T. est.",
+      "stopMediaLabel": "Foto / video (opcional)"
     },
     "discover": {
       "title": "Descubrir",
@@ -3778,7 +3817,10 @@
       "r_location": "Lieu",
       "pinnedLocation": "Lieu épinglé",
       "addCover": "Ajouter une photo de couverture",
-      "searchAddress": "Rechercher une adresse ou un lieu"
+      "searchAddress": "Rechercher une adresse ou un lieu",
+      "locationDenied": "L'autorisation de localisation est désactivée. Activez-la dans Réglages pour utiliser votre position.",
+      "openSettings": "Ouvrir les Réglages",
+      "searchNoResult": "Aucun lieu trouvé — essayez une autre recherche ou touchez la carte"
     },
     "dashboard": {
       "noOpenDate": "Aucune date d'ouverture définie",
@@ -4369,7 +4411,17 @@
       "titlePh": "ex. Parcours du quartier de maman",
       "viewTrail": "Voir le parcours",
       "whenAvailable": "Quand est-il disponible ?",
-      "setLocation": "Définir le lieu"
+      "setLocation": "Définir le lieu",
+      "hintName": "Nommez votre parcours pour continuer",
+      "hintNeedStops": "Ajoutez au moins 2 étapes, chacune avec un lieu",
+      "hintSeal": "Choisissez quand le parcours se débloque et fixez une date",
+      "hintStopLocation": "Une étape n'a pas de lieu — touchez-la pour en définir un",
+      "hintStopTitle": "Donnez un titre à chaque étape",
+      "removeStopMsg": "Cette étape et tout son contenu seront supprimés.",
+      "removeStopTitle": "Supprimer cette étape ?",
+      "setLocationRequired": "Définir le lieu (requis)",
+      "stat_est_time": "Durée est.",
+      "stopMediaLabel": "Photo / vidéo (facultatif)"
     },
     "discover": {
       "title": "Découvrir",
@@ -4890,7 +4942,10 @@
       "r_location": "Ort",
       "pinnedLocation": "Angepinnter Ort",
       "addCover": "Titelbild hinzufügen",
-      "searchAddress": "Adresse oder Ort suchen"
+      "searchAddress": "Adresse oder Ort suchen",
+      "locationDenied": "Standortberechtigung ist aus. Aktiviere sie in den Einstellungen, um deinen Standort zu nutzen.",
+      "openSettings": "Einstellungen öffnen",
+      "searchNoResult": "Kein Ort gefunden — andere Suche versuchen oder auf die Karte tippen"
     },
     "dashboard": {
       "noOpenDate": "Kein Öffnungsdatum festgelegt",
@@ -5481,7 +5536,17 @@
       "titlePh": "z. B. Mamas Viertel-Trail",
       "viewTrail": "Trail ansehen",
       "whenAvailable": "Wann ist er verfügbar?",
-      "setLocation": "Ort festlegen"
+      "setLocation": "Ort festlegen",
+      "hintName": "Benenne deinen Trail, um fortzufahren",
+      "hintNeedStops": "Füge mindestens 2 Stopps hinzu, jeder mit Ort",
+      "hintSeal": "Wähle, wann der Trail freigeschaltet wird, und lege ein Datum fest",
+      "hintStopLocation": "Einem Stopp fehlt der Ort — tippe ihn an, um ihn festzulegen",
+      "hintStopTitle": "Gib jedem Stopp einen Titel",
+      "removeStopMsg": "Dieser Stopp und sein gesamter Inhalt werden gelöscht.",
+      "removeStopTitle": "Diesen Stopp entfernen?",
+      "setLocationRequired": "Ort festlegen (erforderlich)",
+      "stat_est_time": "Gesch. Zeit",
+      "stopMediaLabel": "Foto / Video (optional)"
     },
     "discover": {
       "title": "Entdecken",
@@ -6002,7 +6067,10 @@
       "r_location": "Localização",
       "pinnedLocation": "Localização fixada",
       "addCover": "Adicionar foto de capa",
-      "searchAddress": "Buscar endereço ou local"
+      "searchAddress": "Buscar endereço ou local",
+      "locationDenied": "A permissão de localização está desativada. Ative-a nas Configurações para usar sua localização.",
+      "openSettings": "Abrir Configurações",
+      "searchNoResult": "Nenhum local encontrado — tente outra busca ou toque no mapa"
     },
     "dashboard": {
       "noOpenDate": "Sem data de abertura definida",
@@ -6593,7 +6661,17 @@
       "titlePh": "ex.: Trilha do Bairro da Mãe",
       "viewTrail": "Ver Trilha",
       "whenAvailable": "Quando fica disponível?",
-      "setLocation": "Definir local"
+      "setLocation": "Definir local",
+      "hintName": "Nomeie sua trilha para continuar",
+      "hintNeedStops": "Adicione pelo menos 2 paradas, cada uma com local",
+      "hintSeal": "Escolha quando a trilha abre e defina uma data",
+      "hintStopLocation": "Uma parada está sem local — toque nela para definir",
+      "hintStopTitle": "Dê um título a cada parada",
+      "removeStopMsg": "Esta parada e tudo nela serão excluídos.",
+      "removeStopTitle": "Remover esta parada?",
+      "setLocationRequired": "Definir local (obrigatório)",
+      "stat_est_time": "T. est.",
+      "stopMediaLabel": "Foto / vídeo (opcional)"
     },
     "discover": {
       "title": "Descobrir",
@@ -7114,7 +7192,10 @@
       "r_location": "Posizione",
       "pinnedLocation": "Posizione fissata",
       "addCover": "Aggiungi foto di copertina",
-      "searchAddress": "Cerca indirizzo o luogo"
+      "searchAddress": "Cerca indirizzo o luogo",
+      "locationDenied": "Il permesso di posizione è disattivato. Attivalo nelle Impostazioni per usare la tua posizione.",
+      "openSettings": "Apri Impostazioni",
+      "searchNoResult": "Nessun luogo trovato — prova un'altra ricerca o tocca la mappa"
     },
     "dashboard": {
       "noOpenDate": "Nessuna data di apertura impostata",
@@ -7705,7 +7786,17 @@
       "titlePh": "es. Il percorso del quartiere di mamma",
       "viewTrail": "Vedi percorso",
       "whenAvailable": "Quando è disponibile?",
-      "setLocation": "Imposta luogo"
+      "setLocation": "Imposta luogo",
+      "hintName": "Dai un nome al percorso per continuare",
+      "hintNeedStops": "Aggiungi almeno 2 tappe, ognuna con un luogo",
+      "hintSeal": "Scegli quando il percorso si sblocca e imposta una data",
+      "hintStopLocation": "A una tappa manca il luogo — toccala per impostarlo",
+      "hintStopTitle": "Dai un titolo a ogni tappa",
+      "removeStopMsg": "Questa tappa e tutto il suo contenuto verranno eliminati.",
+      "removeStopTitle": "Rimuovere questa tappa?",
+      "setLocationRequired": "Imposta luogo (obbligatorio)",
+      "stat_est_time": "T. stim.",
+      "stopMediaLabel": "Foto / video (facoltativo)"
     },
     "discover": {
       "title": "Scopri",
@@ -8226,7 +8317,10 @@
       "r_location": "Место",
       "pinnedLocation": "Закреплённое место",
       "addCover": "Добавить обложку",
-      "searchAddress": "Искать адрес или место"
+      "searchAddress": "Искать адрес или место",
+      "locationDenied": "Доступ к геолокации выключен. Включите его в Настройках, чтобы использовать своё местоположение.",
+      "openSettings": "Открыть настройки",
+      "searchNoResult": "Ничего не найдено — измените запрос или коснитесь карты"
     },
     "dashboard": {
       "noOpenDate": "Дата открытия не задана",
@@ -8817,7 +8911,17 @@
       "titlePh": "напр. «Тропа по маминому району»",
       "viewTrail": "Открыть тропу",
       "whenAvailable": "Когда она будет доступна?",
-      "setLocation": "Указать место"
+      "setLocation": "Указать место",
+      "hintName": "Назовите маршрут, чтобы продолжить",
+      "hintNeedStops": "Добавьте минимум 2 остановки, каждую с местом",
+      "hintSeal": "Выберите, когда маршрут откроется, и укажите дату",
+      "hintStopLocation": "У остановки нет места — коснитесь её, чтобы задать",
+      "hintStopTitle": "Дайте название каждой остановке",
+      "removeStopMsg": "Эта остановка и всё её содержимое будут удалены.",
+      "removeStopTitle": "Удалить эту остановку?",
+      "setLocationRequired": "Указать место (обязательно)",
+      "stat_est_time": "Прибл. время",
+      "stopMediaLabel": "Фото / видео (необязательно)"
     },
     "discover": {
       "title": "Обзор",
@@ -9338,7 +9442,10 @@
       "r_location": "स्थान",
       "pinnedLocation": "पिन किया स्थान",
       "addCover": "कवर फ़ोटो जोड़ें",
-      "searchAddress": "पता या स्थान खोजें"
+      "searchAddress": "पता या स्थान खोजें",
+      "locationDenied": "लोकेशन अनुमति बंद है। अपनी मौजूदा लोकेशन इस्तेमाल करने के लिए सेटिंग्स में चालू करें।",
+      "openSettings": "सेटिंग्स खोलें",
+      "searchNoResult": "कोई जगह नहीं मिली — दूसरी खोज आज़माएँ या मैप पर टैप करें"
     },
     "dashboard": {
       "noOpenDate": "खुलने की कोई तारीख तय नहीं",
@@ -9929,7 +10036,17 @@
       "titlePh": "जैसे मॉम का मोहल्ला ट्रेल",
       "viewTrail": "ट्रेल देखें",
       "whenAvailable": "यह कब उपलब्ध होगी?",
-      "setLocation": "स्थान सेट करें"
+      "setLocation": "स्थान सेट करें",
+      "hintName": "जारी रखने के लिए अपने ट्रेल को नाम दें",
+      "hintNeedStops": "कम से कम 2 पड़ाव जोड़ें, हर एक की लोकेशन हो",
+      "hintSeal": "चुनें कि ट्रेल कब अनलॉक हो और तारीख तय करें",
+      "hintStopLocation": "एक पड़ाव की लोकेशन नहीं है — सेट करने के लिए उस पर टैप करें",
+      "hintStopTitle": "हर पड़ाव को एक शीर्षक दें",
+      "removeStopMsg": "यह पड़ाव और इसमें मौजूद सब कुछ हट जाएगा।",
+      "removeStopTitle": "यह पड़ाव हटाएँ?",
+      "setLocationRequired": "लोकेशन सेट करें (आवश्यक)",
+      "stat_est_time": "अनु. समय",
+      "stopMediaLabel": "फ़ोटो / वीडियो (वैकल्पिक)"
     },
     "discover": {
       "title": "खोजें",
@@ -10450,7 +10567,10 @@
       "r_location": "位置",
       "pinnedLocation": "已固定位置",
       "addCover": "添加封面图",
-      "searchAddress": "搜索地址或地点"
+      "searchAddress": "搜索地址或地点",
+      "locationDenied": "定位权限已关闭。请在设置中开启以使用当前位置。",
+      "openSettings": "打开设置",
+      "searchNoResult": "未找到地点 — 换个搜索词或点按地图"
     },
     "dashboard": {
       "noOpenDate": "未设置开启日期",
@@ -11041,7 +11161,17 @@
       "titlePh": "如：妈妈的街区路线",
       "viewTrail": "查看路线",
       "whenAvailable": "何时开放？",
-      "setLocation": "设置位置"
+      "setLocation": "设置位置",
+      "hintName": "为路线命名以继续",
+      "hintNeedStops": "至少添加 2 个站点，每个都要有位置",
+      "hintSeal": "选择路线何时解锁并设置日期",
+      "hintStopLocation": "有个站点缺少位置 — 点按它来设置",
+      "hintStopTitle": "给每个站点起个标题",
+      "removeStopMsg": "该站点及其全部内容将被删除。",
+      "removeStopTitle": "删除该站点？",
+      "setLocationRequired": "设置位置（必填）",
+      "stat_est_time": "预计时间",
+      "stopMediaLabel": "照片 / 视频（可选）"
     },
     "discover": {
       "title": "发现",
@@ -11562,7 +11692,10 @@
       "r_location": "場所",
       "pinnedLocation": "ピン留めした場所",
       "addCover": "カバー写真を追加",
-      "searchAddress": "住所や場所を検索"
+      "searchAddress": "住所や場所を検索",
+      "locationDenied": "位置情報の許可がオフです。現在地を使うには設定でオンにしてください。",
+      "openSettings": "設定を開く",
+      "searchNoResult": "場所が見つかりません — 別の検索を試すか地図をタップ"
     },
     "dashboard": {
       "noOpenDate": "開く日が未設定",
@@ -12153,7 +12286,17 @@
       "titlePh": "例：母さんのご近所トレイル",
       "viewTrail": "トレイルを見る",
       "whenAvailable": "いつ公開する？",
-      "setLocation": "場所を設定"
+      "setLocation": "場所を設定",
+      "hintName": "続けるにはトレイルに名前を付けてください",
+      "hintNeedStops": "場所付きの拠点を2つ以上追加してください",
+      "hintSeal": "トレイルが開く時期を選んで日付を設定してください",
+      "hintStopLocation": "場所のない拠点があります — タップして設定してください",
+      "hintStopTitle": "各拠点にタイトルを付けてください",
+      "removeStopMsg": "この拠点とその内容はすべて削除されます。",
+      "removeStopTitle": "この拠点を削除しますか？",
+      "setLocationRequired": "場所を設定（必須）",
+      "stat_est_time": "推定時間",
+      "stopMediaLabel": "写真／動画（任意）"
     },
     "discover": {
       "title": "見つける",

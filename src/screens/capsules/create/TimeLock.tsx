@@ -46,12 +46,16 @@ const TimeLock: React.FC<Props> = ({ mode, onModeChange, date, onDateChange, all
         </View>
       )}
 
-      <TouchableOpacity style={styles.dateBtn} onPress={() => setPickerOpen(true)} activeOpacity={0.8}>
+      <TouchableOpacity
+        style={[styles.dateBtn, !date && { borderColor: accent, backgroundColor: `${accent}14` }]}
+        onPress={() => setPickerOpen(true)}
+        activeOpacity={0.8}
+      >
         <Ionicons name="calendar-outline" size={18} color={accent} />
         <Text style={[styles.dateText, { color: date ? COLORS.text : COLORS.text3 }]}>
           {date ? formatDate(date.toISOString()) : t('createFlow.pickDate')}
         </Text>
-        <Ionicons name="chevron-forward" size={16} color={COLORS.text3} />
+        <Ionicons name="chevron-forward" size={16} color={!date ? accent : COLORS.text3} />
       </TouchableOpacity>
 
       <DatePickerModal

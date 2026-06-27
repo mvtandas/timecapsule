@@ -476,6 +476,10 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
   // flip into the reader early. `locked` here means time-locked (open_at in future).
   const scrollCreatorPreviewing = isScrollCap && locked && isOwner && creatorPreview;
 
+  // Trail creator preview: an owner of a time-locked trail can preview their own
+  // route early. Trails are time-gated only (sealed === locked); not distance-gated.
+  const trailCreatorPreviewing = item?.type === 'trail' && locked && isOwner && creatorPreview;
+
   if (isScrollCap && (!sealed || scrollCreatorPreviewing)) {
     const cover = item.cover_photo_url || mediaUrl;
     return (
@@ -659,8 +663,9 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
         </View>
       </View>
 
-      {/* Center locked (time) */}
-      {locked && (
+      {/* Center locked (time) — hidden while the owner previews their own trail
+          so the lock overlay never overlaps the previewed timeline (B3 overlap). */}
+      {locked && !trailCreatorPreviewing && (
         <View style={styles.centerContent}>
           <View style={styles.lockedCircle}>
             <Ionicons name="lock-closed" size={34} color={COLORS.ember} />
@@ -679,6 +684,19 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
           )}
           {/* Scroll creator preview: flip into the article reader early. */}
           {isScrollCap && isOwner && (
+            <TouchableOpacity
+              style={styles.previewAsCreatorBtn}
+              onPress={() => setCreatorPreview(true)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="eye-outline" size={16} color={COLORS.ember} />
+              <Text style={styles.previewAsCreatorText}>
+                {t('capDetail.previewAsCreator', { defaultValue: 'Preview as creator' })}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {/* Trail creator preview: flip into the route timeline early. */}
+          {item?.type === 'trail' && isOwner && (
             <TouchableOpacity
               style={styles.previewAsCreatorBtn}
               onPress={() => setCreatorPreview(true)}
@@ -778,8 +796,11 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
         ) : null}
         {item?.media_type === 'audio' && mediaUrl && !sealed && !whisperRecipientGated && <AudioPlayer uri={mediaUrl} />}
 
-        {/* Trail walking */}
-        {item?.type === 'trail' && trailStops.length > 0 && (() => {
+        {/* Trail walking — only when the trail is open OR the owner is previewing.
+            Gating by (!sealed || trailCreatorPreviewing) closes the non-owner
+            pre-open leak (B4) and prevents the timeline overlapping the lock
+            overlay (B3). */}
+        {item?.type === 'trail' && trailStops.length > 0 && (!sealed || trailCreatorPreviewing) && (() => {
           const gold = getCapType('trail').color;
           const done = currentIdx >= trailStops.length;
           // Trail completion summary stats (demo 7446).
@@ -796,7 +817,28 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
             timeLabel ? { label: t('capDetail.statTime', { defaultValue: 'Time' }), value: timeLabel } : null,
           ].filter(Boolean) as { label: string; value: string }[];
           return (
+            <ScrollView
+              style={styles.trailBodyScroll}
+              contentContainerStyle={styles.trailBodyScrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
             <View style={styles.extraSection}>
+              {/* Creator preview banner — owner is previewing a still-sealed trail. */}
+              {trailCreatorPreviewing && (
+                <View style={styles.creatorPreviewBanner}>
+                  <Ionicons name="eye-outline" size={14} color={COLORS.ember} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.creatorPreviewLabel}>{t('capDetail.creatorPreview', { defaultValue: 'Creator preview' })}</Text>
+                    <Text style={styles.creatorPreviewSub}>
+                      {t('capDetail.creatorPreviewSub', { defaultValue: 'Only you can see this. Readers see a sealed state until it opens.' })}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setCreatorPreview(false)} style={styles.creatorPreviewExit} activeOpacity={0.8}>
+                    <Text style={styles.creatorPreviewExitText}>{t('capDetail.exitPreview', { defaultValue: 'Exit preview' })}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
               <Text style={styles.extraSectionTitle}>
                 {done
                   ? t('capDetail.trailStopsCount', { count: trailStops.length })
@@ -931,7 +973,7 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
               })()}
 
               {!done && trailViewMode === 'timeline' && (
-              <ScrollView style={styles.extraScroll} keyboardShouldPersistTaps="handled">
+              <ScrollView style={styles.extraScroll} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
                 {trailStops.map((stop, idx) => {
                   const isDone = completed.includes(idx);
                   const isCurrent = idx === currentIdx && !done;
@@ -1070,6 +1112,7 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
               </ScrollView>
               )}
             </View>
+            </ScrollView>
           );
         })()}
 
@@ -1868,6 +1911,16 @@ const styles = StyleSheet.create({
   },
   extraScroll: {
     maxHeight: 180,
+  },
+  // Trail body wrapper — lets long trails (many stops / map open) scroll within
+  // the modal instead of overflowing the bottom-anchored content and clipping
+  // the start / map-toggle / progress controls off-screen (U4).
+  trailBodyScroll: {
+    maxHeight: height * 0.55,
+    marginBottom: 10,
+  },
+  trailBodyScrollContent: {
+    flexGrow: 1,
   },
   trailStopRow: {
     flexDirection: 'row',

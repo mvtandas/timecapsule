@@ -1,7 +1,8 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, Image, StyleSheet, Alert, ScrollView,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView,
 } from 'react-native';
+import type { ScrollView as RNScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, RADIUS, SPACING, font } from '../../../constants/theme';
@@ -15,8 +16,8 @@ import { useT } from '../../../i18n';
 import WizardShell from './WizardShell';
 import CoverPicker from './CoverPicker';
 import TimeLock, { TimeMode } from './TimeLock';
-import LocationPicker, { PickedLocation } from './LocationPicker';
-import MediaPicker, { PickedMedia } from './MediaPicker';
+import LocationPicker from './LocationPicker';
+import MediaPicker from './MediaPicker';
 import ExitWarningSheet from './ExitWarningSheet';
 import ShareSheet from '../../../components/ShareSheet';
 import { Heading, CategoryPicker, TRAIL_CATEGORIES, uploadUri } from './CreateBits';
@@ -72,13 +73,12 @@ const TrailCreate: React.FC<Props> = ({ onClose, onNavigate, onSealed, onViewCap
 
   // ── Step 1: Stops ─────────────────────────────────────────────
   const [stops, setStops] = useState<DraftStop[]>([]);
-  const [adding, setAdding] = useState(false);
   // Which existing stop currently has its location editor open (inline).
   const [editLocKey, setEditLocKey] = useState<string | null>(null);
-  const [sTitle, setSTitle] = useState('');
-  const [sLoc, setSLoc] = useState<PickedLocation | null>(null);
-  const [sMedia, setSMedia] = useState<PickedMedia | null>(null);
-  const [sMsg, setSMsg] = useState('');
+  // Body scroll ref (lives in WizardShell) so adding a stop can reveal it.
+  const scrollRef = useRef<RNScrollView>(null);
+  // Title input refs per stop key, so a freshly-added stop autofocuses its title.
+  const titleRefs = useRef<Record<string, TextInput | null>>({});
 
   // ── Step 2: Seal ──────────────────────────────────────────────
   const [mode, setMode] = useState<TimeMode>('locked');
@@ -115,7 +115,11 @@ const TrailCreate: React.FC<Props> = ({ onClose, onNavigate, onSealed, onViewCap
   // ── Stop list mutations ───────────────────────────────────────
   const updateStop = (key: string, updates: Partial<DraftStop>) =>
     setStops((prev) => prev.map((s) => (s.key === key ? { ...s, ...updates } : s)));
-  const removeStop = (key: string) => setStops((prev) => prev.filter((s) => s.key !== key));
+  const removeStop = (key: string) => {
+    delete titleRefs.current[key];
+    if (editLocKey === key) setEditLocKey(null);
+    setStops((prev) => prev.filter((s) => s.key !== key));
+  };
   const moveStop = (i: number, dir: -1 | 1) =>
     setStops((prev) => {
       const j = i + dir;
@@ -125,34 +129,73 @@ const TrailCreate: React.FC<Props> = ({ onClose, onNavigate, onSealed, onViewCap
       return next;
     });
 
-  const resetAddForm = () => { setSTitle(''); setSLoc(null); setSMedia(null); setSMsg(''); };
-  const addStop = () => {
-    if (!sTitle.trim()) return;
+  /** True if a stop carries any user-authored content worth confirming before deletion. */
+  const stopHasContent = (s: DraftStop) =>
+    !!(s.title?.trim() || s.content?.trim() || s.tip?.trim() || s.photo_url || s.lat != null || s.lng != null);
+
+  /** Delete with a confirm step only when the stop has authored content. */
+  const confirmRemoveStop = (s: DraftStop) => {
+    if (!stopHasContent(s)) { removeStop(s.key); return; }
+    Alert.alert(
+      t('trailEditor.removeStopTitle', { defaultValue: 'Remove this stop?' }),
+      t('trailEditor.removeStopMsg', { defaultValue: 'This stop and everything in it will be deleted.' }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.delete', { defaultValue: 'Delete' }), style: 'destructive', onPress: () => removeStop(s.key) },
+      ],
+    );
+  };
+
+  /** Append a fresh empty stop, then autofocus its title + scroll it into view. */
+  const appendStop = () => {
+    const key = uuidv4();
     setStops((prev) => [
       ...prev,
       {
-        key: uuidv4(),
+        key,
         ordinal: prev.length,
-        title: sTitle.trim(),
-        location_name: sLoc?.name || null,
-        lat: sLoc?.lat ?? null,
-        lng: sLoc?.lng ?? null,
-        content: sMsg.trim() || null,
+        title: '',
+        location_name: null,
+        lat: null,
+        lng: null,
+        content: null,
         tip: null,
-        photo_url: sMedia && sMedia.type !== 'audio' ? sMedia.uri : null,
-        media_uri: sMedia && sMedia.type !== 'audio' ? sMedia.uri : null,
-        media_type: sMedia?.type === 'video' ? 'video' : 'image',
+        photo_url: null,
+        media_uri: null,
+        media_type: 'image',
         estimated_minutes: 30,
       },
     ]);
-    resetAddForm();
-    setAdding(false);
+    setEditLocKey(null);
+    // Focus the new stop's title and reveal it (rendered at the end of the list).
+    setTimeout(() => {
+      titleRefs.current[key]?.focus();
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 350);
   };
 
   // ── Validation / step gating ──────────────────────────────────
   const dirty = !!(title || desc || cover || stops.length);
   const timeValid = !!date; // locked → date set, expires → date set
-  const canAdvance = step === 0 ? !!title.trim() : step === 1 ? stops.length >= 2 : timeValid;
+  // A trail is GPS-locked: every stop needs a title AND coordinates, and there must be ≥2.
+  const stopsComplete =
+    stops.length >= 2 &&
+    stops.every((s) => !!s.title?.trim() && s.lat != null && s.lng != null);
+  const canAdvance = step === 0 ? !!title.trim() : step === 1 ? stopsComplete : timeValid;
+
+  // ── Per-step hint explaining a disabled primary button ────────
+  const stepHint = (() => {
+    if (step === 0) return title.trim() ? undefined : t('trailEditor.hintName', { defaultValue: 'Name your trail to continue' });
+    if (step === 1) {
+      if (stops.length < 2) return t('trailEditor.hintNeedStops', { defaultValue: 'Add at least 2 stops, each with a location' });
+      if (stops.some((s) => !s.title?.trim()))
+        return t('trailEditor.hintStopTitle', { defaultValue: 'Give every stop a title' });
+      if (stops.some((s) => s.lat == null || s.lng == null))
+        return t('trailEditor.hintStopLocation', { defaultValue: 'A stop is missing its location — tap it to set one' });
+      return undefined;
+    }
+    return timeValid ? undefined : t('trailEditor.hintSeal', { defaultValue: 'Choose when the trail unlocks and set a date' });
+  })();
 
   // ── Seal: create cap + persist stops in one shot ──────────────
   const seal = async () => {
@@ -249,7 +292,7 @@ const TrailCreate: React.FC<Props> = ({ onClose, onNavigate, onSealed, onViewCap
           <View style={styles.statDivider} />
           <Stat value={`${totalDistanceKm.toFixed(1)} km`} label={t('trailEditor.stat_distance', { defaultValue: 'Distance' })} accent={accent} />
           <View style={styles.statDivider} />
-          <Stat value={formatTotalTime(totalMinutes)} label={t('trailEditor.stat_time', { defaultValue: 'Time' })} accent={accent} />
+          <Stat value={formatTotalTime(totalMinutes)} label={t('trailEditor.stat_est_time', { defaultValue: 'Est. time' })} accent={accent} />
         </View>
 
         <View style={styles.sealedActions}>
@@ -284,10 +327,11 @@ const TrailCreate: React.FC<Props> = ({ onClose, onNavigate, onSealed, onViewCap
     <>
       <WizardShell
         title={getCapType('trail').name} accent={accent} stepIndex={step} steps={STEPS}
+        scrollRef={scrollRef}
         onClose={() => (dirty ? setShowExit(true) : onClose())}
         onBack={() => setStep((s) => Math.max(0, s - 1))}
         primaryLabel={step === STEPS - 1 ? t('trailEditor.sealCta', { defaultValue: 'Seal this Trail  →' }) : t('createFlow.next')}
-        primaryDisabled={!canAdvance} loading={sealing}
+        primaryDisabled={!canAdvance} hintText={stepHint} loading={sealing}
         onPrimary={() => (step === STEPS - 1 ? seal() : setStep((s) => s + 1))}
       >
         {/* Labeled stepper to mirror the demo ("1. Name · 2. Stops · 3. Seal"). */}
@@ -341,31 +385,55 @@ const TrailCreate: React.FC<Props> = ({ onClose, onNavigate, onSealed, onViewCap
                     <TouchableOpacity onPress={() => moveStop(i, 1)} disabled={i === stops.length - 1} style={styles.iconBtn} hitSlop={6}>
                       <Ionicons name="chevron-down" size={18} color={i === stops.length - 1 ? COLORS.text3 : COLORS.text2} />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => removeStop(s.key)} style={styles.iconBtn} hitSlop={6}>
+                    {/* Spacer so the trash isn't mis-tapped next to the reorder chevrons. */}
+                    <View style={styles.trashSpacer} />
+                    <TouchableOpacity onPress={() => confirmRemoveStop(s)} style={styles.iconBtn} hitSlop={6} accessibilityRole="button" accessibilityLabel={t('common.delete', { defaultValue: 'Delete' })}>
                       <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
                     </TouchableOpacity>
                   </View>
                 </View>
 
-                <TextInput style={styles.stopInput} value={s.title || ''} onChangeText={(v) => updateStop(s.key, { title: v })} placeholder={t('trailEditor.stopTitlePh', { defaultValue: "Stop title (e.g. Joe's Pizza)" })} placeholderTextColor={COLORS.text3} />
+                <TextInput
+                  ref={(r) => { titleRefs.current[s.key] = r; }}
+                  style={styles.stopInput}
+                  value={s.title || ''}
+                  onChangeText={(v) => updateStop(s.key, { title: v })}
+                  placeholder={t('trailEditor.stopTitlePh', { defaultValue: "Stop title (e.g. Joe's Pizza)" })}
+                  placeholderTextColor={COLORS.text3}
+                />
 
-                <TouchableOpacity
-                  style={styles.locRow}
-                  onPress={() => setEditLocKey((k) => (k === s.key ? null : s.key))}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                >
-                  <Ionicons name="location" size={14} color={s.location_name ? accent : COLORS.text3} />
-                  <Text style={[styles.locText, { color: s.location_name ? COLORS.text : COLORS.text3 }]} numberOfLines={1}>
-                    {s.location_name || t('trailEditor.setLocation', { defaultValue: 'Set location' })}
-                  </Text>
-                  <Ionicons name={editLocKey === s.key ? 'chevron-up' : 'pencil'} size={14} color={COLORS.text3} />
-                </TouchableOpacity>
+                {(() => {
+                  const hasLoc = s.lat != null && s.lng != null;
+                  return (
+                    <TouchableOpacity
+                      style={[styles.locRow, !hasLoc && { borderColor: accent, backgroundColor: `${accent}14` }]}
+                      onPress={() => setEditLocKey((k) => (k === s.key ? null : s.key))}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                    >
+                      <Ionicons name="location" size={14} color={accent} />
+                      <Text style={[styles.locText, { color: hasLoc ? COLORS.text : accent }]} numberOfLines={1}>
+                        {hasLoc
+                          ? (s.location_name || t('createFlow.pinnedLocation'))
+                          : t('trailEditor.setLocationRequired', { defaultValue: 'Set location (required)' })}
+                      </Text>
+                      <Ionicons name={editLocKey === s.key ? 'chevron-up' : 'pencil'} size={14} color={hasLoc ? COLORS.text3 : accent} />
+                    </TouchableOpacity>
+                  );
+                })()}
                 {editLocKey === s.key && (
                   <View style={{ marginBottom: SPACING.sm }}>
                     <LocationPicker
                       value={s.lat != null && s.lng != null ? { lat: s.lat, lng: s.lng, name: s.location_name || undefined } : null}
-                      onChange={(v) => updateStop(s.key, { lat: v.lat, lng: v.lng, location_name: v.name || null })}
+                      onChange={(v) =>
+                        updateStop(s.key, {
+                          lat: v.lat,
+                          lng: v.lng,
+                          // A map tap without a reverse-geocoded name must NOT clear a set
+                          // location — keep a fallback label so a pinned stop never reads as unset.
+                          location_name: v.name || t('createFlow.pinnedLocation'),
+                        })
+                      }
                       accent={accent}
                     />
                   </View>
@@ -376,15 +444,20 @@ const TrailCreate: React.FC<Props> = ({ onClose, onNavigate, onSealed, onViewCap
                 <Text style={[styles.miniLabel, { color: accent }]}>{t('trailEditor.tipLabel', { defaultValue: 'Pro tip (optional)' })}</Text>
                 <TextInput style={[styles.stopInput, { backgroundColor: `${accent}14`, borderColor: `${accent}4D` }]} value={s.tip || ''} onChangeText={(v) => updateStop(s.key, { tip: v })} placeholder={t('trailEditor.tipPlaceholder', { defaultValue: 'Insider advice (e.g. Order the truffle pizza)' })} placeholderTextColor={COLORS.text3} />
 
-                {!!s.photo_url && (
-                  <View style={styles.stopThumbWrap}>
-                    <Image source={{ uri: s.photo_url }} style={styles.stopThumb} resizeMode="cover" />
-                    {s.media_type === 'video' && <View style={styles.thumbPlay}><Ionicons name="play-circle" size={32} color={COLORS.white} /></View>}
-                    <TouchableOpacity style={styles.thumbRemove} onPress={() => updateStop(s.key, { photo_url: null, media_uri: null })} hitSlop={6}>
-                      <Ionicons name="close" size={14} color={COLORS.white} />
-                    </TouchableOpacity>
-                  </View>
-                )}
+                {/* Photo/video for this stop (no voice — trail stops have no audio slot). */}
+                <Text style={styles.miniLabel}>{t('trailEditor.stopMediaLabel', { defaultValue: 'Photo / video (optional)' })}</Text>
+                <MediaPicker
+                  allowVoice={false}
+                  media={s.photo_url ? { uri: s.photo_url, type: s.media_type === 'video' ? 'video' : 'image' } : null}
+                  onChange={(m) =>
+                    updateStop(s.key, {
+                      photo_url: m ? m.uri : null,
+                      media_uri: m ? m.uri : null,
+                      media_type: m?.type === 'video' ? 'video' : 'image',
+                    })
+                  }
+                  accent={accent}
+                />
 
                 <View style={styles.estRow}>
                   <Text style={styles.estLabel}>{t('trailEditor.estLabel', { defaultValue: 'Estimated time:' })}</Text>
@@ -409,35 +482,18 @@ const TrailCreate: React.FC<Props> = ({ onClose, onNavigate, onSealed, onViewCap
                 <View style={styles.statDivider} />
                 <Stat value={`${totalDistanceKm.toFixed(1)} km`} label={t('trailEditor.stat_distance', { defaultValue: 'Distance' })} accent={accent} />
                 <View style={styles.statDivider} />
-                <Stat value={formatTotalTime(totalMinutes)} label={t('trailEditor.stat_time', { defaultValue: 'Time' })} accent={accent} />
+                <Stat value={formatTotalTime(totalMinutes)} label={t('trailEditor.stat_est_time', { defaultValue: 'Est. time' })} accent={accent} />
               </View>
             )}
 
-            {/* Add-stop inline form. */}
-            {adding ? (
-              <View style={[styles.addForm, { borderColor: `${accent}4D` }]}>
-                <TextInput style={styles.stopInput} value={sTitle} onChangeText={setSTitle} placeholder={t('trailEditor.nameStopPh', { defaultValue: 'Name this stop' })} placeholderTextColor={COLORS.text3} autoFocus />
-                <LocationPicker value={sLoc} onChange={setSLoc} accent={accent} />
-                <MediaPicker media={sMedia} onChange={setSMedia} accent={accent} />
-                <TextInput style={[styles.stopInput, styles.multiline]} value={sMsg} onChangeText={setSMsg} placeholder={t('trailEditor.stopMsgPh', { defaultValue: 'Leave a message for this stop...' })} placeholderTextColor={COLORS.text3} multiline />
-                <View style={styles.addFormActions}>
-                  <TouchableOpacity style={styles.cancelBtn} onPress={() => { resetAddForm(); setAdding(false); }} activeOpacity={0.85}>
-                    <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.addToTrailBtn, { backgroundColor: accent, opacity: sTitle.trim() ? 1 : 0.4 }]} onPress={addStop} disabled={!sTitle.trim()} activeOpacity={0.9}>
-                    <Text style={styles.addToTrailText}>{t('trailEditor.addToTrail', { defaultValue: 'Add to trail  →' })}</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : (
-              <TouchableOpacity style={[styles.addBtn, { borderColor: `${accent}80`, backgroundColor: `${accent}14` }]} onPress={() => setAdding(true)} activeOpacity={0.85}>
-                <Ionicons name="add" size={20} color={accent} />
-                <Text style={[styles.addBtnText, { color: accent }]}>{t('trailEditor.addStop', { defaultValue: 'Add a stop' })}</Text>
-              </TouchableOpacity>
-            )}
+            {/* Add a stop: appends an empty stop and opens its editor (the card IS the editor). */}
+            <TouchableOpacity style={[styles.addBtn, { borderColor: `${accent}80`, backgroundColor: `${accent}14` }]} onPress={appendStop} activeOpacity={0.85} accessibilityRole="button">
+              <Ionicons name="add" size={20} color={accent} />
+              <Text style={[styles.addBtnText, { color: accent }]}>{t('trailEditor.addStop', { defaultValue: 'Add a stop' })}</Text>
+            </TouchableOpacity>
 
-            {stops.length < 2 && !adding && (
-              <Text style={styles.note}>{t('trailEditor.needTwoStops', { defaultValue: 'Add at least 2 stops to continue' })}</Text>
+            {stops.length < 2 && (
+              <Text style={styles.note}>{t('trailEditor.needTwoStops', { defaultValue: 'Add at least 2 stops, each with a location' })}</Text>
             )}
           </View>
         )}
@@ -540,6 +596,7 @@ const styles = StyleSheet.create({
   stopHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   stopHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   stopHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  trashSpacer: { width: SPACING.md },
   ordinalBadge: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   ordinalText: { ...font('labelBold'), color: COLORS.bg },
   stopEyebrow: { ...font('eyebrow'), color: COLORS.text3 },
@@ -548,11 +605,7 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 70, textAlignVertical: 'top' },
   locRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, backgroundColor: COLORS.bg3, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, paddingHorizontal: SPACING.md, paddingVertical: SPACING.md },
   locText: { ...font('caption'), flex: 1 },
-  miniLabel: { ...font('eyebrow') },
-  stopThumbWrap: { borderRadius: RADIUS.md, overflow: 'hidden' },
-  stopThumb: { width: '100%', height: 140, backgroundColor: COLORS.bg3 },
-  thumbPlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
-  thumbRemove: { position: 'absolute', top: SPACING.sm, right: SPACING.sm, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' },
+  miniLabel: { ...font('eyebrow'), color: COLORS.text2 },
   estRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   estLabel: { ...font('caption'), color: COLORS.text3 },
   estChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: COLORS.bg3, borderWidth: 1, borderColor: COLORS.border },
@@ -565,13 +618,7 @@ const styles = StyleSheet.create({
   statLabel: { ...font('eyebrow'), color: COLORS.text3, marginTop: 2 },
   statDivider: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', backgroundColor: COLORS.border },
 
-  // Add-stop form
-  addForm: { backgroundColor: COLORS.card, borderWidth: 1, borderRadius: RADIUS.lg, padding: SPACING.md, gap: SPACING.md },
-  addFormActions: { flexDirection: 'row', gap: SPACING.sm },
-  cancelBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.bg3 },
-  cancelBtnText: { ...font('labelBold'), color: COLORS.text2 },
-  addToTrailBtn: { flex: 2, alignItems: 'center', justifyContent: 'center', paddingVertical: SPACING.md, borderRadius: RADIUS.md },
-  addToTrailText: { ...font('labelBold'), color: COLORS.bg },
+  // Add-stop button
   addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderStyle: 'dashed' },
   addBtnText: { ...font('labelBold') },
   note: { ...font('caption'), color: COLORS.text3, textAlign: 'center', marginTop: SPACING.sm },
