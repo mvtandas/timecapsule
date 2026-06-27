@@ -48,6 +48,11 @@ import { useT } from '../i18n';
 
 const { width, height } = Dimensions.get('window');
 
+// Reverse-geocode cache (rounded lat,lng → place) shared across all detail
+// opens. The OS geocoder is rate-limited, so we cache and only call it when a
+// cap has no stored location_name.
+const geocodeCache = new Map<string, string>();
+
 // Rough word count across scroll body blocks → drives the "N min read" byline.
 function countScrollWords(blocks: any[]): number {
   if (!Array.isArray(blocks)) return 0;
@@ -135,7 +140,10 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
     setShowReveal(false);
     revealFiredRef.current = false;
     if (item?.owner_id) loadOwner(item.owner_id);
-    if (item?.lat && item?.lng) loadAddress(item.lat, item.lng);
+    // Prefer the cap's stored place name; only hit the (rate-limited) geocoder
+    // when there's no name to show.
+    if (item?.location_name) setAddress(item.location_name);
+    else if (item?.lat && item?.lng) loadAddress(item.lat, item.lng);
     if (item?.id) loadCommentCount();
     if (item?.id) loadSaved();
     if (item?.id && item?.type === 'trail') { loadTrailStops(); loadTrailProgress(); loadTrailCompletions(); }
@@ -414,13 +422,17 @@ const CapsulePage = ({ item, onClose, onOwnerPress, onPause }: { item: any; onCl
   };
 
   const loadAddress = async (lat: number, lng: number) => {
+    const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+    const cached = geocodeCache.get(key);
+    if (cached) { setAddress(cached); return; }
     try {
       const results = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
       if (results.length > 0) {
         const a = results[0];
-        setAddress([a.city, a.region].filter(Boolean).join(', '));
+        const name = [a.city, a.region].filter(Boolean).join(', ');
+        if (name) { geocodeCache.set(key, name); setAddress(name); }
       }
-    } catch (e) { if (__DEV__) console.error(e); }
+    } catch { /* OS geocoder rate-limit / offline — non-fatal, leave address unset */ }
   };
 
   const mediaUrl = getMediaUrl(item);
