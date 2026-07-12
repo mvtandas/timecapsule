@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../store/authStore';
 import { COLORS, font, SHADOWS } from '../../constants/theme';
 import { VoorcapMark } from '../../components/common/VoorcapLogo';
+import SocialAuthButtons from '../../components/auth/SocialAuthButtons';
 import { useT } from '../../i18n';
 
 interface SignupScreenProps {
@@ -293,14 +294,13 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigate, onSignup, onGoB
           </Text>
         </View>
 
+        {/* Social sign-up */}
+        <View style={styles.socialWrap}>
+          <SocialAuthButtons showDivider />
+        </View>
+
         {/* Footer */}
         <View style={styles.footer}>
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>{t('common.or')}</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
           <TouchableOpacity onPress={() => onNavigate('Login')}>
             <Text style={styles.footerText}>
               {t('auth.haveAccount')}
@@ -431,6 +431,10 @@ const styles = StyleSheet.create({
   },
   footer: {
     alignItems: 'center',
+  },
+  socialWrap: {
+    marginTop: 20,
+    marginBottom: 20,
   },
   divider: {
     flexDirection: 'row',

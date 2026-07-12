@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ImageBackground, StyleSheet, Dimensions }
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, font, SHADOWS } from '../../constants/theme';
 import { VoorcapWordmark } from '../../components/common/VoorcapLogo';
+import SocialAuthButtons from '../../components/auth/SocialAuthButtons';
 import { useT } from '../../i18n';
 
 const { height } = Dimensions.get('window');
@@ -63,6 +64,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onNavigate }) => {
         >
           <Text style={styles.secondaryButtonText}>{t('welcome.logIn')}</Text>
         </TouchableOpacity>
+
+        <SocialAuthButtons showDivider />
       </View>
     </View>
   );

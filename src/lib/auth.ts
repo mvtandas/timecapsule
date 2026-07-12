@@ -1,5 +1,41 @@
+import { Platform } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { supabase } from './supabase';
 import { User } from '../types';
+
+// Finish any pending web-auth session on app resume (Google flow).
+WebBrowser.maybeCompleteAuthSession();
+
+/**
+ * Pull the tokens/code a provider hands back on the redirect URL. Supabase may
+ * return either an OAuth `code` (PKCE) in the query string or `access_token` /
+ * `refresh_token` in the URL fragment (implicit) depending on the flow — handle
+ * both so Google sign-in works regardless of the client's flowType.
+ */
+function parseAuthRedirect(url: string): {
+  code?: string;
+  access_token?: string;
+  refresh_token?: string;
+} {
+  const result: { code?: string; access_token?: string; refresh_token?: string } = {};
+  const readParams = (raw: string) => {
+    for (const pair of raw.split('&')) {
+      const [k, v] = pair.split('=');
+      if (!k) continue;
+      const val = decodeURIComponent(v || '');
+      if (k === 'code') result.code = val;
+      if (k === 'access_token') result.access_token = val;
+      if (k === 'refresh_token') result.refresh_token = val;
+    }
+  };
+  const queryIndex = url.indexOf('?');
+  const hashIndex = url.indexOf('#');
+  if (queryIndex >= 0) readParams(url.substring(queryIndex + 1, hashIndex >= 0 ? hashIndex : undefined));
+  if (hashIndex >= 0) readParams(url.substring(hashIndex + 1));
+  return result;
+}
 
 export class AuthService {
   // Sign up with email and password
@@ -116,13 +152,121 @@ export class AuthService {
       const { data, error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: 'timecapsule://auth/callback',
+          emailRedirectTo: 'voorcap://auth/callback',
         },
       });
 
       return { data, error };
     } catch (error) {
       return { data: null, error };
+    }
+  }
+
+  /**
+   * Whether native Sign in with Apple is available (iOS 13+ real device/build).
+   * Use this to decide whether to render the Apple button.
+   */
+  static async isAppleAuthAvailable(): Promise<boolean> {
+    if (Platform.OS !== 'ios') return false;
+    try {
+      return await AppleAuthentication.isAvailableAsync();
+    } catch {
+      return false;
+    }
+  }
+
+  // Sign in with Apple (native token flow → Supabase)
+  static async signInWithApple(): Promise<{ data: any; error: any; canceled?: boolean }> {
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (!credential.identityToken) {
+        throw new Error('Apple did not return an identity token');
+      }
+
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+      });
+      if (error) throw error;
+
+      // Apple only returns the full name on the FIRST authorization. Persist it
+      // so the profile isn't left nameless. onAuthStateChange auto-creates the
+      // profile row; we just fill in the display name when we have one.
+      const fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      if (fullName && data.user) {
+        await supabase
+          .from('profiles')
+          .update({ display_name: fullName } as any)
+          .eq('id', data.user.id)
+          .is('display_name', null);
+      }
+
+      return { data, error: null };
+    } catch (error: any) {
+      // User tapped "Cancel" in the Apple sheet — not a real error.
+      if (error?.code === 'ERR_REQUEST_CANCELED' || error?.code === 'ERR_CANCELED') {
+        return { data: null, error: null, canceled: true };
+      }
+      return { data: null, error };
+    }
+  }
+
+  // Sign in with Google (Supabase OAuth via in-app browser)
+  static async signInWithGoogle(): Promise<{ data: any; error: any; canceled?: boolean }> {
+    try {
+      const redirectTo = Linking.createURL('auth/callback');
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo, skipBrowserRedirect: true },
+      });
+      if (error) throw error;
+      if (!data?.url) throw new Error('Could not start Google sign-in');
+
+      const res = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+      // User dismissed the browser / canceled.
+      if (res.type !== 'success' || !res.url) {
+        return { data: null, error: null, canceled: true };
+      }
+
+      const { error: sessionErr } = await AuthService.setSessionFromUrl(res.url);
+      if (sessionErr) throw sessionErr;
+
+      return { data: null, error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Establish a Supabase session from a deep-link URL. Used by the Google OAuth
+   * callback and the password-recovery link. Handles both PKCE (`?code=`) and
+   * implicit (`#access_token=...`) responses.
+   */
+  static async setSessionFromUrl(url: string): Promise<{ error: any }> {
+    try {
+      const { code, access_token, refresh_token } = parseAuthRedirect(url);
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        return { error };
+      }
+      if (access_token && refresh_token) {
+        const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+        return { error };
+      }
+      return { error: new Error('No auth tokens found in URL') };
+    } catch (error) {
+      return { error };
     }
   }
 
@@ -297,7 +441,7 @@ export class AuthService {
   static async resetPassword(email: string) {
     try {
       const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'timecapsule://auth/reset-password',
+        redirectTo: 'voorcap://auth/reset-password',
       });
 
       return { data, error };

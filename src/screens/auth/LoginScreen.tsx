@@ -6,6 +6,7 @@ import { useAuthStore } from '../../store/authStore';
 import { AuthService } from '../../lib/auth';
 import { COLORS, font, SHADOWS } from '../../constants/theme';
 import { VoorcapMark } from '../../components/common/VoorcapLogo';
+import SocialAuthButtons from '../../components/auth/SocialAuthButtons';
 import { useT } from '../../i18n';
 
 interface LoginScreenProps {
@@ -172,16 +173,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigate, onLogin, onGoBack
           }}>
             <Text style={styles.forgotPasswordText}>{t('auth.forgotPassword')}</Text>
           </TouchableOpacity>
+
+          <View style={styles.socialWrap}>
+            <SocialAuthButtons showDivider onSuccess={onLogin} />
+          </View>
         </View>
 
         {/* Footer */}
         <View style={styles.footer}>
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>{t('common.or')}</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
           <TouchableOpacity onPress={() => onNavigate('Signup')}>
             <Text style={styles.footerText}>
               {t('auth.noAccount')}
@@ -280,6 +279,9 @@ const styles = StyleSheet.create({
   forgotPassword: {
     alignSelf: 'center',
     marginTop: 8,
+  },
+  socialWrap: {
+    marginTop: 24,
   },
   forgotPasswordText: {
     color: COLORS.ember,

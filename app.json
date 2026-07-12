@@ -17,7 +17,8 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.timecapsule.app",
+      "bundleIdentifier": "com.voorcap.app",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Voorcap needs camera access to take photos for your caps and profile picture.",
         "NSPhotoLibraryUsageDescription": "Voorcap needs photo library access to add photos to your caps.",
@@ -26,7 +27,7 @@
       }
     },
     "android": {
-      "package": "com.timecapsule.app",
+      "package": "com.voorcap.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0E1116"
@@ -81,7 +82,8 @@
           "cameraPermission": "Voorcap needs camera access to take photos for your caps and profile picture."
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      "expo-apple-authentication"
     ],
     "notification": {
       "color": "#E8633A",

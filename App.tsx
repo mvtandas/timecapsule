@@ -20,6 +20,8 @@ import OnboardingScreen from './src/screens/auth/OnboardingScreen';
 import WelcomeScreen from './src/screens/auth/WelcomeScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import SignupScreen from './src/screens/auth/SignupScreen';
+import ResetPasswordScreen from './src/screens/auth/ResetPasswordScreen';
+import { AuthService } from './src/lib/auth';
 import DashboardScreen from './src/screens/dashboard/DashboardScreen';
 import MyCapsulesScreen from './src/screens/dashboard/MyCapsulesScreen';
 import CreateCapsuleScreen from './src/screens/capsules/CreateCapsuleScreen';
@@ -28,6 +30,7 @@ import ProfileScreen from './src/screens/profile/ProfileScreen';
 import FriendProfileScreen from './src/screens/friends/FriendProfileScreen';
 import FriendsScreen from './src/screens/friends/FriendsScreen';
 import AccountSettingsScreen from './src/screens/profile/AccountSettingsScreen';
+import BlockedUsersScreen from './src/screens/profile/BlockedUsersScreen';
 import NotificationsScreen from './src/screens/notifications/NotificationsScreen';
 import AchievementsScreen from './src/screens/achievements/AchievementsScreen';
 import SearchScreen from './src/screens/search/SearchScreen';
@@ -141,6 +144,9 @@ function AppStack() {
       <RootStack.Screen name="AccountSettings">
         {({ navigation }) => <AccountSettingsScreen {...makeNav(navigation)} onLogout={signOut} />}
       </RootStack.Screen>
+      <RootStack.Screen name="BlockedUsers">
+        {({ navigation }) => <BlockedUsersScreen {...makeNav(navigation)} />}
+      </RootStack.Screen>
       <RootStack.Screen name="FriendProfile">
         {({ navigation, route }) => (
           <FriendProfileScreen {...makeNav(navigation)} friend={(route.params as any)?.friend} />
@@ -205,6 +211,13 @@ function capIdFromUrl(url?: string | null): string | null {
   return m ? m[1] : null;
 }
 
+// A password-recovery deep link: the reset-password route, or any auth callback
+// carrying a `type=recovery` marker from Supabase.
+function isRecoveryUrl(url?: string | null): boolean {
+  if (!url) return false;
+  return url.includes('auth/reset-password') || url.includes('type=recovery');
+}
+
 // React Navigation's built-in linking handles the WARM case (app running). The
 // manual handler below is the safety net for COLD starts, where the Cap route
 // (authed AppStack only) isn't mounted yet when the URL first resolves.
@@ -233,6 +246,7 @@ export default function App() {
   const [needLang, setNeedLang] = useState<boolean | null>(null);
   const [pendingCap, setPendingCap] = useState<string | null>(null);
   const [navReady, setNavReady] = useState(false);
+  const [recovery, setRecovery] = useState(false);
   const [fontsLoaded] = useFonts({
     Fraunces_600SemiBold,
     Fraunces_700Bold,
@@ -247,15 +261,22 @@ export default function App() {
     useLanguage.getState().init();
   }, []);
 
-  // Capture incoming cap deep links (initial URL + while running).
+  // Capture incoming deep links (initial URL + while running): password-recovery
+  // links take priority over cap links.
   useEffect(() => {
-    Linking.getInitialURL()
-      .then((u) => { const id = capIdFromUrl(u); if (id) setPendingCap(id); })
-      .catch(() => {});
-    const sub = Linking.addEventListener('url', ({ url }) => {
+    const handleUrl = (url?: string | null) => {
+      if (isRecoveryUrl(url)) {
+        // Establish the recovery session, then show the set-new-password screen.
+        AuthService.setSessionFromUrl(url as string).then(({ error }) => {
+          if (!error) setRecovery(true);
+        });
+        return;
+      }
       const id = capIdFromUrl(url);
       if (id) setPendingCap(id);
-    });
+    };
+    Linking.getInitialURL().then(handleUrl).catch(() => {});
+    const sub = Linking.addEventListener('url', ({ url }) => handleUrl(url));
     return () => sub.remove();
   }, []);
 
@@ -315,6 +336,24 @@ export default function App() {
       <View style={styles.loading}>
         <ActivityIndicator size="large" color={COLORS.ember} />
       </View>
+    );
+  }
+
+  // A password-recovery link was opened: force the set-new-password screen over
+  // everything (the recovery link also creates a session, so `user` may be set).
+  if (recovery) {
+    return (
+      <SafeAreaProvider>
+        <ResetPasswordScreen
+          onDone={(changed) => {
+            setRecovery(false);
+            // Cancelled: drop the recovery session so we don't leave the user
+            // authenticated without having chosen a new password.
+            if (!changed) useAuthStore.getState().signOut();
+          }}
+        />
+        <StatusBar style="light" />
+      </SafeAreaProvider>
     );
   }
 

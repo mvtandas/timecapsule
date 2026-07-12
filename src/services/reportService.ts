@@ -5,6 +5,7 @@ export const REPORT_REASONS = [
   'Inappropriate Content',
   'Harassment',
   'Hate Speech',
+  'Criminal Activity',
   'Other',
 ] as const;
 
@@ -123,26 +124,54 @@ export class ReportService {
   }
 
   /**
-   * Get all blocked users
+   * Get all blocked users, joined with the blocked profile's display info.
+   * Two-step fetch (rows, then profiles by id) so we don't depend on a named
+   * FK relationship in the schema. Returns [] on any failure.
    */
-  static async getBlockedUsers(): Promise<any[]> {
+  static async getBlockedUsers(): Promise<BlockedUser[]> {
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return [];
 
-      const { data, error } = await supabase
+      const { data: rows, error } = await supabase
         .from('blocked_users')
-        .select('*')
+        .select('id, blocked_id, created_at')
         .eq('blocker_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) return [];
+      if (error || !rows || rows.length === 0) return [];
 
-      return data || [];
+      const blockedIds = rows.map((r: any) => r.blocked_id);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, username, avatar_url')
+        .in('id', blockedIds);
+
+      const profileById = new Map(
+        (profiles || []).map((p: any) => [p.id, p])
+      );
+
+      return rows.map((r: any) => ({
+        id: r.id,
+        blocked_id: r.blocked_id,
+        created_at: r.created_at,
+        display_name: profileById.get(r.blocked_id)?.display_name ?? null,
+        username: profileById.get(r.blocked_id)?.username ?? null,
+        avatar_url: profileById.get(r.blocked_id)?.avatar_url ?? null,
+      }));
     } catch {
       return [];
     }
   }
+}
+
+export interface BlockedUser {
+  id: string;
+  blocked_id: string;
+  created_at: string;
+  display_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
 }

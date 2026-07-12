@@ -620,13 +620,27 @@ const AccountSettingsScreen = ({ onNavigate, onGoBack, onLogout }: AccountSettin
         {/* Account Group */}
         <Text style={styles.sectionHeader}>{t('settingsMore.section_account')}</Text>
         <View style={styles.card}>
-          {renderMenuItem('notifications-outline', t('settingsMore.menu_notifications'), () => onNavigate('Notifications'), { isLast: true })}
+          {renderMenuItem('notifications-outline', t('settingsMore.menu_notifications'), () => onNavigate('Notifications'))}
+          {renderMenuItem('ban-outline', t('settingsMore.menu_blocked_users', { defaultValue: 'Blocked Users' }), () => onNavigate('BlockedUsers'), { isLast: true })}
         </View>
 
         {/* Support Group */}
         <Text style={styles.sectionHeader}>{t('settingsMore.section_support')}</Text>
         <View style={styles.card}>
-          {renderMenuItem('help-circle-outline', t('settingsMore.menu_help_support'), () => {
+          {renderMenuItem('help-circle-outline', t('settingsMore.menu_help_support'), async () => {
+            // Open the user's mail client pre-addressed to support. Fall back to
+            // the informational alert if no mail app is available.
+            const subject = encodeURIComponent('Voorcap Support');
+            const url = `mailto:support@voorcap.app?subject=${subject}`;
+            try {
+              const canOpen = await Linking.canOpenURL(url);
+              if (canOpen) {
+                await Linking.openURL(url);
+                return;
+              }
+            } catch {
+              // fall through to alert
+            }
             Alert.alert(t('settingsMore.alert_help_title'), t('settingsMore.alert_help_msg'));
           })}
           {renderMenuItem('document-text-outline', t('settingsMore.menu_terms', { defaultValue: 'Terms of Service' }), () => {
